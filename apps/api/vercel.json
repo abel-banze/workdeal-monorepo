@@ -1,15 +1,10 @@
 {
   "version": 2,
-  "builds": [
+  "buildCommand": "pnpm --filter @workdeal/api build",
+  "rewrites": [
     {
-      "src": "dist/index.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "dist/index.js"
+      "source": "/(.*)",
+      "destination": "/api"
     }
   ]
 }

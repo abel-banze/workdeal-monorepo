@@ -324,7 +324,20 @@ app.notFound(() => {
 
 app.onError(errorHandler);
 
-export default {
+// Export para Vercel (@vercel/node): suporta Hono via `export default app` ou `{ fetch }`.
+// Para Bun dev (`bun run src/index.ts`) mantemos compatibilidade com `port`.
+const handler = {
   port: env.PORT,
   fetch: app.fetch,
 };
+
+// Vercel: prefere default = app (Web Standards) — usar `app` garante routing correto.
+// Bun: precisa de { port, fetch } para auto-serve.
+export default app;
+export { handler };
+// Compat Bun: se for executado directamente, inicia servidor (Vercel importa, não executa como main)
+// @ts-ignore - Bun global existe apenas em runtime Bun
+if (typeof Bun !== "undefined" && (import.meta as unknown as { main?: boolean }).main) {
+  // @ts-ignore
+  Bun.serve(handler);
+}
