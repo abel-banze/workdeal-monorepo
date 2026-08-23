@@ -1,5 +1,5 @@
-import { db } from "./client";
-import { category, badge, tag } from "./schema";
+import { db } from "./client.js";
+import { category, badge, tag } from "./schema.js";
 
 // Taxonomia Workdeal — 8 domínios L1 + 42 subcategorias L2
 // PT-MZ, slugs estáveis, serve directório e onboarding. Preserva slugs antigos para retrocompatibilidade.
@@ -140,7 +140,8 @@ export async function seed() {
   console.log("Seed concluído.");
 }
 
-if (import.meta.main) {
+// @ts-ignore - Bunism, tsc nodenext não tem `main` em ImportMeta
+if ((import.meta as unknown as { main?: boolean }).main) {
   seed()
     .then(() => process.exit(0))
     .catch((e) => {

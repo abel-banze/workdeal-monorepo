@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "build": "tsc",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
@@ -19,15 +20,15 @@
     "typescript": "^5"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./lib/env": "./src/lib/env.ts",
-    "./lib/logger": "./src/lib/logger.ts",
-    "./lib/geo": "./src/lib/geo.ts",
-    "./lib/rate-limit": "./src/lib/rate-limit.ts",
-    "./lib/company-size": "./src/lib/company-size.ts",
-    "./lib/phone": "./src/lib/phone.ts",
-    "./lib/contact-verification": "./src/lib/contact-verification.ts",
-    "./schemas/company": "./src/schemas/company.ts",
-    "./schemas/tag": "./src/schemas/tag.ts"
+    ".": "./dist/index.js",
+    "./lib/env": "./dist/lib/env.js",
+    "./lib/logger": "./dist/lib/logger.js",
+    "./lib/geo": "./dist/lib/geo.js",
+    "./lib/rate-limit": "./dist/lib/rate-limit.js",
+    "./lib/company-size": "./dist/lib/company-size.js",
+    "./lib/phone": "./dist/lib/phone.js",
+    "./lib/contact-verification": "./dist/lib/contact-verification.js",
+    "./schemas/company": "./dist/schemas/company.js",
+    "./schemas/tag": "./dist/schemas/tag.js"
   }
 }

@@ -1,4 +1,5 @@
 import "./load-env.js";
+import { handle } from "hono/vercel";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
@@ -324,20 +325,19 @@ app.notFound(() => {
 
 app.onError(errorHandler);
 
-// Export para Vercel (@vercel/node): suporta Hono via `export default app` ou `{ fetch }`.
-// Para Bun dev (`bun run src/index.ts`) mantemos compatibilidade com `port`.
-const handler = {
-  port: env.PORT,
-  fetch: app.fetch,
-};
+// Exports Vercel — igual a anita-corporation (hono/vercel handle)
+export const GET = handle(app);
+export const POST = handle(app);
+export const PUT = handle(app);
+export const PATCH = handle(app);
+export const DELETE = handle(app);
+export const OPTIONS = handle(app);
+export const HEAD = handle(app);
+export default handle(app);
 
-// Vercel: prefere default = app (Web Standards) — usar `app` garante routing correto.
-// Bun: precisa de { port, fetch } para auto-serve.
-export default app;
-export { handler };
-// Compat Bun: se for executado directamente, inicia servidor (Vercel importa, não executa como main)
-// @ts-ignore - Bun global existe apenas em runtime Bun
+// Compat Bun dev — mantém `bun run src/index.ts` a funcionar
+// @ts-ignore
 if (typeof Bun !== "undefined" && (import.meta as unknown as { main?: boolean }).main) {
   // @ts-ignore
-  Bun.serve(handler);
+  Bun.serve({ fetch: app.fetch, port: Number(env.PORT ?? 4000) });
 }

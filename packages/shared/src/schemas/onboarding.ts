@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { createProfileSchema } from "./profile";
-import { companyQualificationSchema } from "./company";
+import { createProfileSchema } from "./profile.js";
+import { companyQualificationSchema } from "./company.js";
 
 // Payload único do POST /api/v1/onboarding/complete — o orquestrador transacional
 // do onboarding. Validação TOTAL acontece antes de qualquer escrita.

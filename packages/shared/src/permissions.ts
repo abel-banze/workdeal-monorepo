@@ -1,4 +1,4 @@
-import type { OrgRole, SystemRole } from "./types";
+import type { OrgRole, SystemRole } from "./types.js";
 
 export type DomainPermission =
   | "profile:edit"

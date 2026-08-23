@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { businessHoursSchema } from "./business-hours";
+import { businessHoursSchema } from "./business-hours.js";
 
 // DTOs do proxy Places (/api/v1/places/*) — fonte única usada pela API e pelas Server Actions
 

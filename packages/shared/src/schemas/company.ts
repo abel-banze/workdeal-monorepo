@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { companySizeEnum, legalFormEnum } from "../lib/company-size";
+import { companySizeEnum, legalFormEnum } from "../lib/company-size.js";
 
 export const companyQualificationSchema = z.object({
   workers: z.coerce.number().int().min(1).max(100000),

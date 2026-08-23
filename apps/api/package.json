@@ -5,13 +5,14 @@
   "private": true,
   "scripts": {
     "dev": "bun run --hot src/index.ts",
-    "start": "bun run src/index.ts",
-    "build": "node build.mjs",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.build.json",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
     "@hono/zod-validator": "^0.9.0",
     "@workdeal/auth": "workspace:*",
     "@workdeal/db": "workspace:*",

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { emailSchema } from "./auth";
-import { businessHoursSchema } from "./business-hours";
+import { emailSchema } from "./auth.js";
+import { businessHoursSchema } from "./business-hours.js";
 
 export const profileTypeSchema = z.enum(["individual", "company"]);
 export const profileStatusSchema = z.enum(["draft", "active", "suspended"]);

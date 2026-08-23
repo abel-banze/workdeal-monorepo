@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { jwt, bearer, organization } from "better-auth/plugins";
 import { db } from "@workdeal/db";
 import * as schema from "@workdeal/db/schema";
-import { env } from "./env";
+import { env } from "./env.js";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {

@@ -11,7 +11,7 @@ class ProfilesService {
     const result = input.organizationId ? await this.createCompanyProfile(user, input, input.organizationId) : await this.createIndividualProfile(user, input);
     // P2-4: tries profile-complete badge best-effort (does not block creation)
     try {
-      const { ensureProfileCompleteForProfile } = await import("./badges.job");
+      const { ensureProfileCompleteForProfile } = await import("./badges.job.js");
       await ensureProfileCompleteForProfile(result.id);
     } catch {}
     return result;
@@ -65,7 +65,7 @@ class ProfilesService {
     }
     // P2-4: update badge after edit
     try {
-      const { ensureProfileCompleteForProfile } = await import("./badges.job");
+      const { ensureProfileCompleteForProfile } = await import("./badges.job.js");
       await ensureProfileCompleteForProfile(row.id);
     } catch {}
     return this.toProfileView(row);

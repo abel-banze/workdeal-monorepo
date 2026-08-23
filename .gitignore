@@ -20,6 +20,8 @@ out/
 # production
 build
 dist
+!apps/api/dist
+!packages/*/dist
 
 # turbo
 .turbo

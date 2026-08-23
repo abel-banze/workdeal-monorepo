@@ -38,7 +38,7 @@ export const portfolioService = {
     });
     // tenta selo perfil-completo
     try {
-      const { ensureProfileCompleteForProfile } = await import("./badges.job");
+      const { ensureProfileCompleteForProfile } = await import("./badges.job.js");
       await ensureProfileCompleteForProfile(input.profileId);
     } catch {}
     return row;
@@ -55,7 +55,7 @@ export const portfolioService = {
       ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
     });
     try {
-      const { ensureProfileCompleteForProfile } = await import("./badges.job");
+      const { ensureProfileCompleteForProfile } = await import("./badges.job.js");
       await ensureProfileCompleteForProfile(existing.profileId);
     } catch {}
     return row;
@@ -66,7 +66,7 @@ export const portfolioService = {
     await assertCanEditProfile(user, existing.profileId);
     await portfolioRepository.delete(id);
     try {
-      const { ensureProfileCompleteForProfile } = await import("./badges.job");
+      const { ensureProfileCompleteForProfile } = await import("./badges.job.js");
       await ensureProfileCompleteForProfile(existing.profileId);
     } catch {}
     return { id };

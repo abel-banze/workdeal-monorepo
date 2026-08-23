@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "build": "tsc",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
@@ -23,11 +24,11 @@
     "typescript": "^5"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./server": "./src/server.ts",
-    "./client": "./src/client.ts",
-    "./session": "./src/session.ts",
-    "./cookies": "./src/cookies.ts",
-    "./repository": "./src/repository.ts"
+    ".": "./dist/index.js",
+    "./server": "./dist/server.js",
+    "./client": "./dist/client.js",
+    "./session": "./dist/session.js",
+    "./cookies": "./dist/cookies.js",
+    "./repository": "./dist/repository.js"
   }
 }

@@ -54,7 +54,7 @@ adminRoute.get("/metrics", async (c) => {
 });
 
 adminRoute.post("/badges/run", async (c) => {
-  const { runBadgeJob } = await import("../services/badges.job");
+  const { runBadgeJob } = await import("../services/badges.job.js");
   await runBadgeJob();
   return c.json({ success: true, data: { ranAt: new Date().toISOString() } });
 });

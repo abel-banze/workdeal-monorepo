@@ -63,7 +63,7 @@ export const quotesService = {
     // Anexar ficheiros, se houver — valida existência; ficheiros com dono
     // só podem pertencer ao próprio solicitante (uploads de convidados ficam sem dono)
     if (input.fileIds && input.fileIds.length > 0) {
-      const { filesRepository } = await import("../repositories/files.repository");
+      const { filesRepository } = await import("../repositories/files.repository.js");
       const files = await filesRepository.findByIds(input.fileIds);
       if (files.length !== input.fileIds.length) {
         throw new AppError(400, "INVALID_FILE_IDS", "Um ou mais ficheiros não foram encontrados");
