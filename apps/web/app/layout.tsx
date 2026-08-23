@@ -1,5 +1,6 @@
 import { Geist_Mono, Inter, Sora } from "next/font/google"
 import NextTopLoader from "nextjs-toploader"
+import { Analytics } from "@vercel/analytics/next"
 import "@workspace/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@workspace/ui/lib/utils"
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="bg-[#F6F3EE] text-[#0F1A2E]">
         <NextTopLoader color="#0B5E56" height={3} showSpinner={false} shadow="0 0 10px rgba(11,94,86,0.35)" crawlSpeed={180} />
         <ThemeProvider>{children}</ThemeProvider>
+        <Analytics />
       </body>
     </html>
   )
