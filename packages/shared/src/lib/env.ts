@@ -76,4 +76,28 @@ export function formatAllowedOrigins(origins: string): string[] {
     .filter(Boolean);
 }
 
-export const env = parseEnv();
+// Lazy — não valida no import top-level (evita throw durante build/bundle)
+// Só valida quando uma propriedade é acedida em runtime (Vercel injecta env por projecto)
+let _cachedEnv: Env | null = null;
+function getCachedEnv(): Env {
+  if (!_cachedEnv) _cachedEnv = parseEnv();
+  return _cachedEnv;
+}
+export const env: Env = new Proxy({} as Env, {
+  get(_t, prop) {
+    return (getCachedEnv() as unknown as Record<string | symbol, unknown>)[prop as string];
+  },
+  has(_t, prop) {
+    return prop in getCachedEnv();
+  },
+  ownKeys() {
+    return Reflect.ownKeys(getCachedEnv());
+  },
+  getOwnPropertyDescriptor(_t, prop) {
+    const v = getCachedEnv();
+    return Reflect.getOwnPropertyDescriptor(v, prop);
+  },
+});
+export function __clearEnvCache() {
+  _cachedEnv = null;
+}

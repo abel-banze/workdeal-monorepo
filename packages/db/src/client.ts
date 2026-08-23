@@ -3,6 +3,34 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { env } from "@workdeal/shared/lib/env";
 import * as schema from "./schema.js";
 
-export const pool = new Pool({ connectionString: env.DATABASE_URL, max: 10 });
+// Lazy — evita throw no import/build quando Root Directory = apps/api e env ainda não foi validado
+let _pool: Pool | null = null;
+let _db: ReturnType<typeof drizzle> | null = null;
 
-export const db = drizzle(pool, { schema });
+function getPool(): Pool {
+  if (_pool) return _pool;
+  _pool = new Pool({ connectionString: env.DATABASE_URL, max: 10 });
+  return _pool;
+}
+function getDb(): ReturnType<typeof drizzle> {
+  if (_db) return _db;
+  _db = drizzle(getPool(), { schema });
+  return _db;
+}
+
+// Proxy mantém compatibilidade `import { db, pool } from "@workdeal/db"` sem mudar call-sites
+export const pool: Pool = new Proxy({} as Pool, {
+  get(_t, prop) {
+    const p = getPool();
+    const v = (p as unknown as Record<string | symbol, unknown>)[prop as string];
+    return typeof v === "function" ? (v as Function).bind(p) : v;
+  },
+});
+
+export const db: ReturnType<typeof drizzle> = new Proxy({} as ReturnType<typeof drizzle>, {
+  get(_t, prop) {
+    const d = getDb();
+    const v = (d as unknown as Record<string | symbol, unknown>)[prop as string];
+    return typeof v === "function" ? (v as Function).bind(d) : v;
+  },
+});

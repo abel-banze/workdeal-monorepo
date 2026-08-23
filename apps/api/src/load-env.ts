@@ -1,12 +1,13 @@
 import dotenv from "dotenv";
 
-// Em produção (Vercel) as env vars já vêm injectadas via dashboard — não há ficheiro .env
-// Este módulo só deve carregar .env em desenvolvimento local.
-// Mantido como side-effect import para compatibilidade com `bun run src/index.ts`.
+// Em produção (Vercel, Root Directory = apps/api) as env vars já vêm injectadas via dashboard — não há ficheiro .env
+// Em dev, carrega por projecto: apps/api/.env > apps/api/.env.local (prioridade per-project)
 if (process.env.NODE_ENV !== "production") {
-  // Tenta primeiro .env na CWD (comportamento padrão do dotenv)
-  dotenv.config();
-  // Fallback para monorepo: quando a API corre a partir de apps/api, o .env está em ../../.env
-  dotenv.config({ path: "../../.env" });
-  dotenv.config({ path: "../../../.env" });
+  // CWD = apps/api quando corre `bun run src/index.ts` ou `pnpm --filter @workdeal/api dev`
+  dotenv.config(); // apps/api/.env
+  dotenv.config({ path: ".env.local", override: false });
+  // Compat legado: se ainda existir .env na raiz do monorepo, carrega sem sobrescrever (transição)
+  dotenv.config({ path: "../../.env", override: false });
+  dotenv.config({ path: "../../.env.local", override: false });
+  dotenv.config({ path: "../../../.env", override: false });
 }
