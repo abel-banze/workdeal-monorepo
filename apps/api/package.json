@@ -34,7 +34,7 @@
     "@types/node": "^20",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
-    "esbuild": "^0.28.2",
+    "esbuild": "0.28.2",
     "eslint": "^9",
     "tsx": "^4.23.9",
     "typescript": "^5",
