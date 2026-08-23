@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
-    "build": "echo 'API: no build step - @vercel/node bundler handles TS (imports com .js)'",
+    "build": "node build.mjs",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
@@ -31,6 +31,7 @@
     "@types/node": "^20",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "tsx": "^4.23.9",
     "typescript": "^5",
