@@ -1,10 +1,10 @@
 import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { sendContactEmail, sendOtpEmail } from "../services/email.service";
-import { ok, fail } from "../lib/api-response";
+import { sendContactEmail, sendOtpEmail } from "../services/email.service.js";
+import { ok, fail } from "../lib/api-response.js";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
-import { env } from "../env";
+import { env } from "../env.js";
 
 const emailLimiter = createRateLimiter({ windowMs: 60_000, max: 5 });
 const contactLimiter = createRateLimiter({ windowMs: 60_000, max: 5 });

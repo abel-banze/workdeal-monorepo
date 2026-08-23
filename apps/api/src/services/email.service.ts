@@ -1,4 +1,4 @@
-import { resend, EMAIL_FROM } from "../lib/resend";
+import { resend, EMAIL_FROM } from "../lib/resend.js";
 
 export interface SendOtpEmailParams {
   to: string;

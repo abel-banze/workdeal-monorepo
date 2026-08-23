@@ -1,7 +1,7 @@
 import type { AuthUser, FilePurpose } from "@workdeal/shared";
-import { AppError } from "../lib/errors";
-import { filesRepository } from "../repositories/files.repository";
-import { env } from "../env";
+import { AppError } from "../lib/errors.js";
+import { filesRepository } from "../repositories/files.repository.js";
+import { env } from "../env.js";
 
 const ALLOWED_MIME_PREFIXES = ["image/", "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument"];
 const MAX_BYTES = 10 * 1024 * 1024;

@@ -1,7 +1,7 @@
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { logger } from "@workdeal/shared/lib/logger";
-import { fail } from "./api-response";
+import { fail } from "./api-response.js";
 
 export class AppError extends Error {
   constructor(

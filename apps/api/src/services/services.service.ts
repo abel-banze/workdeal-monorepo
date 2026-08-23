@@ -1,8 +1,8 @@
 import { getOrgRole } from "@workdeal/auth";
 import { hasOrgPermission, hasSelfPermission } from "@workdeal/shared";
 import type { AuthUser } from "@workdeal/shared";
-import { AppError } from "../lib/errors";
-import { servicesRepository } from "../repositories/services.repository";
+import { AppError } from "../lib/errors.js";
+import { servicesRepository } from "../repositories/services.repository.js";
 import { db, profile } from "@workdeal/db";
 import { eq } from "drizzle-orm";
 

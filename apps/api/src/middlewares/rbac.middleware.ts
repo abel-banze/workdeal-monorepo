@@ -2,8 +2,8 @@ import { createMiddleware } from "hono/factory";
 import { getOrgRole } from "@workdeal/auth";
 import { hasOrgPermission, hasSystemPermission } from "@workdeal/shared";
 import type { DomainPermission } from "@workdeal/shared";
-import { AppError } from "../lib/errors";
-import type { Env } from "./auth.middleware";
+import { AppError } from "../lib/errors.js";
+import type { Env } from "./auth.middleware.js";
 
 export const requireOrgPermission =
   (permission: DomainPermission) =>

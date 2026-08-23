@@ -2,9 +2,9 @@ import { getOrgRole } from "@workdeal/auth";
 import { hasOrgPermission, hasSelfPermission, normalizeBusinessHours } from "@workdeal/shared";
 import type { AuthUser, CreateProfileInput, DomainPermission, ListProfilesQuery, ProfileType, ProfileView, UpdateProfileInput } from "@workdeal/shared";
 import type { CategoryView } from "@workdeal/shared";
-import { AppError } from "../lib/errors";
-import { profilesRepository } from "../repositories/profiles.repository";
-import type { ProfileWithCategories } from "../repositories/profiles.repository";
+import { AppError } from "../lib/errors.js";
+import { profilesRepository } from "../repositories/profiles.repository.js";
+import type { ProfileWithCategories } from "../repositories/profiles.repository.js";
 
 class ProfilesService {
   async createProfile(user: AuthUser, input: CreateProfileInput): Promise<ProfileView> {

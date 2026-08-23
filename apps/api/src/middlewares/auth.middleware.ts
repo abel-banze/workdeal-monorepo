@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { JWT_COOKIE_NAME, parseCookies, verifyJwt } from "@workdeal/auth";
 import type { AuthUser } from "@workdeal/shared";
-import { AppError } from "../lib/errors";
+import { AppError } from "../lib/errors.js";
 
 export type Env = {
   Variables: {

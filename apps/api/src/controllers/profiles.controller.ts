@@ -1,8 +1,8 @@
 import type { Context } from "hono";
 import type { AuthUser, CreateProfileInput, ListProfilesQuery, UpdateProfileInput } from "@workdeal/shared";
-import type { Env } from "../middlewares/auth.middleware";
-import { ok } from "../lib/api-response";
-import { profilesService } from "../services/profiles.service";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { ok } from "../lib/api-response.js";
+import { profilesService } from "../services/profiles.service.js";
 
 export const profilesController = {
   async create(user: AuthUser, input: CreateProfileInput) {

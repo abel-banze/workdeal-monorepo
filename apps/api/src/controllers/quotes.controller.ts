@@ -1,9 +1,9 @@
 import type { Context } from "hono";
 import type { AuthUser } from "@workdeal/shared";
-import type { Env } from "../middlewares/auth.middleware";
-import type { OptionalUser } from "../middlewares/optional-auth.middleware";
-import { ok } from "../lib/api-response";
-import { quotesService } from "../services/quotes.service";
+import type { Env } from "../middlewares/auth.middleware.js";
+import type { OptionalUser } from "../middlewares/optional-auth.middleware.js";
+import { ok } from "../lib/api-response.js";
+import { quotesService } from "../services/quotes.service.js";
 
 export const quotesController = {
   async create(user: OptionalUser, body: { targetProfileId: string; requesterOrganizationId?: string | null; serviceLabel: string; serviceTag?: string | null; portfolioItemId?: string | null; message: string; contactName: string; contactEmail: string; contactPhone?: string | null; fileIds?: string[] }) {

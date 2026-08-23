@@ -1,6 +1,6 @@
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
-import { AppError } from "../lib/errors";
-import { quotesRepository } from "../repositories/quotes.repository";
+import { AppError } from "../lib/errors.js";
+import { quotesRepository } from "../repositories/quotes.repository.js";
 import { db, organization, member, profile } from "@workdeal/db";
 import { eq } from "drizzle-orm";
 import type { AuthUser } from "@workdeal/shared";

@@ -1,6 +1,6 @@
 import type { AuthUser } from "@workdeal/shared";
-import { ok } from "../lib/api-response";
-import { portfolioService } from "../services/portfolio.service";
+import { ok } from "../lib/api-response.js";
+import { portfolioService } from "../services/portfolio.service.js";
 
 export const portfolioController = {
   async list(profileId: string) {

@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { ok } from "../lib/api-response";
-import { AppError } from "../lib/errors";
-import { profileLocationRepository } from "../repositories/profile-location.repository";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { ok } from "../lib/api-response.js";
+import { AppError } from "../lib/errors.js";
+import { profileLocationRepository } from "../repositories/profile-location.repository.js";
 import { getOrgRole } from "@workdeal/auth";
 import { hasOrgPermission } from "@workdeal/shared";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";

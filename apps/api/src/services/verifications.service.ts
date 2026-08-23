@@ -1,8 +1,8 @@
 import { db, badge, organization, profile, profileBadge } from "@workdeal/db";
 import { eq } from "drizzle-orm";
 import type { VerificationListQuery } from "@workdeal/shared";
-import { AppError } from "../lib/errors";
-import { verificationsRepository } from "../repositories/verifications.repository";
+import { AppError } from "../lib/errors.js";
+import { verificationsRepository } from "../repositories/verifications.repository.js";
 import { logger } from "@workdeal/shared/lib/logger";
 
 function newId(): string {

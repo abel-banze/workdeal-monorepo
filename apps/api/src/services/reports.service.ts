@@ -1,6 +1,6 @@
 import type { CreateReportInput, ReportListQuery } from "@workdeal/shared";
-import { AppError } from "../lib/errors";
-import { reportsRepository } from "../repositories/reports.repository";
+import { AppError } from "../lib/errors.js";
+import { reportsRepository } from "../repositories/reports.repository.js";
 import { db, profile, review } from "@workdeal/db";
 import { eq } from "drizzle-orm";
 

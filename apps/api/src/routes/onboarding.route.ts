@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
 import { onboardingCompleteSchema } from "@workdeal/shared";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { onboardingController } from "../controllers/onboarding.controller";
-import { AppError } from "../lib/errors";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { onboardingController } from "../controllers/onboarding.controller.js";
+import { AppError } from "../lib/errors.js";
 
 const completeLimiter = createRateLimiter({ windowMs: 60_000, max: 5 });
 

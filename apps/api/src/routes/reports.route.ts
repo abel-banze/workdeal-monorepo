@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { createReportSchema } from "@workdeal/shared";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { reportsController } from "../controllers/reports.controller";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { reportsController } from "../controllers/reports.controller.js";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
-import { AppError } from "../lib/errors";
+import { AppError } from "../lib/errors.js";
 
 const writeLimiter = createRateLimiter({ windowMs: 60_000, max: 10 });
 function rateLimit(limiter: ReturnType<typeof createRateLimiter>) {

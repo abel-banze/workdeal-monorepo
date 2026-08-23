@@ -2,11 +2,11 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
 import { createQuoteSchema, listQuotesQuerySchema, updateQuoteStatusSchema } from "@workdeal/shared";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { optionalAuth, getUserOrNull } from "../middlewares/optional-auth.middleware";
-import { quotesController } from "../controllers/quotes.controller";
-import { AppError } from "../lib/errors";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { optionalAuth, getUserOrNull } from "../middlewares/optional-auth.middleware.js";
+import { quotesController } from "../controllers/quotes.controller.js";
+import { AppError } from "../lib/errors.js";
 
 const createLimiter = createRateLimiter({ windowMs: 60_000, max: 5 });
 

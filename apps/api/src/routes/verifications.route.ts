@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { verificationsService } from "../services/verifications.service";
-import { profilesRepository } from "../repositories/profiles.repository";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { verificationsService } from "../services/verifications.service.js";
+import { profilesRepository } from "../repositories/profiles.repository.js";
 import { getOrgRole } from "@workdeal/auth";
 import { hasOrgPermission } from "@workdeal/shared";
-import { AppError } from "../lib/errors";
+import { AppError } from "../lib/errors.js";
 
 export const verificationsRoute = new Hono<Env>();
 

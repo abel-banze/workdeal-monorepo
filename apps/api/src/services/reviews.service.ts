@@ -1,7 +1,7 @@
 import type { AuthUser, CreateReviewInput } from "@workdeal/shared";
-import { AppError } from "../lib/errors";
-import { reviewsRepository } from "../repositories/reviews.repository";
-import { profilesRepository } from "../repositories/profiles.repository";
+import { AppError } from "../lib/errors.js";
+import { reviewsRepository } from "../repositories/reviews.repository.js";
+import { profilesRepository } from "../repositories/profiles.repository.js";
 
 function newId(): string {
   return `rev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { db, quoteRequest } from "@workdeal/db";
 import { sql, gte } from "drizzle-orm";
-import { ok } from "../lib/api-response";
+import { ok } from "../lib/api-response.js";
 
 export const metricsRoute = new Hono();
 

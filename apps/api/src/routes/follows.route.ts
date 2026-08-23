@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { followsRepository } from "../repositories/follows.repository";
-import { ok } from "../lib/api-response";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { followsRepository } from "../repositories/follows.repository.js";
+import { ok } from "../lib/api-response.js";
 
 export const followsRoute = new Hono<Env>();
 

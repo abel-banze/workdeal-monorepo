@@ -1,5 +1,5 @@
-import { ok } from "../lib/api-response";
-import { verificationsService } from "../services/verifications.service";
+import { ok } from "../lib/api-response.js";
+import { verificationsService } from "../services/verifications.service.js";
 import type { VerificationListQuery } from "@workdeal/shared";
 
 export const verificationsController = {

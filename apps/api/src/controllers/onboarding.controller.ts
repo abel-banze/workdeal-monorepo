@@ -1,8 +1,8 @@
 import type { AuthUser, OnboardingCompleteInput } from "@workdeal/shared";
 import { parseVerifiedContacts } from "@workdeal/shared/lib/contact-verification";
-import { env } from "../env";
-import { ok } from "../lib/api-response";
-import { onboardingService } from "../services/onboarding.service";
+import { env } from "../env.js";
+import { ok } from "../lib/api-response.js";
+import { onboardingService } from "../services/onboarding.service.js";
 
 class OnboardingController {
   async complete(user: AuthUser, input: OnboardingCompleteInput, verifiedHeader: string | null) {

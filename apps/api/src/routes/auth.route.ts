@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { ok } from "../lib/api-response";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { ok } from "../lib/api-response.js";
 
 export const authV1Route = new Hono<Env>();
 

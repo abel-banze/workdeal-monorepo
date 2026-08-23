@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
 import { uploadFileSchema } from "@workdeal/shared";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { optionalAuth } from "../middlewares/optional-auth.middleware";
-import { filesController } from "../controllers/files.controller";
-import { AppError } from "../lib/errors";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { optionalAuth } from "../middlewares/optional-auth.middleware.js";
+import { filesController } from "../controllers/files.controller.js";
+import { AppError } from "../lib/errors.js";
 
 const uploadLimiter = createRateLimiter({ windowMs: 60_000, max: 20 });
 const anonUploadLimiter = createRateLimiter({ windowMs: 60_000, max: 10 });

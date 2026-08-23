@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { JWT_COOKIE_NAME, parseCookies, verifyJwt } from "@workdeal/auth";
 import type { AuthUser } from "@workdeal/shared";
-import type { Env } from "./auth.middleware";
+import type { Env } from "./auth.middleware.js";
 
 /**
  * Auth opcional: define `user` se houver sessão válida, caso contrário

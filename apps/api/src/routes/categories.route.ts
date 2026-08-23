@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import type { Env } from "../middlewares/auth.middleware";
-import { profilesController } from "../controllers/profiles.controller";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { profilesController } from "../controllers/profiles.controller.js";
 
 export const categoriesRoute = new Hono<Env>();
 

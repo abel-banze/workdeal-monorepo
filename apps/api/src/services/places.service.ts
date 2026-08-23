@@ -1,7 +1,7 @@
 import { businessHoursSchema, openingPeriodSchema, placeSuggestionSchema } from "@workdeal/shared";
 import type { BusinessHours, PlaceDetails, PlaceSuggestion } from "@workdeal/shared";
-import { env } from "../env";
-import { AppError } from "../lib/errors";
+import { env } from "../env.js";
+import { AppError } from "../lib/errors.js";
 
 // Proxy para Google Places API (New) — a chave fica server-side; o browser só fala
 // com /api/v1/places/* (autenticado + rate limited). O mapa interactivo (pin)

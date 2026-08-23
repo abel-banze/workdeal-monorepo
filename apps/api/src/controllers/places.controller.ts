@@ -1,5 +1,5 @@
-import { placesService } from "../services/places.service";
-import { ok } from "../lib/api-response";
+import { placesService } from "../services/places.service.js";
+import { ok } from "../lib/api-response.js";
 
 class PlacesController {
   async autocomplete(input: string) {

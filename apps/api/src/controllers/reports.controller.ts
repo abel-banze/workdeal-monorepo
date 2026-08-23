@@ -1,5 +1,5 @@
-import { ok } from "../lib/api-response";
-import { reportsService } from "../services/reports.service";
+import { ok } from "../lib/api-response.js";
+import { reportsService } from "../services/reports.service.js";
 import type { CreateReportInput, ReportListQuery } from "@workdeal/shared";
 
 export const reportsController = {

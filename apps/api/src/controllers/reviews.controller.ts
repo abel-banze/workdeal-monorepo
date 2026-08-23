@@ -1,6 +1,6 @@
 import type { AuthUser, CreateReviewInput } from "@workdeal/shared";
-import { ok } from "../lib/api-response";
-import { reviewsService } from "../services/reviews.service";
+import { ok } from "../lib/api-response.js";
+import { reviewsService } from "../services/reviews.service.js";
 
 export const reviewsController = {
   async create(user: AuthUser, input: CreateReviewInput) {

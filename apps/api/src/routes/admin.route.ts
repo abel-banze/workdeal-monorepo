@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { requireAuth } from "../middlewares/auth.middleware";
-import { requireSystemRole } from "../middlewares/rbac.middleware";
-import type { Env } from "../middlewares/auth.middleware";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireSystemRole } from "../middlewares/rbac.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
 import { verificationListQuerySchema, verificationReviewSchema } from "@workdeal/shared";
-import { verificationsController } from "../controllers/verifications.controller";
-import { reportsController } from "../controllers/reports.controller";
+import { verificationsController } from "../controllers/verifications.controller.js";
+import { reportsController } from "../controllers/reports.controller.js";
 import { reportListQuerySchema } from "@workdeal/shared";
 import { z } from "zod";
 

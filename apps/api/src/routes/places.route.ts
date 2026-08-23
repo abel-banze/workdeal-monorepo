@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
 import { placeAutocompleteQuerySchema } from "@workdeal/shared";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { placesController } from "../controllers/places.controller";
-import { AppError } from "../lib/errors";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { placesController } from "../controllers/places.controller.js";
+import { AppError } from "../lib/errors.js";
 
 const autocompleteLimiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const detailsLimiter = createRateLimiter({ windowMs: 60_000, max: 60 });

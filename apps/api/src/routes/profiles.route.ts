@@ -3,13 +3,13 @@ import { zValidator } from "@hono/zod-validator";
 import { createMiddleware } from "hono/factory";
 import { createProfileSchema, listProfilesQuerySchema, updateProfileSchema } from "@workdeal/shared";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { profilesController } from "../controllers/profiles.controller";
-import { profilesRepository } from "../repositories/profiles.repository";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { profilesController } from "../controllers/profiles.controller.js";
+import { profilesRepository } from "../repositories/profiles.repository.js";
 import { getOrgRole } from "@workdeal/auth";
 import { hasOrgPermission, hasSelfPermission, hasSystemPermission } from "@workdeal/shared";
-import { AppError } from "../lib/errors";
+import { AppError } from "../lib/errors.js";
 
 const listLimiter = createRateLimiter({ windowMs: 60_000, max: 60 });
 const writeLimiter = createRateLimiter({ windowMs: 60_000, max: 20 });

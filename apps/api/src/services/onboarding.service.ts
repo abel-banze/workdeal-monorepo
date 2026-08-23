@@ -9,8 +9,8 @@ import { contactIdentifier } from "@workdeal/shared/lib/phone";
 import type { ContactChannel } from "@workdeal/shared/lib/phone";
 import type { AuthUser, OnboardingCompleteInput } from "@workdeal/shared";
 import type { ContactVerificationPayload } from "@workdeal/shared/lib/contact-verification";
-import { AppError } from "../lib/errors";
-import { onboardingRepository } from "../repositories/onboarding.repository";
+import { AppError } from "../lib/errors.js";
+import { onboardingRepository } from "../repositories/onboarding.repository.js";
 
 class OnboardingService {
   async complete(

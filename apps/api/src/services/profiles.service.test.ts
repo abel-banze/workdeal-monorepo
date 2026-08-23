@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { slugify } from "../services/profiles.service";
+import { slugify } from "../services/profiles.service.js";
 import { hasOrgPermission, hasSelfPermission } from "@workdeal/shared";
 
 describe("slugify", () => {

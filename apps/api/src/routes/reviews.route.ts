@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { createReviewSchema } from "@workdeal/shared";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { Env } from "../middlewares/auth.middleware";
-import { reviewsController } from "../controllers/reviews.controller";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { Env } from "../middlewares/auth.middleware.js";
+import { reviewsController } from "../controllers/reviews.controller.js";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
-import { AppError } from "../lib/errors";
+import { AppError } from "../lib/errors.js";
 
 const writeLimiter = createRateLimiter({ windowMs: 60_000, max: 10 });
 

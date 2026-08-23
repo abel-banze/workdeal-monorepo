@@ -1,6 +1,6 @@
 import type { AuthUser, FilePurpose } from "@workdeal/shared";
-import { ok } from "../lib/api-response";
-import { filesService } from "../services/files.service";
+import { ok } from "../lib/api-response.js";
+import { filesService } from "../services/files.service.js";
 
 export const filesController = {
   async upload(uploadedByUserId: string | null, file: File, purpose: FilePurpose) {
