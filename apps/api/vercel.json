@@ -1,6 +1,7 @@
 {
   "version": 2,
   "installCommand": "corepack enable && corepack prepare pnpm@10.33.4 --activate && pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @workdeal/shared build && pnpm --filter @workdeal/db build && pnpm --filter @workdeal/auth build",
   "builds": [
     {
       "src": "src/index.ts",
