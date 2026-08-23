@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 
 const pkg = JSON.parse(readFileSync("./package.json", "utf8"));
 const externals = [
@@ -22,6 +22,9 @@ const externals = [
   "dns",
   "child_process",
 ].filter((d) => !d.startsWith("@workdeal/"));
+
+// Limpa dist antes para não misturar artefactos tsc + esbuild (ver diagnóstico 404)
+rmSync("dist", { recursive: true, force: true });
 
 await build({
   entryPoints: ["src/index.ts"],
