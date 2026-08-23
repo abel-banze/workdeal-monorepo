@@ -7,7 +7,7 @@
       "src": "src/index.ts",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["../../packages/shared/dist/**", "../../packages/db/dist/**", "../../packages/auth/dist/**"]
+        "includeFiles": ["../../packages/**", "packages/**", "dist/**", "apps/api/dist/**"]
       }
     }
   ],
