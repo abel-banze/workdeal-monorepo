@@ -2,10 +2,15 @@ import { build } from "esbuild";
 import { readFileSync } from "node:fs";
 
 const pkg = JSON.parse(readFileSync("./package.json", "utf8"));
+const dbPkg = JSON.parse(readFileSync("../../packages/db/package.json", "utf8"));
 const externals = [
   ...Object.keys(pkg.dependencies ?? {}),
   ...Object.keys(pkg.devDependencies ?? {}),
-  // Node built-ins that dotenv/better-auth may require via `require("fs")`
+  ...Object.keys(dbPkg.dependencies ?? {}),
+  // pg é transitivo via @workdeal/db — se bundlado causa Dynamic require of "events"
+  "pg",
+  "pg-native",
+  // Node built-ins que pg/dotenv/better-auth fazem require
   "fs",
   "path",
   "os",
@@ -16,6 +21,10 @@ const externals = [
   "buffer",
   "url",
   "querystring",
+  "net",
+  "tls",
+  "dns",
+  "child_process",
 ];
 // Manter @workdeal/* bundlado (inline) para evitar ERR_MODULE_NOT_FOUND em runtime
 const external = externals.filter((d) => !d.startsWith("@workdeal/"));
