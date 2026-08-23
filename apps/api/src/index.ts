@@ -1,6 +1,6 @@
 import "./load-env.js";
-import { handle } from "hono/vercel";
 import { Hono } from "hono";
+import { getRequestListener } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { auth } from "@workdeal/auth";
@@ -325,15 +325,18 @@ app.notFound(() => {
 
 app.onError(errorHandler);
 
-// Exports Vercel — igual a anita-corporation (hono/vercel handle)
-export const GET = handle(app);
-export const POST = handle(app);
-export const PUT = handle(app);
-export const PATCH = handle(app);
-export const DELETE = handle(app);
-export const OPTIONS = handle(app);
-export const HEAD = handle(app);
-export default handle(app);
+// Exports Vercel Node.js - getRequestListener converte Node IncomingMessage -> Fetch Request
+// Corrige "this.raw.headers.get is not a function" e o WARN de default export Response
+const vercelHandler = getRequestListener(app.fetch);
+
+export const GET = vercelHandler;
+export const POST = vercelHandler;
+export const PUT = vercelHandler;
+export const PATCH = vercelHandler;
+export const DELETE = vercelHandler;
+export const OPTIONS = vercelHandler;
+export const HEAD = vercelHandler;
+export default vercelHandler;
 
 // Compat Bun dev — mantém `bun run src/index.ts` a funcionar
 // @ts-ignore
