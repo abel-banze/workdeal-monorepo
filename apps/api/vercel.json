@@ -3,6 +3,7 @@
   "buildCommand": "pnpm run build",
   "installCommand": "pnpm install",
   "framework": null,
+  "outputDirectory": "public",
   "functions": {
     "api/index.js": {
       "includeFiles": "dist/**"
