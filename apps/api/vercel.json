@@ -1,17 +1,17 @@
 {
   "version": 2,
   "installCommand": "cd ../.. && corepack enable && corepack prepare pnpm@10.33.4 --activate && pnpm install --frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm --filter @workdeal/shared build && pnpm --filter @workdeal/db build && pnpm --filter @workdeal/auth build",
+  "buildCommand": "cd ../.. && pnpm --filter @workdeal/api build",
   "builds": [
     {
-      "src": "src/index.ts",
+      "src": "dist/index.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "src/index.ts"
+      "dest": "dist/index.js"
     }
   ]
 }
