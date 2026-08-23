@@ -5,7 +5,10 @@
   "builds": [
     {
       "src": "src/index.ts",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["../../packages/shared/dist/**", "../../packages/db/dist/**", "../../packages/auth/dist/**"]
+      }
     }
   ],
   "routes": [
