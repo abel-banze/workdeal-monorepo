@@ -1,4 +1,24 @@
 import { build } from "esbuild";
+import { readFileSync } from "node:fs";
+
+const pkg = JSON.parse(readFileSync("./package.json", "utf8"));
+const externals = [
+  ...Object.keys(pkg.dependencies ?? {}),
+  ...Object.keys(pkg.devDependencies ?? {}),
+  // Node built-ins that dotenv/better-auth may require via `require("fs")`
+  "fs",
+  "path",
+  "os",
+  "crypto",
+  "stream",
+  "util",
+  "events",
+  "buffer",
+  "url",
+  "querystring",
+];
+// Manter @workdeal/* bundlado (inline) para evitar ERR_MODULE_NOT_FOUND em runtime
+const external = externals.filter((d) => !d.startsWith("@workdeal/"));
 
 await build({
   entryPoints: ["src/index.ts"],
@@ -7,22 +27,14 @@ await build({
   target: "node20",
   format: "esm",
   outdir: "dist",
-  // keep source maps for Vercel logs
   sourcemap: true,
-  // minify a bit but keep readable for debugging
   minify: false,
-  // handle .ts imports with .js extension (NodeNext style)
   resolveExtensions: [".ts", ".js", ".json"],
-  // bundle workspace packages (@workdeal/*) inline; keep native / optional externals
-  packages: "bundle",
-  // mark node built-ins as external automatically (platform=node does)
-  // explicitly externalize pg-native which is optional and breaks esbuild
-  external: ["pg-native", "cloudinary"],
+  // bundla @workdeal/* inline; externaliza node_modules para evitar `Dynamic require of "fs"`
+  external,
   loader: { ".ts": "ts" },
-  // needed for Hono JSX if any
   jsx: "automatic",
   jsxImportSource: "hono/jsx",
-  // define NODE_ENV for dead-code elimination
   define: {
     "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
   },
