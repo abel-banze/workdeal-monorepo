@@ -4,14 +4,14 @@
   "buildCommand": "pnpm --filter @workdeal/shared build && pnpm --filter @workdeal/db build && pnpm --filter @workdeal/auth build && pnpm --filter @workdeal/api build",
   "builds": [
     {
-      "src": "apps/api/dist/index.js",
+      "src": "dist/index.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "apps/api/dist/index.js"
+      "dest": "dist/index.js"
     }
   ]
 }
