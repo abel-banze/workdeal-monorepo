@@ -6,6 +6,3 @@ import app from "../dist/index.js";
 // Importa do `dist` já bundlado (com @workdeal/* inline) para evitar
 // `ERR_MODULE_NOT_FOUND: @workdeal/auth/src/index.ts` em runtime Node.
 export default app;
-export const config = {
-  runtime: "nodejs20.x",
-};
