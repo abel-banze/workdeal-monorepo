@@ -1,0 +1,33 @@
+{
+  "name": "@workdeal/shared",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "eslint": "^9",
+    "typescript": "^5"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./lib/env": "./src/lib/env.ts",
+    "./lib/logger": "./src/lib/logger.ts",
+    "./lib/geo": "./src/lib/geo.ts",
+    "./lib/rate-limit": "./src/lib/rate-limit.ts",
+    "./lib/company-size": "./src/lib/company-size.ts",
+    "./lib/phone": "./src/lib/phone.ts",
+    "./lib/contact-verification": "./src/lib/contact-verification.ts",
+    "./schemas/company": "./src/schemas/company.ts",
+    "./schemas/tag": "./src/schemas/tag.ts"
+  }
+}

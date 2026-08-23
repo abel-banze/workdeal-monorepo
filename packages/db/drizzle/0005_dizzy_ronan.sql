@@ -1,0 +1,1 @@
+ALTER TABLE "profile" ALTER COLUMN "geom" SET DATA TYPE text;

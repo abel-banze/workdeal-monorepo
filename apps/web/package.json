@@ -12,15 +12,31 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@base-ui/react": "^1.7.0",
+    "@shadcn/react": "^0.3.0",
+    "@workdeal/auth": "workspace:*",
+    "@workdeal/db": "workspace:*",
+    "@workdeal/shared": "workspace:*",
     "@workspace/ui": "workspace:*",
+    "better-auth": "1.6.26",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "0.45.2",
+    "input-otp": "^1.5.0",
     "lucide-react": "^1.28.0",
     "next": "16.2.6",
     "next-themes": "^0.4.6",
+    "nextjs-toploader": "^3.9.17",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-icons": "^5.7.0",
+    "recharts": "3.8.0",
+    "resend": "^6.20.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/google.maps": "^3.65.5",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

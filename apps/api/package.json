@@ -1,0 +1,37 @@
+{
+  "name": "@workdeal/api",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "lint": "eslint",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.9.0",
+    "@workdeal/auth": "workspace:*",
+    "@workdeal/db": "workspace:*",
+    "@workdeal/shared": "workspace:*",
+    "@zernio/node": "^0.2.592",
+    "better-auth": "1.6.26",
+    "cloudinary": "^2.7.0",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "0.45.2",
+    "hono": "^4.13.0",
+    "jose": "^6.2.8",
+    "resend": "^6.20.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "eslint": "^9",
+    "tsx": "^4.23.9",
+    "typescript": "^5",
+    "vitest": "^3.2.7"
+  }
+}

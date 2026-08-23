@@ -1,0 +1,1 @@
+ALTER TABLE "quote_request" ALTER COLUMN "requester_user_id" DROP NOT NULL;
