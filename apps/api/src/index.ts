@@ -345,6 +345,10 @@ function renderDbUi(data){
       </div>
       \${obj.details ? \`<p style="margin:6px 0 0; color:var(--muted); font-size:11px; line-height:1.5">\${esc(obj.details)}</p>\` : ''}
       \${obj.error ? \`<p style="margin:6px 0 0; color:#FCA5A5; font-family:JetBrains Mono,monospace; font-size:11px; word-break:break-all">\${esc(obj.error)}</p>\` : ''}
+      \${obj.code ? \`<p style="margin:4px 0 0; color:var(--muted); font-family:JetBrains Mono,monospace; font-size:10px">code: \${esc(obj.code)}</p>\` : ''}
+      \${obj.cause ? \`<p style="margin:4px 0 0; color:#FCA5A5; font-family:JetBrains Mono,monospace; font-size:10px; word-break:break-all">cause: \${esc(obj.cause)}</p>\` : ''}
+      \${obj.detail ? \`<p style="margin:4px 0 0; color:var(--muted); font-family:JetBrains Mono,monospace; font-size:10px; word-break:break-all">detail: \${esc(obj.detail)}</p>\` : ''}
+      \${obj.stack ? \`<p style="margin:4px 0 0; color:var(--muted); font-family:JetBrains Mono,monospace; font-size:9px; opacity:.7; word-break:break-all">stack: \${esc(obj.stack)}</p>\` : ''}
       \${obj.hint ? \`<p style="margin:6px 0 0; color:var(--amber); font-size:11px; line-height:1.4">💡 \${esc(obj.hint)}</p>\` : ''}
     </div>\`;
   };
