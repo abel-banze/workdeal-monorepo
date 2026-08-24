@@ -185,7 +185,31 @@ export default async function CompaniesPage({ searchParams }: Props) {
       {/* listagem */}
       <section className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-6">
         <div>
-          <Suspense fallback={<div className="rounded-[16px] border border-[#D9D2C2] bg-white px-6 py-12 text-center text-sm text-[#0F1A2E]/40">A carregar empresas…</div>}>
+          <Suspense
+            fallback={
+              <div aria-busy="true" aria-live="polite">
+                <span className="sr-only">A carregar empresas…</span>
+                <div className="mb-4 h-4 w-48 animate-pulse rounded-full bg-[#0B5E56]/15" />
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="rounded-2xl border border-[#D9D2C2] bg-white p-5">
+                      <div className="flex gap-4">
+                        <div className="size-12 animate-pulse rounded-full bg-[#F6F3EE] ring-1 ring-[#D9D2C2]" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-3 w-32 animate-pulse rounded bg-[#F6F3EE]" />
+                          <div className="h-2 w-48 animate-pulse rounded bg-[#F6F3EE]/80" />
+                          <div className="flex gap-1.5 pt-1">
+                            <span className="h-5 w-16 animate-pulse rounded-full bg-[#F6F3EE] ring-1 ring-[#D9D2C2]" />
+                            <span className="h-5 w-20 animate-pulse rounded-full bg-[#F6F3EE] ring-1 ring-[#D9D2C2]" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            }
+          >
             <CompaniesList searchParams={params} />
           </Suspense>
         </div>

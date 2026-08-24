@@ -70,7 +70,16 @@ export default async function ResetPasswordPage() {
                   <h2 className="mt-3 text-[22px] font-black tracking-[-0.03em] text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>Nova palavra-passe</h2>
                   <p className="mt-1 text-sm text-[#0F1A2E]/60">Define a nova chave para entrar na tua conta.</p>
                 </div>
-                <Suspense fallback={<div className="py-8 text-center text-sm text-[#0F1A2E]/40">A carregar...</div>}>
+                <Suspense
+                  fallback={
+                    <div className="space-y-4" aria-busy="true" aria-live="polite">
+                      <span className="sr-only">A preparar formulário…</span>
+                      <div className="h-10 animate-pulse rounded-lg bg-[#F6F3EE] ring-1 ring-[#D9D2C2]" />
+                      <div className="h-10 animate-pulse rounded-lg bg-[#F6F3EE] ring-1 ring-[#D9D2C2]" />
+                      <div className="h-11 animate-pulse rounded-full bg-[#0F1A2E]/10" />
+                    </div>
+                  }
+                >
                   <ResetPasswordForm />
                 </Suspense>
               </div>

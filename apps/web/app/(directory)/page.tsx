@@ -459,7 +459,29 @@ export default async function DirectoryPage({ searchParams }: Props) {
         </p>
 
         <div className="mt-6">
-          <Suspense fallback={<div className="py-12 text-center text-sm text-[#0F1A2E]/40">A carregar empresas…</div>}>
+          <Suspense
+            fallback={
+              <div className="grid gap-4 md:grid-cols-2" aria-busy="true" aria-live="polite">
+                <span className="sr-only">A carregar empresas…</span>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-2xl border border-[#D9D2C2] bg-white p-5">
+                    <div className="flex gap-4">
+                      <div className="size-12 animate-pulse rounded-full bg-[#F6F3EE] ring-1 ring-[#D9D2C2]" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 w-32 animate-pulse rounded bg-[#F6F3EE]" />
+                        <div className="h-2 w-48 animate-pulse rounded bg-[#F6F3EE]/80" />
+                        <div className="flex gap-1.5 pt-1">
+                          <span className="h-5 w-16 animate-pulse rounded-full bg-[#F6F3EE] ring-1 ring-[#D9D2C2]" />
+                          <span className="h-5 w-20 animate-pulse rounded-full bg-[#F6F3EE] ring-1 ring-[#D9D2C2]" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 h-3 w-20 animate-pulse rounded-full bg-[#F6F3EE]" />
+                  </div>
+                ))}
+              </div>
+            }
+          >
             <FeaturedCompanies searchParams={params} />
           </Suspense>
         </div>
