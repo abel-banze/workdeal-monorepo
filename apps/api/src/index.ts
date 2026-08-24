@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { env as _envDiag } from "./env.js";
 // força validação e log de diagnóstico (o import acima já fez log, mas este garante que o Proxy de env valida e mostra host)
 void _envDiag.BETTER_AUTH_URL;
-import { getRequestListener } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { auth } from "@workdeal/auth";
@@ -37,6 +36,10 @@ const app = new Hono();
 app.use("*", requestId());
 app.use("*", async (c, next) => {
   const start = Date.now();
+  // Log de entrada em mutações — se um handler pendurar, vê-se aqui que chegou a iniciar
+  if (c.req.method !== "GET") {
+    logger.info(`${c.req.method} ${c.req.path} inicio`, { requestId: c.req.header("X-Request-Id"), route: c.req.path, method: c.req.method });
+  }
   await next();
   const durationMs = Date.now() - start;
   const requestIdVal = c.req.header("X-Request-Id") ?? (c.get("requestId" as never) as string | undefined) ?? "-";
@@ -451,12 +454,11 @@ app.notFound(() => {
 
 app.onError(errorHandler);
 
-// Exports Vercel Node.js - getRequestListener converte Node IncomingMessage -> Fetch Request
-// Corrige "this.raw.headers.get is not a function" e o WARN de default export Response
-// overrideGlobalObjects=false sob Bun: sem ele o node-server substitui global.Response pela sua
-// versão lazy ("Response (lightweight)") que o Bun.serve rejeita ("Expected a Response object")
-const isBunRuntime = typeof Bun !== "undefined";
-const vercelHandler = getRequestListener(app.fetch, { overrideGlobalObjects: !isBunRuntime });
+// Exports Vercel Node.js — handlers Web-standard nativos (a Vercel faz a ponte req/res).
+// NÃO usar getRequestListener do @hono/node-server aqui: os wrappers lazy de
+// Request/Response que ele instala nos globals penduram os POST /api/auth/* no
+// runtime da Vercel (body nunca resolve → 504 FUNCTION_INVOCATION_TIMEOUT sem logs).
+const vercelHandler = (request: Request) => app.fetch(request);
 
 export const GET = vercelHandler;
 export const POST = vercelHandler;
@@ -468,7 +470,8 @@ export const HEAD = vercelHandler;
 export default vercelHandler;
 
 // Compat Bun dev — mantém `bun run src/index.ts` a funcionar
-if (isBunRuntime) {
+// @ts-ignore
+if (typeof Bun !== "undefined") {
   const _port = Number(env.PORT ?? 4000);
   // @ts-ignore
   Bun.serve({ fetch: app.fetch as never, port: _port });

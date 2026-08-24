@@ -14,6 +14,10 @@ function getPool(): Pool {
     max: 10,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 10000,
+    // Fail-fast: sem isto, uma query presa (ex.: PgBouncer em fila) pendura o
+    // request até ao timeout da Vercel (300s de 504) sem nenhum erro nos logs
+    statement_timeout: 10_000,
+    query_timeout: 10_000,
   });
   _pool.on("error", (err) => {
     console.error("[db] Pool error:", err.message);
