@@ -9,7 +9,15 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 function getPool(): Pool {
   if (_pool) return _pool;
-  _pool = new Pool({ connectionString: env.DATABASE_URL, max: 10 });
+  _pool = new Pool({
+    connectionString: env.DATABASE_URL,
+    max: 10,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 10000,
+  });
+  _pool.on("error", (err) => {
+    console.error("[db] Pool error:", err.message);
+  });
   return _pool;
 }
 function getDb(): ReturnType<typeof drizzle> {
