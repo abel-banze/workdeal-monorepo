@@ -468,11 +468,13 @@ export default vercelHandler;
 // @ts-ignore
 if (typeof Bun !== "undefined") {
   const _port = Number(env.PORT ?? 4000);
-  // Bun espera Response nativo; Hono devolve lightweight Response — converte se necessário
+  // Bun espera Response nativo; Hono devolve lightweight Response com nativeResponse — extrai ou converte
+  // @ts-ignore - Hono types com Bun
   const bunFetch = async (req: Request) => {
-    const res = await app.fetch(req as never);
-    // @ts-ignore - garante Response nativo para o Bun
-    return res instanceof Response ? res : new Response((res as { body?: BodyInit }).body as BodyInit, { status: (res as Response).status, headers: (res as Response).headers });
+    const raw = (await (app.fetch as unknown as (r: Request) => Promise<Response>)(req)) as unknown as Response & { nativeResponse?: Response };
+    if (raw instanceof Response) return raw;
+    if ((raw as unknown as { nativeResponse?: Response }).nativeResponse instanceof Response) return (raw as unknown as { nativeResponse: Response }).nativeResponse;
+    return new Response((raw as unknown as { body?: BodyInit }).body as BodyInit, { status: (raw as Response).status, headers: (raw as Response).headers as HeadersInit });
   };
   // @ts-ignore
   Bun.serve({ fetch: bunFetch as never, port: _port });
