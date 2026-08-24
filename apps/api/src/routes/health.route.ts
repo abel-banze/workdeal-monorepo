@@ -92,10 +92,12 @@ healthRoute.get("/full", async (c) => {
     console.error("[health/db/full] connection failed:", JSON.stringify(err).slice(0, 2000), "dbInfo:", JSON.stringify(dbInfo).slice(0, 1000));
     let hint = "";
     const msg = err.message;
-    if (/timeout/i.test(msg) || /timeout/i.test(err.cause ?? "") || /ETIMEDOUT/i.test(err.code ?? "")) hint = "Timeout 5s — firewall Hostinger/hPanel para 6432, ou pgbouncer listen_addr≠*, ou DB pausada. Testa nc -vz <host> 6432 de fora da tua rede.";
-    else if (/password|auth|28P01|3D000/i.test(msg) || /password|auth/i.test(err.cause ?? "")) hint = "Auth falhou — verifica user/password (caracteres @ precisam %40) e se o user tem permissão na DB workdeal_sandbox.";
-    else if (/ENOTFOUND|getaddrinfo|EAI_AGAIN/i.test(msg) || /ENOTFOUND/i.test(err.cause ?? "")) hint = "Host não resolvido — verifica hostname do DATABASE_URL.";
-    else if (/refused|ECONNREFUSED/i.test(msg) || /refused/i.test(err.cause ?? "")) hint = "Conexão recusada — pgbouncer/Postgres não escuta em 0.0.0.0:6432, verifica ss -tlnp e listen_addr=*";
+    const cause = err.cause ?? "";
+    if (/unsupported startup parameter/i.test(msg) || /unsupported startup parameter/i.test(cause)) hint = "pgbouncer rejeitou parâmetro (statement_timeout/query_timeout) — removido em 234e57e, faz redeploy. Se persistir, verifica pgbouncer.ini ignore_startup_parameters.";
+    else if (/timeout/i.test(msg) || /timeout/i.test(cause) || /ETIMEDOUT/i.test(err.code ?? "")) hint = "Timeout 5s — firewall Hostinger/hPanel para 6432, ou pgbouncer listen_addr≠*, ou DB pausada. Testa nc -vz <host> 6432 de fora da tua rede.";
+    else if (/password|auth|28P01|3D000/i.test(msg) || /password|auth/i.test(cause)) hint = "Auth falhou — verifica user/password (caracteres @ precisam %40) e se o user tem permissão na DB workdeal_sandbox.";
+    else if (/ENOTFOUND|getaddrinfo|EAI_AGAIN/i.test(msg) || /ENOTFOUND/i.test(cause)) hint = "Host não resolvido — verifica hostname do DATABASE_URL.";
+    else if (/refused|ECONNREFUSED/i.test(msg) || /refused/i.test(cause)) hint = "Conexão recusada — pgbouncer/Postgres não escuta em 0.0.0.0:6432, verifica ss -tlnp e listen_addr=*";
     tests.connection = { ok: false, error: err.message, code: err.code, cause: err.cause, detail: err.detail, stack: err.stack, hint };
     return c.json({ success: false, data: { startedAt: new Date(started).toISOString(), env: envInfo, tests, totalMs: Date.now() - started, summary: { allOk: false, cause: hint || msg.slice(0, 300) } } }, 503);
   }
