@@ -9,11 +9,17 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 function getPool(): Pool {
   if (_pool) return _pool;
+  const connStr = env.DATABASE_URL.includes("connect_timeout")
+    ? env.DATABASE_URL
+    : `${env.DATABASE_URL}${env.DATABASE_URL.includes("?") ? "&" : "?"}connect_timeout=5`;
   _pool = new Pool({
-    connectionString: env.DATABASE_URL,
+    connectionString: connStr,
     max: 10,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 10000,
+    statement_timeout: 5000,
+    query_timeout: 5000,
+    keepAlive: true,
   });
   _pool.on("error", (err) => {
     console.error("[db] Pool error:", err.message);
