@@ -5,6 +5,7 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ all: string[] }>
   const { all } = await ctx.params
   const base = env.BETTER_AUTH_URL?.replace(/\/+$/, "") ?? "http://localhost:4000"
   const target = new URL(`${base}/api/auth/${all.join("/")}`)
+  console.log(`[auth proxy] ${req.method} ${req.nextUrl.pathname}${req.nextUrl.search} -> ${target.href} env=${process.env.VERCEL_ENV ?? process.env.NODE_ENV} baseHost=${(() => { try { return new URL(base).host; } catch { return base; } })()}`)
   target.search = req.nextUrl.search
 
   const headers = new Headers(req.headers)

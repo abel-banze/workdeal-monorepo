@@ -1,5 +1,8 @@
 import "./load-env.js";
 import { Hono } from "hono";
+import { env as _envDiag } from "./env.js";
+// força validação e log de diagnóstico (o import acima já fez log, mas este garante que o Proxy de env valida e mostra host)
+void _envDiag.BETTER_AUTH_URL;
 import { getRequestListener } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
