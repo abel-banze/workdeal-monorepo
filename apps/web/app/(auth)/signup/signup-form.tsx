@@ -58,13 +58,8 @@ export function SignUpForm() {
     "w-full rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] leading-none text-[#0F1A2E] placeholder:text-[#0F1A2E]/35 outline-none transition focus:border-[#0B5E56] focus:bg-white focus:ring-2 focus:ring-[#0B5E56]/15";
   const labelCls = "text-xs font-bold tracking-[0.07em] text-[#0F1A2E]/70 uppercase";
 
-  return (
+    return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="rounded-2xl border border-[#0B5E56]/15 bg-[#0B5E56]/5 px-4 py-3">
-        <p className="text-sm font-bold text-[#0F1A2E]">Registo de empresa</p>
-        <p className="text-xs leading-relaxed text-[#0F1A2E]/60">Crie a sua conta e no passo seguinte configuramos a empresa — nome, contactos verificados e presença no ecossistema.</p>
-      </div>
-
       <div className="space-y-1.5">
         <label htmlFor="name" className={labelCls}>
           NOME COMPLETO

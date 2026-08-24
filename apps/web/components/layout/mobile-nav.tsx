@@ -9,7 +9,7 @@ export function MobileNav({
   links,
 }: {
   session: SessionInfo | null;
-  links: { href: string; label: string; badge?: string }[];
+  links: { href: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -45,12 +45,8 @@ export function MobileNav({
                 className="flex items-center justify-between rounded-lg px-3 py-2.5 text-[15px] font-medium text-[#0F1A2E] hover:bg-white"
               >
                 <span>{l.label}</span>
-                {l.badge && <span className="rounded-full bg-[#0F1A2E]/5 px-2 py-0.5 text-[10px] font-bold tracking-widest text-[#0F1A2E]/40">{l.badge}</span>}
               </Link>
             ))}
-            <Link href="/#selos" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-[15px] font-medium text-[#0F1A2E]/60 hover:bg-white">
-              Selos de confiança
-            </Link>
           </nav>
           <div className="mt-4 flex gap-2 border-t border-[#D9D2C2] pt-4">
             {session ? (

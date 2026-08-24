@@ -1,4 +1,5 @@
 import { resend, EMAIL_FROM } from "../lib/resend.js";
+import { welcomeAccountHtml, welcomeCompanyHtml, resetPasswordHtml } from "@workdeal/shared/lib/email-templates";
 
 export interface SendOtpEmailParams {
   to: string;
@@ -194,6 +195,134 @@ export async function sendContactEmail({ to, fromName, fromEmail, message, profi
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[Email] Falha contacto:", msg.slice(0, 800));
+    return { ok: false as const, error: msg };
+  }
+}
+
+export interface SendWelcomeAccountParams {
+  to: string;
+  name: string;
+  ctaUrl?: string;
+}
+
+export async function sendWelcomeAccountEmail({ to, name, ctaUrl }: SendWelcomeAccountParams) {
+  const webOrigin = (process.env.ALLOWED_ORIGINS?.split(",")[0]?.trim() ?? "https://workdeal.co.mz").replace(/\/+$/, "");
+  const url = ctaUrl ?? `${webOrigin}/onboarding`;
+  if (!resend) {
+    console.warn("[Email] RESEND_API_KEY não configurado — mock welcome conta");
+    console.log(`[Email welcome conta mock] para ${to} (${name}) -> ${url}`);
+    return { ok: true as const };
+  }
+  console.log(`[Email] Enviando boas-vindas conta para ${to}`);
+  try {
+    const sendPromise = resend.emails.send({
+      from: EMAIL_FROM,
+      to,
+      subject: "Bem-vindo ao Workdeal — a tua conta está pronta",
+      html: welcomeAccountHtml({ name, ctaUrl: url }),
+    });
+    const timeoutPromise = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Resend timeout 8s")), 8000));
+    const { data, error } = (await Promise.race([sendPromise, timeoutPromise])) as Awaited<typeof sendPromise>;
+    if (error) {
+      console.error("[Email] Resend welcome conta error:", JSON.stringify(error).slice(0, 800));
+      const msg = (error as { message?: string })?.message || JSON.stringify(error).slice(0, 500);
+      return { ok: false as const, error: msg };
+    }
+    if (!data?.id) {
+      console.error("[Email] Resend welcome conta sem id:", JSON.stringify(data).slice(0, 800));
+      return { ok: false as const, error: "Resposta sem id" };
+    }
+    console.log(`[Email] Welcome conta enviado para ${to} (id: ${data.id})`);
+    return { ok: true as const };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[Email] Falha welcome conta:", msg.slice(0, 800));
+    return { ok: false as const, error: msg };
+  }
+}
+
+export interface SendWelcomeCompanyParams {
+  to: string;
+  name: string;
+  companyName: string;
+  profileSlug?: string;
+  profileId?: string;
+}
+
+export async function sendWelcomeCompanyEmail({ to, name, companyName, profileSlug, profileId }: SendWelcomeCompanyParams) {
+  const webOrigin = (process.env.ALLOWED_ORIGINS?.split(",")[0]?.trim() ?? "https://workdeal.co.mz").replace(/\/+$/, "");
+  const slugOrId = profileSlug ?? profileId ?? "";
+  const profileUrl = slugOrId ? `${webOrigin}/profiles/${slugOrId}` : `${webOrigin}/dashboard`;
+  const dashboardUrl = `${webOrigin}/dashboard`;
+  if (!resend) {
+    console.warn("[Email] RESEND_API_KEY não configurado — mock welcome empresa");
+    console.log(`[Email welcome empresa mock] para ${to} (${companyName}) -> ${profileUrl}`);
+    return { ok: true as const };
+  }
+  console.log(`[Email] Enviando boas-vindas empresa para ${to} (${companyName})`);
+  try {
+    const sendPromise = resend.emails.send({
+      from: EMAIL_FROM,
+      to,
+      subject: `${companyName} está no ar — bem-vindo ao Workdeal`,
+      html: welcomeCompanyHtml({ name, companyName, profileUrl, dashboardUrl }),
+    });
+    const timeoutPromise = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Resend timeout 8s")), 8000));
+    const { data, error } = (await Promise.race([sendPromise, timeoutPromise])) as Awaited<typeof sendPromise>;
+    if (error) {
+      console.error("[Email] Resend welcome empresa error:", JSON.stringify(error).slice(0, 800));
+      const msg = (error as { message?: string })?.message || JSON.stringify(error).slice(0, 500);
+      return { ok: false as const, error: msg };
+    }
+    if (!data?.id) {
+      console.error("[Email] Resend welcome empresa sem id:", JSON.stringify(data).slice(0, 800));
+      return { ok: false as const, error: "Resposta sem id" };
+    }
+    console.log(`[Email] Welcome empresa enviado para ${to} (id: ${data.id})`);
+    return { ok: true as const };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[Email] Falha welcome empresa:", msg.slice(0, 800));
+    return { ok: false as const, error: msg };
+  }
+}
+
+export interface SendResetPasswordParams {
+  to: string;
+  name?: string;
+  resetUrl: string;
+}
+
+export async function sendResetPasswordEmail({ to, name, resetUrl }: SendResetPasswordParams) {
+  if (!resend) {
+    console.warn("[Email] RESEND_API_KEY não configurado — mock reset password");
+    console.log(`[Email reset mock] para ${to} -> ${resetUrl}`);
+    return { ok: true as const };
+  }
+  console.log(`[Email] Enviando reset password para ${to}`);
+  try {
+    const sendPromise = resend.emails.send({
+      from: EMAIL_FROM,
+      to,
+      subject: "Redefine a tua palavra-passe — Workdeal",
+      html: resetPasswordHtml({ name: name ?? "", resetUrl }),
+    });
+    const timeoutPromise = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Resend timeout 8s")), 8000));
+    const { data, error } = (await Promise.race([sendPromise, timeoutPromise])) as Awaited<typeof sendPromise>;
+    if (error) {
+      console.error("[Email] Resend reset error:", JSON.stringify(error).slice(0, 800));
+      const msg = (error as { message?: string })?.message || JSON.stringify(error).slice(0, 500);
+      return { ok: false as const, error: msg };
+    }
+    if (!data?.id) {
+      console.error("[Email] Resend reset sem id:", JSON.stringify(data).slice(0, 800));
+      return { ok: false as const, error: "Resposta sem id" };
+    }
+    console.log(`[Email] Reset enviado para ${to} (id: ${data.id})`);
+    return { ok: true as const };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[Email] Falha reset:", msg.slice(0, 800));
     return { ok: false as const, error: msg };
   }
 }
