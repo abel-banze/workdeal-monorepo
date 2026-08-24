@@ -214,7 +214,14 @@ app.get("/", (c) => {
       <button class="copy" id="btn-test-db-full" onclick="testDbFull()" title="Testa conexão, leitura e escrita (rollback)">🧪 Testar DB (conexão + leitura + escrita)</button>
       <span id="test-db-full-result" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted)"></span>
     </div>
-    <pre id="test-db-full-details" style="display:none; margin-top:10px; background:#0E121A; border:1px solid var(--line); border-radius:12px; padding:12px; overflow:auto; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5; white-space:pre-wrap; word-break:break-all"></pre>
+    <div id="test-db-full-panel" style="display:none; margin-top:12px; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel)">
+      <div style="display:flex; border-bottom:1px solid var(--line)">
+        <button id="tab-btn-ui" onclick="switchDbTab('ui')" style="flex:1; padding:10px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; background:var(--panel2); color:var(--text); border:none; border-right:1px solid var(--line); cursor:pointer">Visão</button>
+        <button id="tab-btn-json" onclick="switchDbTab('json')" style="flex:1; padding:10px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; background:transparent; color:var(--muted); border:none; cursor:pointer">JSON</button>
+      </div>
+      <div id="tab-ui" style="padding:14px; background:var(--panel)"></div>
+      <pre id="tab-json" style="display:none; margin:0; padding:12px; background:#0E121A; overflow:auto; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5; white-space:pre-wrap; word-break:break-all; max-height:420px"></pre>
+    </div>
   </section>
 
   <div class="grid">
@@ -300,13 +307,82 @@ async function checkStatus(){
 checkStatus();
 setInterval(checkStatus, 30000);
 
+let _dbTab='ui';
+function switchDbTab(tab){
+  _dbTab=tab;
+  const uiBtn=document.getElementById('tab-btn-ui');
+  const jsonBtn=document.getElementById('tab-btn-json');
+  const ui=document.getElementById('tab-ui');
+  const json=document.getElementById('tab-json');
+  if(tab==='ui'){
+    if(ui) ui.style.display='block';
+    if(json) json.style.display='none';
+    if(uiBtn){ uiBtn.style.background='var(--panel2)'; uiBtn.style.color='var(--text)'; }
+    if(jsonBtn){ jsonBtn.style.background='transparent'; jsonBtn.style.color='var(--muted)'; }
+  } else {
+    if(ui) ui.style.display='none';
+    if(json) json.style.display='block';
+    if(jsonBtn){ jsonBtn.style.background='var(--panel2)'; jsonBtn.style.color='var(--text)'; }
+    if(uiBtn){ uiBtn.style.background='transparent'; uiBtn.style.color='var(--muted)'; }
+  }
+}
+function renderDbUi(data){
+  if(!data) return '<p style="color:var(--muted); font-family:JetBrains Mono,monospace; font-size:11px">Sem dados</p>';
+  const ok = data.success ?? data.data?.success;
+  const d = data.data ?? data;
+  const env = d.env ?? {};
+  const tests = d.tests ?? {};
+  const summary = d.summary ?? {};
+  const esc = (s)=> String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const pill = (okB, label)=> \`<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-family:JetBrains Mono,monospace; font-size:10px; letter-spacing:.06em; text-transform:uppercase; border:1px solid \${okB ? 'rgba(20,184,166,.35)' : 'rgba(239,68,68,.35)'}; background:\${okB ? 'rgba(20,184,166,.12)' : 'rgba(239,68,68,.12)'}; color:\${okB ? 'var(--teal)' : 'var(--red)'}">\${okB ? '✓' : '✗'} \${esc(label)}</span>\`;
+  const row = (title, obj)=>{
+    if(!obj) return '';
+    const isOk = obj.ok;
+    return \`<div style="border:1px solid var(--line); border-radius:10px; padding:10px; background:rgba(255,255,255,.02)">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap">
+        <b style="font-size:12px; letter-spacing:-.02em">\${esc(title)}</b>
+        \${pill(isOk, isOk ? 'OK' : 'FALHOU')} <span style="font-family:JetBrains Mono,monospace; font-size:11px; color:var(--muted)">\${obj.ms ? obj.ms+'ms' : ''}</span>
+      </div>
+      \${obj.details ? \`<p style="margin:6px 0 0; color:var(--muted); font-size:11px; line-height:1.5">\${esc(obj.details)}</p>\` : ''}
+      \${obj.error ? \`<p style="margin:6px 0 0; color:#FCA5A5; font-family:JetBrains Mono,monospace; font-size:11px; word-break:break-all">\${esc(obj.error)}</p>\` : ''}
+      \${obj.hint ? \`<p style="margin:6px 0 0; color:var(--amber); font-size:11px; line-height:1.4">💡 \${esc(obj.hint)}</p>\` : ''}
+    </div>\`;
+  };
+  let html = '';
+  html += \`<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px">
+    \${pill(!!d.summary?.allOk || !!data.success, d.summary?.allOk || data.success ? 'TUDO OK' : 'COM FALHAS')}
+    <span style="font-family:JetBrains Mono,monospace; font-size:11px; color:var(--muted)">\${d.totalMs ? d.totalMs+'ms total' : ''} · \${esc(d.startedAt ?? '')}</span>
+  </div>\`;
+  if(summary.cause && !summary.allOk){
+    html += \`<div style="margin-bottom:10px; padding:8px 10px; border-radius:8px; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.25); color:var(--amber); font-size:11px; line-height:1.4">⚠️ \${esc(summary.cause)}</div>\`;
+  }
+  // Env string
+  const dbUrl = env.DATABASE_URL ?? {};
+  html += \`<div style="margin-bottom:10px; padding:10px; border-radius:10px; background:rgba(255,255,255,.03); border:1px solid var(--line)">
+    <p style="margin:0 0 6px; font-family:JetBrains Mono,monospace; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)">String de conexão</p>
+    <p style="margin:0; font-family:JetBrains Mono,monospace; font-size:11px; word-break:break-all">
+      <span style="color:var(--muted)">DB:</span> <b>\${esc(dbUrl.database ?? '∅')}</b> <span style="color:var(--muted)">· host</span> \${esc(dbUrl.host ?? '∅')}:\${esc(dbUrl.port ?? '')} \${dbUrl.isPgbouncer ? '<span style="padding:2px 6px; border-radius:6px; background:rgba(20,184,166,.15); border:1px solid rgba(20,184,166,.25); font-size:10px">pgbouncer</span>' : ''}
+    </p>
+    <p style="margin:4px 0 0; font-family:JetBrains Mono,monospace; font-size:11px; color:var(--muted); word-break:break-all">\${esc(dbUrl.masked ?? '')} · user \${esc(dbUrl.user ?? '')} · \${esc(dbUrl.passwordLength ?? '')}</p>
+    \${dbUrl.error ? \`<p style="margin:6px 0 0; color:var(--red); font-family:JetBrains Mono,monospace; font-size:11px">\${esc(dbUrl.error)}</p>\` : ''}
+    <p style="margin:6px 0 0; font-family:JetBrains Mono,monospace; font-size:10px; color:var(--muted)">BETTER_AUTH_URL: \${esc(env.BETTER_AUTH_URL?.value ?? '∅')} · ALLOWED_ORIGINS: \${esc(env.ALLOWED_ORIGINS?.value ?? env.ALLOWED_ORIGINS?.masked ?? '∅')}</p>
+  </div>\`;
+  html += \`<div style="display:grid; gap:8px">\`;
+  html += row('Conexão', tests.connection);
+  html += row('Leitura', tests.read);
+  html += row('Escrita', tests.write);
+  html += \`</div>\`;
+  return html;
+}
 async function testDbFull(){
   const btn=document.getElementById('btn-test-db-full');
   const resEl=document.getElementById('test-db-full-result');
-  const detEl=document.getElementById('test-db-full-details');
+  const panel=document.getElementById('test-db-full-panel');
+  const uiEl=document.getElementById('tab-ui');
+  const jsonEl=document.getElementById('tab-json');
   if(btn) { btn.disabled=true; btn.textContent='a testar…'; }
   if(resEl) resEl.textContent='a sondar /health/db/full…';
-  if(detEl) { detEl.style.display='none'; detEl.textContent=''; }
+  if(panel) panel.style.display='none';
   const t0=performance.now();
   try{
     const r=await fetch('/health/db/full', {headers:{'Accept':'application/json'}, cache:'no-store'});
@@ -317,18 +393,22 @@ async function testDbFull(){
       resEl.textContent = ok ? '✓ DB OK ('+ms+'ms) — conexão, leitura e escrita' : '✗ DB falhou ('+ms+'ms) — HTTP '+r.status;
       resEl.style.color = ok ? 'var(--teal)' : 'var(--red)';
     }
-    if(detEl && j) {
-      detEl.style.display='block';
-      detEl.textContent = JSON.stringify(j.data ?? j, null, 2);
-    }
-    if(detEl && !j) {
-      detEl.style.display='block';
-      detEl.textContent = 'Sem JSON — HTTP '+r.status;
-    }
+    if(panel) panel.style.display='block';
+    if(jsonEl) jsonEl.textContent = j ? JSON.stringify(j, null, 2) : 'Sem JSON — HTTP '+r.status;
+    if(uiEl) uiEl.innerHTML = j ? renderDbUi(j) : '<p style="color:var(--red)">Sem JSON</p>';
+    switchDbTab('ui');
   }catch(e){
     const ms=Math.round(performance.now()-t0);
     if(resEl) { resEl.textContent='✗ erro de rede ('+ms+'ms) — '+ (e instanceof Error ? e.message : String(e)); resEl.style.color='var(--red)'; }
-    if(detEl) { detEl.style.display='block'; detEl.textContent = String(e); }
+    const panel2=document.getElementById('test-db-full-panel');
+    const ui2=document.getElementById('tab-ui');
+    const json2=document.getElementById('tab-json');
+    if(panel2) panel2.style.display='block';
+    if(json2) json2.textContent = String(e);
+    if(ui2) ui2.innerHTML = '<p style="color:var(--red); font-family:JetBrains Mono,monospace; font-size:11px">'+String(e).replace(/</g,'&lt;')+'</p>';
+    if(json2) json2.style.display='none';
+    if(ui2) ui2.style.display='block';
+    switchDbTab('ui');
   }finally{
     if(btn) { btn.disabled=false; btn.textContent='🧪 Testar DB (conexão + leitura + escrita)'; }
   }
