@@ -466,7 +466,15 @@ export default vercelHandler;
 
 // Compat Bun dev — mantém `bun run src/index.ts` a funcionar
 // @ts-ignore
-if (typeof Bun !== "undefined" && (import.meta as unknown as { main?: boolean }).main) {
+if (typeof Bun !== "undefined") {
+  const _port = Number(env.PORT ?? 4000);
+  // Bun espera Response nativo; Hono devolve lightweight Response — converte se necessário
+  const bunFetch = async (req: Request) => {
+    const res = await app.fetch(req as never);
+    // @ts-ignore - garante Response nativo para o Bun
+    return res instanceof Response ? res : new Response((res as { body?: BodyInit }).body as BodyInit, { status: (res as Response).status, headers: (res as Response).headers });
+  };
   // @ts-ignore
-  Bun.serve({ fetch: app.fetch, port: Number(env.PORT ?? 4000) });
+  Bun.serve({ fetch: bunFetch as never, port: _port });
+  console.log(`[api] listening on http://localhost:${_port} — env=${env.NODE_ENV} db=${(() => { try { return new URL(env.DATABASE_URL).host; } catch { return "invalid-url"; } })()}`);
 }
