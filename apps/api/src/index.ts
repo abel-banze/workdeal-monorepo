@@ -210,6 +210,11 @@ app.get("/", (c) => {
         <div class="s-meta">CORS: <code style="max-width:18ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom">${formatAllowedOrigins(env.ALLOWED_ORIGINS)[0] ?? "—"}</code></div>
       </div>
     </div>
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+      <button class="copy" id="btn-test-db-full" onclick="testDbFull()" title="Testa conexão, leitura e escrita (rollback)">🧪 Testar DB (conexão + leitura + escrita)</button>
+      <span id="test-db-full-result" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted)"></span>
+    </div>
+    <pre id="test-db-full-details" style="display:none; margin-top:10px; background:#0E121A; border:1px solid var(--line); border-radius:12px; padding:12px; overflow:auto; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5; white-space:pre-wrap; word-break:break-all"></pre>
   </section>
 
   <div class="grid">
@@ -294,6 +299,40 @@ async function checkStatus(){
 }
 checkStatus();
 setInterval(checkStatus, 30000);
+
+async function testDbFull(){
+  const btn=document.getElementById('btn-test-db-full');
+  const resEl=document.getElementById('test-db-full-result');
+  const detEl=document.getElementById('test-db-full-details');
+  if(btn) { btn.disabled=true; btn.textContent='a testar…'; }
+  if(resEl) resEl.textContent='a sondar /health/db/full…';
+  if(detEl) { detEl.style.display='none'; detEl.textContent=''; }
+  const t0=performance.now();
+  try{
+    const r=await fetch('/health/db/full', {headers:{'Accept':'application/json'}, cache:'no-store'});
+    const ms=Math.round(performance.now()-t0);
+    const j=await r.json().catch(()=>null);
+    const ok = r.ok && j && j.success;
+    if(resEl) {
+      resEl.textContent = ok ? '✓ DB OK ('+ms+'ms) — conexão, leitura e escrita' : '✗ DB falhou ('+ms+'ms) — HTTP '+r.status;
+      resEl.style.color = ok ? 'var(--teal)' : 'var(--red)';
+    }
+    if(detEl && j) {
+      detEl.style.display='block';
+      detEl.textContent = JSON.stringify(j.data ?? j, null, 2);
+    }
+    if(detEl && !j) {
+      detEl.style.display='block';
+      detEl.textContent = 'Sem JSON — HTTP '+r.status;
+    }
+  }catch(e){
+    const ms=Math.round(performance.now()-t0);
+    if(resEl) { resEl.textContent='✗ erro de rede ('+ms+'ms) — '+ (e instanceof Error ? e.message : String(e)); resEl.style.color='var(--red)'; }
+    if(detEl) { detEl.style.display='block'; detEl.textContent = String(e); }
+  }finally{
+    if(btn) { btn.disabled=false; btn.textContent='🧪 Testar DB (conexão + leitura + escrita)'; }
+  }
+}
 </script>
 </body>
 </html>`);
