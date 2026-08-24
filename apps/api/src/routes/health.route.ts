@@ -2,53 +2,117 @@ import { Hono } from "hono";
 import { db } from "@workdeal/db";
 import { sql } from "drizzle-orm";
 
+function mask(v: string | undefined, show = 4): string {
+  if (!v) return "∅ VAZIA";
+  if (v.length <= show * 2) return `${v.slice(0, 1)}***${v.slice(-1)} (${v.length}ch)`;
+  return `${v.slice(0, show)}...${v.slice(-show)} (${v.length}ch)`;
+}
+function parseDbUrl(raw: string | undefined): Record<string, unknown> {
+  if (!raw) return { present: false, error: "DATABASE_URL vazia — Vercel Preview sem DB, define em Settings → Env → Preview (develop)" };
+  try {
+    const u = new URL(raw);
+    const dbName = u.pathname.replace(/^\//, "") || "∅";
+    const isPgbouncer = u.port === "6432";
+    return {
+      present: true,
+      masked: mask(raw, 6),
+      protocol: u.protocol,
+      host: u.hostname,
+      port: u.port || "5432",
+      database: dbName,
+      user: u.username || "∅",
+      passwordLength: u.password ? `${u.password.length}ch` : "∅",
+      isPgbouncer,
+      search: u.search || "∅",
+    };
+  } catch (e) {
+    return { present: true, masked: mask(raw, 6), error: `URL inválida: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 export const healthRoute = new Hono();
 
 healthRoute.get("/", async (c) => {
   let dbOk = false;
+  let error: string | undefined;
   try {
     await db.execute(sql`SELECT 1`);
     dbOk = true;
-  } catch {
+  } catch (e) {
     dbOk = false;
+    error = e instanceof Error ? e.message.slice(0, 300) : String(e);
   }
   const status = dbOk ? 200 : 503;
-  return c.json({ success: dbOk, data: { status: dbOk ? "ok" : "degraded", db: dbOk ? "up" : "down" } }, status);
+  return c.json({ success: dbOk, data: { status: dbOk ? "ok" : "degraded", db: dbOk ? "up" : "down", error, hint: dbOk ? undefined : "Verifica DATABASE_URL e firewall 6432/5432" } }, status);
 });
 
 healthRoute.get("/full", async (c) => {
   const started = Date.now();
-  const result: Record<string, unknown> = { startedAt: new Date().toISOString() };
+  const rawDbUrl = process.env.DATABASE_URL;
+  const dbInfo = parseDbUrl(rawDbUrl);
+  const envInfo = {
+    DATABASE_URL: dbInfo,
+    BETTER_AUTH_URL: { value: process.env.BETTER_AUTH_URL ?? "∅ VAZIA", host: (() => { try { return new URL(process.env.BETTER_AUTH_URL ?? "").host; } catch { return "URL inválida"; } })(), masked: mask(process.env.BETTER_AUTH_URL) },
+    BETTER_AUTH_SECRET: { present: !!process.env.BETTER_AUTH_SECRET, masked: mask(process.env.BETTER_AUTH_SECRET, 4) },
+    ALLOWED_ORIGINS: { value: process.env.ALLOWED_ORIGINS ?? "∅ VAZIA", masked: mask(process.env.ALLOWED_ORIGINS, 8) },
+    RESEND_API_KEY: { present: !!process.env.RESEND_API_KEY, masked: mask(process.env.RESEND_API_KEY, 4) },
+    INTERNAL_API_SECRET: { present: !!process.env.INTERNAL_API_SECRET, masked: mask(process.env.INTERNAL_API_SECRET, 4) },
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_REGION: process.env.VERCEL_REGION ?? "∅",
+    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+  };
+
+  const tests: Record<string, unknown> = {};
+
   // 1. Conexão
   try {
     const t0 = Date.now();
     await db.execute(sql`SELECT 1 as ping`);
-    result.connection = { ok: true, ms: Date.now() - t0 };
+    tests.connection = { ok: true, ms: Date.now() - t0, details: "TCP + Pool OK, SELECT 1 respondeu" };
   } catch (e) {
-    result.connection = { ok: false, error: e instanceof Error ? e.message.slice(0, 300) : String(e) };
-    return c.json({ success: false, data: result }, 503);
+    const msg = e instanceof Error ? e.message : String(e);
+    let hint = "";
+    if (/timeout/i.test(msg)) hint = "Timeout 5s — firewall Hostinger/hPanel para 6432, ou pgbouncer listen_addr≠*, ou DB pausada. Testa nc -vz <host> 6432 de fora da tua rede.";
+    else if (/password|auth/i.test(msg)) hint = "Auth falhou — verifica user/password (caracteres @ precisam %40) e se o user tem permissão na DB.";
+    else if (/ENOTFOUND|getaddrinfo/i.test(msg)) hint = "Host não resolvido — verifica hostname do DATABASE_URL.";
+    tests.connection = { ok: false, error: msg.slice(0, 500), hint };
+    return c.json({ success: false, data: { startedAt: new Date(started).toISOString(), env: envInfo, tests, totalMs: Date.now() - started, summary: { allOk: false, cause: hint || msg.slice(0, 200) } } }, 503);
   }
+
   // 2. Leitura
   try {
     const t0 = Date.now();
-    const rows = await db.execute(sql`SELECT id, slug FROM category LIMIT 1`);
-    result.read = { ok: true, ms: Date.now() - t0, sample: (rows as unknown as { rows?: unknown[] })?.rows?.length ?? 1 };
+    const res: unknown = await db.execute(sql`SELECT id, slug FROM category LIMIT 1`);
+    const rows = (res as { rows?: unknown[] })?.rows ?? (Array.isArray(res) ? res : []);
+    tests.read = { ok: true, ms: Date.now() - t0, rowCount: Array.isArray(rows) ? rows.length : 1, details: "SELECT em category OK" };
   } catch (e) {
-    result.read = { ok: false, error: e instanceof Error ? e.message.slice(0, 300) : String(e) };
+    const msg = e instanceof Error ? e.message : String(e);
+    tests.read = { ok: false, error: msg.slice(0, 500), hint: "Leitura falhou — verifica permissões SELECT e se a tabela category existe." };
   }
-  // 3. Escrita (transação que faz rollback — não suja dados)
+
+  // 3. Escrita (rollback — não suja dados)
   try {
     const t0 = Date.now();
     await db.execute(sql`BEGIN`);
     await db.execute(sql`CREATE TEMP TABLE IF NOT EXISTS _workdeal_health_write_test (id text PRIMARY KEY, v int) ON COMMIT DROP`);
-    await db.execute(sql`INSERT INTO _workdeal_health_write_test (id, v) VALUES ('health-${Date.now()}', 1) ON CONFLICT DO NOTHING`);
+    const tid = `health-${Date.now()}`;
+    await db.execute(sql`INSERT INTO _workdeal_health_write_test (id, v) VALUES (${tid}, 1) ON CONFLICT DO NOTHING`);
     await db.execute(sql`ROLLBACK`);
-    result.write = { ok: true, ms: Date.now() - t0 };
+    tests.write = { ok: true, ms: Date.now() - t0, details: "BEGIN + CREATE TEMP + INSERT + ROLLBACK OK — permissão de escrita confirmada" };
   } catch (e) {
     try { await db.execute(sql`ROLLBACK`); } catch {}
-    result.write = { ok: false, error: e instanceof Error ? e.message.slice(0, 300) : String(e) };
+    const msg = e instanceof Error ? e.message : String(e);
+    tests.write = { ok: false, error: msg.slice(0, 500), hint: "Escrita falhou — verifica permissão CREATE TEMP / INSERT ou se a DB está em modo read-only." };
   }
-  result.totalMs = Date.now() - started;
-  const allOk = (result.connection as { ok?: boolean })?.ok && (result.read as { ok?: boolean })?.ok && (result.write as { ok?: boolean })?.ok;
-  return c.json({ success: !!allOk, data: result }, allOk ? 200 : 503);
+
+  const totalMs = Date.now() - started;
+  const allOk = (tests.connection as { ok?: boolean })?.ok && (tests.read as { ok?: boolean })?.ok && (tests.write as { ok?: boolean })?.ok;
+  let cause = "";
+  if (!allOk) {
+    if (!(tests.connection as { ok?: boolean })?.ok) cause = (tests.connection as { hint?: string })?.hint ?? "Falha de conexão";
+    else if (!(tests.read as { ok?: boolean })?.ok) cause = (tests.read as { hint?: string })?.hint ?? "Falha de leitura";
+    else if (!(tests.write as { ok?: boolean })?.ok) cause = (tests.write as { hint?: string })?.hint ?? "Falha de escrita";
+  }
+  return c.json({ success: !!allOk, data: { startedAt: new Date(started).toISOString(), env: envInfo, tests, totalMs, summary: { allOk: !!allOk, cause: cause || (allOk ? "Tudo OK" : "Verifica logs acima") } } }, allOk ? 200 : 503);
 });
