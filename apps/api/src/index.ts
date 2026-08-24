@@ -453,7 +453,10 @@ app.onError(errorHandler);
 
 // Exports Vercel Node.js - getRequestListener converte Node IncomingMessage -> Fetch Request
 // Corrige "this.raw.headers.get is not a function" e o WARN de default export Response
-const vercelHandler = getRequestListener(app.fetch);
+// overrideGlobalObjects=false sob Bun: sem ele o node-server substitui global.Response pela sua
+// versão lazy ("Response (lightweight)") que o Bun.serve rejeita ("Expected a Response object")
+const isBunRuntime = typeof Bun !== "undefined";
+const vercelHandler = getRequestListener(app.fetch, { overrideGlobalObjects: !isBunRuntime });
 
 export const GET = vercelHandler;
 export const POST = vercelHandler;
@@ -465,18 +468,9 @@ export const HEAD = vercelHandler;
 export default vercelHandler;
 
 // Compat Bun dev — mantém `bun run src/index.ts` a funcionar
-// @ts-ignore
-if (typeof Bun !== "undefined") {
+if (isBunRuntime) {
   const _port = Number(env.PORT ?? 4000);
-  // Bun espera Response nativo; Hono devolve lightweight Response com nativeResponse — extrai ou converte
-  // @ts-ignore - Hono types com Bun
-  const bunFetch = async (req: Request) => {
-    const raw = (await (app.fetch as unknown as (r: Request) => Promise<Response>)(req)) as unknown as Response & { nativeResponse?: Response };
-    if (raw instanceof Response) return raw;
-    if ((raw as unknown as { nativeResponse?: Response }).nativeResponse instanceof Response) return (raw as unknown as { nativeResponse: Response }).nativeResponse;
-    return new Response((raw as unknown as { body?: BodyInit }).body as BodyInit, { status: (raw as Response).status, headers: (raw as Response).headers as HeadersInit });
-  };
   // @ts-ignore
-  Bun.serve({ fetch: bunFetch as never, port: _port });
+  Bun.serve({ fetch: app.fetch as never, port: _port });
   console.log(`[api] listening on http://localhost:${_port} — env=${env.NODE_ENV} db=${(() => { try { return new URL(env.DATABASE_URL).host; } catch { return "invalid-url"; } })()}`);
 }

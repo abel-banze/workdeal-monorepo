@@ -16,16 +16,21 @@ export async function placesAutocompleteAction(input: string): Promise<PlacesSug
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Pesquisa inválida" };
   }
   const token = (await cookies()).get(JWT_COOKIE_NAME)?.value ?? null;
-  if (!token) return { ok: false, error: "Sessão necessária" };
+  if (!token) {
+    console.error(`[places:action] sem JWT cookie (${JWT_COOKIE_NAME}) — autocomplete bloqueado`);
+    return { ok: false, error: "Sessão necessária" };
+  }
 
   try {
-    const res = await apiFetchWithAuth<PlaceSuggestion[]>("/api/v1/places/autocomplete", token, {
-      method: "POST",
-      body: JSON.stringify(parsed.data),
+    const qs = new URLSearchParams({ input: parsed.data.input });
+    console.log(`[places:action] GET ${process.env.API_URL ?? "(api url default)"}/api/v1/places/autocomplete?input=${JSON.stringify(parsed.data.input)}`);
+    const res = await apiFetchWithAuth<PlaceSuggestion[]>(`/api/v1/places/autocomplete?${qs.toString()}`, token, {
       cache: "no-store",
     });
+    console.log(`[places:action] resposta ok — ${Array.isArray(res.data) ? res.data.length : 0} sugestões`);
     return { ok: true, suggestions: Array.isArray(res.data) ? res.data : [] };
   } catch (e) {
+    console.error("[places:action] falhou:", e instanceof Error ? e.message : e);
     return { ok: false, error: e instanceof Error ? e.message.slice(0, 300) : "Falha na pesquisa" };
   }
 }
