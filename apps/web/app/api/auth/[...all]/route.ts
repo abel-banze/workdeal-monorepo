@@ -37,9 +37,13 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ all: string[] }>
       res.headers.set(key, value)
     })
     for (const cookie of upstream.headers.getSetCookie()) {
+      // Remove Domain — garante que o cookie fica no domínio do web (proxy), não no da API.
+      // Replace Path with / — better-auth define Path=/api/auth por omissão, mas o browser só
+      // envia cookies para caminhos dentro desse path. Usar Path=/ garante que o cookie é
+      // enviado em todos os pedidos, incluindo Server Actions e /api/auth/token.
       const cleaned = cookie
         .replace(/;\s*Domain=[^;]*/gi, "")
-        .replace(/;\s*Path=[^;]*/gi, "")
+        .replace(/;\s*Path=[^;]*/gi, "; Path=/")
       res.headers.append("set-cookie", cleaned)
     }
 
