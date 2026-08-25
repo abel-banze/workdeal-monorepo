@@ -1,15 +1,13 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { jwtVerify, type JWTPayload } from "jose";
 import type { AuthUser, SessionInfo } from "@workdeal/shared";
 
 const BETTER_AUTH_URL = process.env.BETTER_AUTH_URL ?? "http://localhost:4000";
 
-// better-auth expõe JWKS em /api/auth/jwks (404 em /.well-known/jwks.json)
-const JWKS_URL = new URL(`${BETTER_AUTH_URL}/api/auth/jwks`);
-const JWKS = createRemoteJWKSet(JWKS_URL, {
-  cacheMaxAge: 60 * 60 * 1000,
-});
+// better-auth uses HS256 (HMAC-SHA256). We verify locally with the shared secret
+// instead of fetching JWKS remotely (unreachable from web server to API in preview).
+const secret = new TextEncoder().encode(process.env.BETTER_AUTH_SECRET ?? "");
 
-interface JwtClaims {
+interface JwtClaims extends JWTPayload {
   sub?: string;
   sessionId?: string;
   email?: string;
@@ -23,11 +21,10 @@ interface JwtClaims {
 
 export async function verifyJwt(token: string): Promise<SessionInfo | null> {
   try {
-    const { payload } = await jwtVerify(token, JWKS, {
+    const { payload } = await jwtVerify(token, secret, {
       issuer: BETTER_AUTH_URL,
       audience: BETTER_AUTH_URL,
     });
-    console.log("[verifyJwt] ok, sub:", payload.sub)
     return claimsToSessionInfo(payload as JwtClaims);
   } catch (e) {
     console.error("[verifyJwt] FAILED:", e instanceof Error ? e.message : String(e))
