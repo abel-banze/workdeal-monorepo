@@ -8,6 +8,7 @@ import {
   contactIdentifier,
   normalizeMzPhone,
 } from "@workdeal/shared/lib/phone";
+import { getWebOrigin } from "@/lib/api";
 import {
   signContactVerification,
   parseVerifiedContacts,
@@ -279,7 +280,7 @@ export async function sendEmailOtp(input: { email: string }): Promise<SendResult
 
   try {
     // Route through local proxy to avoid Vercel Deployment Protection
-    const res = await fetch("/api/v1/email/otp", {
+    const res = await fetch(`${getWebOrigin()}/api/v1/email/otp`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -9,17 +9,27 @@ export interface ApiEnvelope<T> {
 }
 
 /**
+ * Build the absolute origin of this web deployment.
+ * Server Components and Server Actions run on the server where relative URLs
+ * don't resolve — we need an absolute URL that hits our own /api/v1/* proxy.
+ */
+export function getWebOrigin(): string {
+  const vercelUrl = process.env.VERCEL_URL;
+  if (vercelUrl) return `https://${vercelUrl}`;
+  return `http://localhost:${process.env.PORT ?? 3000}`;
+}
+
+/**
  * Server-side fetch to the API via the local proxy (/api/v1/*).
  * The proxy forwards to BETTER_AUTH_URL with the JWT as Bearer token.
- * No direct server-to-server calls — avoids Vercel Deployment Protection.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<ApiEnvelope<T>> {
   const cookieStore = await cookies();
   const jwt = cookieStore.get(JWT_COOKIE_NAME)?.value;
   const authHeaders: Record<string, string> = jwt ? { Authorization: `Bearer ${jwt}` } : {};
 
-  // Route through local proxy — path already starts with /api/v1/
-  const res = await fetch(path, {
+  const url = `${getWebOrigin()}${path}`;
+  const res = await fetch(url, {
     ...init,
     headers: { "Content-Type": "application/json", ...authHeaders, ...(init?.headers ?? {}) },
   });
@@ -34,7 +44,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<Api
 export async function apiFetchWithAuth<T>(path: string, token: string | null, init?: RequestInit): Promise<ApiEnvelope<T>> {
   const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-  const res = await fetch(path, {
+  const url = `${getWebOrigin()}${path}`;
+  const res = await fetch(url, {
     ...init,
     headers: { "Content-Type": "application/json", ...authHeaders, ...(init?.headers ?? {}) },
   });

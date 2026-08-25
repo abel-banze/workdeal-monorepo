@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { getWebOrigin } from "@/lib/api";
 
 const contactSchema = z.object({
   to: z.string().email("Email destino inválido"),
@@ -21,7 +22,7 @@ export async function sendContactEmail(input: z.infer<typeof contactSchema>): Pr
   const internalSecret = process.env.INTERNAL_API_SECRET;
   try {
     // Route through local proxy to avoid Vercel Deployment Protection
-    const res = await fetch("/api/v1/email/contact", {
+    const res = await fetch(`${getWebOrigin()}/api/v1/email/contact`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

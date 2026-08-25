@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
+import { getWebOrigin } from "@/lib/api";
 
 export type UploadFileResult =
   | { ok: true; file: { id: string; url: string; publicId: string; resourceType: string; format: string | null; bytes: number | null; originalFilename: string | null } }
@@ -23,7 +24,7 @@ export async function uploadFilesAction(formData: FormData): Promise<UploadFileR
 
   try {
     // Route through local proxy to avoid Vercel Deployment Protection
-    const res = await fetch("/api/v1/files/upload", {
+    const res = await fetch(`${getWebOrigin()}/api/v1/files/upload`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: fd,
