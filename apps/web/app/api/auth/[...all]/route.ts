@@ -33,7 +33,10 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ all: string[] }>
       res.headers.set(key, value)
     })
     for (const cookie of upstream.headers.getSetCookie()) {
-      res.headers.append("set-cookie", cookie)
+      // Remove Domain attribute — garante que o cookie fica no domínio do web (proxy),
+      // não no domínio da API (sandbox-api), para que Next.js server-side possa lê-lo.
+      const cleaned = cookie.replace(/;\s*Domain=[^;]*/gi, "")
+      res.headers.append("set-cookie", cleaned)
     }
 
     return res
