@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const envSchema = z.object({
+  NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
   BETTER_AUTH_URL: z.string().url().default("http://localhost:4000"),
   API_URL: z.string().url().default("http://localhost:4000"),
   ZERNIO_API_KEY: z.string().min(1).optional(),
