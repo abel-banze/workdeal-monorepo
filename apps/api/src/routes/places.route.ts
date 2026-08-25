@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
 import { placeAutocompleteQuerySchema } from "@workdeal/shared";
-import { requireAuth } from "../middlewares/auth.middleware.js";
 import type { Env } from "../middlewares/auth.middleware.js";
 import { placesController } from "../controllers/places.controller.js";
 import { AppError } from "../lib/errors.js";
@@ -24,7 +23,6 @@ export const placesRoute = new Hono<Env>();
 // Pesquisa de lugares (empresas/endereços) — proxy autenticado para Google Places API (New)
 placesRoute.get(
   "/autocomplete",
-  requireAuth,
   rateLimit(autocompleteLimiter),
   zValidator("query", placeAutocompleteQuerySchema),
   async (c) => {
@@ -35,7 +33,7 @@ placesRoute.get(
 );
 
 // Detalhes de um lugar — pré-preenche morada/contactos/horário no onboarding e edição
-placesRoute.get("/details/:placeId", requireAuth, rateLimit(detailsLimiter), async (c) => {
+placesRoute.get("/details/:placeId", rateLimit(detailsLimiter), async (c) => {
   const placeId = c.req.param("placeId");
   const { body, status } = await placesController.details(placeId);
   return c.json(body, status);
