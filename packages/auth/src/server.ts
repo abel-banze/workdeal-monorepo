@@ -12,7 +12,7 @@ export const auth = betterAuth({
   }),
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: env.ALLOWED_ORIGINS.split(","),
+  trustedOrigins: env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()),
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
