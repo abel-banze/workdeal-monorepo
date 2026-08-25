@@ -5,11 +5,21 @@ import { redirect } from "next/navigation"
 import { JWT_COOKIE_NAME, jwtCookieOptions } from "@workdeal/auth/cookies"
 import { env } from "@/lib/env"
 
+const BETTER_AUTH_SESSION_COOKIES = ["__Secure-better-auth.session_token", "better-auth.session_token"] as const
+
+function readSessionToken(store: { get: (name: string) => { value?: string } | undefined }): string | undefined {
+  for (const name of BETTER_AUTH_SESSION_COOKIES) {
+    const v = store.get(name)?.value
+    if (v) return v
+  }
+  return undefined
+}
+
 export async function signOut() {
   const store = await cookies()
-  const sessionToken = store.get("better-auth.session_token")?.value
+  const sessionToken = readSessionToken(store)
   store.delete(JWT_COOKIE_NAME)
-  store.delete("better-auth.session_token")
+  for (const name of BETTER_AUTH_SESSION_COOKIES) store.delete(name)
 
   if (sessionToken) {
     await fetch(`${env.BETTER_AUTH_URL}/api/auth/sign-out`, {
@@ -24,17 +34,16 @@ export async function signOut() {
 /**
  * Store the JWT as an httpOnly cookie.
  *
- * When `jwtToken` is provided (from the client-side better-auth signIn/signUp
- * response via the jwtClient plugin), we store it directly — no API call needed.
+ * When `jwtToken` is provided (fetched via proxy from /api/auth/token),
+ * store it directly — no additional API call needed.
  *
- * When omitted, we fall back to reading the `better-auth.session_token` cookie
- * and exchanging it via the API's /token endpoint. This path is used by the
- * team-switcher / onboarding where the session cookie IS available server-side.
+ * When omitted, fall back to reading the session cookie and exchanging
+ * via the API's /token endpoint (server-to-server).
  */
 export async function syncJwt(jwtToken?: string): Promise<{ ok: boolean; error?: string }> {
   const store = await cookies()
 
-  // Fast path: client already has the JWT from better-auth's signIn/signUp response.
+  // Fast path: JWT already fetched by client via /api/auth/token proxy.
   if (jwtToken) {
     console.log("[syncJwt] storing JWT from client, preview:", jwtToken.slice(0, 20) + "...")
     const isSecure = env.BETTER_AUTH_URL.startsWith("https://")
@@ -47,8 +56,8 @@ export async function syncJwt(jwtToken?: string): Promise<{ ok: boolean; error?:
     return { ok: true }
   }
 
-  // Fallback: exchange session cookie for JWT via API /token endpoint.
-  const sessionToken = store.get("better-auth.session_token")?.value
+  // Fallback: read session cookie and exchange for JWT via API.
+  const sessionToken = readSessionToken(store)
   console.log("[syncJwt] fallback path, cookie present:", !!sessionToken)
   if (!sessionToken) {
     console.log("[syncJwt] no token and no cookie — available:", store.getAll().map((c) => c.name))
