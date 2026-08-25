@@ -27,7 +27,9 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ all: string[] }>
     const res = new NextResponse(upstream.body, { status: upstream.status })
 
     upstream.headers.forEach((value, key) => {
-      if (key.toLowerCase() === "set-cookie" || key.toLowerCase() === "content-length") return
+      const k = key.toLowerCase()
+      if (k === "set-cookie" || k === "content-length") return
+      if (k === "transfer-encoding" || k === "content-encoding" || k === "connection") return
       res.headers.set(key, value)
     })
     for (const cookie of upstream.headers.getSetCookie()) {

@@ -568,6 +568,8 @@ const vercelHandler = async (req: unknown, res?: unknown) => {
       const buf = isHead ? undefined : new Uint8Array(await response.arrayBuffer());
       const h: Record<string, string | string[]> = {};
       response.headers.forEach((v, k) => {
+        const lower = k.toLowerCase();
+        if (lower === "transfer-encoding" || lower === "content-encoding" || lower === "connection") return;
         h[k] = v;
       });
       const setCookies = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
