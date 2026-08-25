@@ -26,6 +26,10 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ all: string[] }>
     clearTimeout(timeout)
     const res = new NextResponse(upstream.body, { status: upstream.status })
 
+    console.log(`[auth proxy] upstream ${upstream.status} for ${target.pathname}`)
+    const rawCookies = upstream.headers.getSetCookie()
+    console.log(`[auth proxy] raw Set-Cookie count: ${rawCookies.length}`, rawCookies.map((c) => c.slice(0, 120)))
+
     upstream.headers.forEach((value, key) => {
       const k = key.toLowerCase()
       if (k === "set-cookie" || k === "content-length") return
@@ -33,15 +37,14 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ all: string[] }>
       res.headers.set(key, value)
     })
     for (const cookie of upstream.headers.getSetCookie()) {
-      // Remove Domain — garante que o cookie fica no domínio do web (proxy), não no da API.
-      // Remove Path — better-auth define Path=/api/auth por omissão, mas o browser só envia
-      // cookies para Server Actions se o Path incluir o caminho da action. Strip para Path=/.
       const cleaned = cookie
         .replace(/;\s*Domain=[^;]*/gi, "")
         .replace(/;\s*Path=[^;]*/gi, "")
       res.headers.append("set-cookie", cleaned)
     }
 
+    const forwardedCookies = res.headers.getSetCookie()
+    console.log(`[auth proxy] forwarded Set-Cookie count: ${forwardedCookies.length}`, forwardedCookies.map((c) => c.slice(0, 120)))
     return res
   } catch (e) {
     clearTimeout(timeout)

@@ -44,6 +44,7 @@ export function SignUpForm() {
       const data = parsed.data;
       const res = await authClient.signUp.email({ name: data.name, email: data.email, password: data.password });
       if (res.error) throw new Error(res.error.message ?? "Falha ao criar conta");
+      console.log("[signup] signUp ok, token:", !!res.data?.token, "tokenPreview:", res.data?.token ? String(res.data.token).slice(0, 20) + "..." : "null");
 
       await fetchJwtToken(res.data?.token ?? undefined);
       router.push("/onboarding");

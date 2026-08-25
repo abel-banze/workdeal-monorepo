@@ -24,31 +24,40 @@ export async function signOut() {
 export async function syncJwt(sessionTokenOverride?: string): Promise<{ ok: boolean; error?: string }> {
   const store = await cookies()
   const sessionToken = sessionTokenOverride ?? store.get("better-auth.session_token")?.value
-  if (!sessionToken) return { ok: false, error: "Sessão não encontrada" }
+  console.log("[syncJwt] override:", !!sessionTokenOverride, "cookie:", !!store.get("better-auth.session_token")?.value, "final:", !!sessionToken)
+  if (!sessionToken) {
+    console.log("[syncJwt] no session token — cookie names:", [...store.getAll().map((c) => c.name)])
+    return { ok: false, error: "Sessão não encontrada" }
+  }
 
+  const tokenUrl = `${env.BETTER_AUTH_URL}/api/auth/token`
+  console.log("[syncJwt] fetching token from:", tokenUrl)
   try {
-    const res = await fetch(`${env.BETTER_AUTH_URL}/api/auth/token`, {
+    const res = await fetch(tokenUrl, {
       method: "GET",
       headers: { Cookie: `better-auth.session_token=${sessionToken}` },
       cache: "no-store",
     })
+    const txtBody = await res.text().catch(() => "")
+    console.log("[syncJwt] token response:", res.status, "body:", txtBody.slice(0, 500))
     if (!res.ok) {
-      const txt = await res.text().catch(() => "")
-      return { ok: false, error: `Falha ao obter JWT: ${res.status} ${txt.slice(0, 200)}` }
+      return { ok: false, error: `Falha ao obter JWT: ${res.status} ${txtBody.slice(0, 200)}` }
     }
-    const data = (await res.json().catch(() => ({}))) as { token?: string }
+    const data = (txtBody ? JSON.parse(txtBody) : {}) as { token?: string }
     const token = data.token
+    console.log("[syncJwt] token present:", !!token, "type:", typeof token)
     if (!token || typeof token !== "string") return { ok: false, error: "Token vazio" }
 
     const isSecure = env.BETTER_AUTH_URL.startsWith("https://")
-    // `cookies()` em Server Action é mutável em runtime; tipagem `ReadonlyRequestCookies` não expõe `set`
     await (store as unknown as { set: (n: string, v: string, o: unknown) => void }).set(
       JWT_COOKIE_NAME,
       token,
       jwtCookieOptions(isSecure),
     )
+    console.log("[syncJwt] JWT cookie set, ok")
     return { ok: true }
   } catch (e) {
+    console.error("[syncJwt] exception:", e)
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
