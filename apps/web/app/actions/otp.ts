@@ -298,7 +298,6 @@ export async function sendEmailOtp(input: { email: string }): Promise<SendResult
       return { ok: true };
     }
     const apiMessage = data?.error?.message ?? text.slice(0, 200) ?? `${res.status}`;
-    console.warn(`[Email] falha ${apiUrl}/api/v1/email/otp → ${res.status} ${apiMessage}`);
     if (!isProd() && !res.ok) {
       // dev: não bloquear onboarding local se API offline
       return { ok: true };
