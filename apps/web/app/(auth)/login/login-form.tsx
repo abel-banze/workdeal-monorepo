@@ -28,7 +28,7 @@ export function LoginForm({ next }: { next?: string }) {
     try {
       const res = await authClient.signIn.email({ email, password });
       if (res.error) throw new Error(res.error.message ?? "Credenciais inválidas");
-      await fetchJwtToken();
+      await fetchJwtToken(res.data?.session?.token);
       router.push(next ?? "/dashboard");
       router.refresh();
     } catch (err) {

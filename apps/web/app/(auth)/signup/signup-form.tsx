@@ -45,7 +45,7 @@ export function SignUpForm() {
       const res = await authClient.signUp.email({ name: data.name, email: data.email, password: data.password });
       if (res.error) throw new Error(res.error.message ?? "Falha ao criar conta");
 
-      await fetchJwtToken();
+      await fetchJwtToken(res.data?.session?.token);
       router.push("/onboarding");
       router.refresh();
     } catch (err) {

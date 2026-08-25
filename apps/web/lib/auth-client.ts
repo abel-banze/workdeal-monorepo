@@ -5,11 +5,12 @@ export const authClient = createAuthClient({
   plugins: [organizationClient(), jwtClient()],
 })
 
-// Mantido por compatibilidade — delega para Server Action httpOnly (mais seguro).
-// O JWT é gravado como cookie httpOnly `workdeal_jwt` via `syncJwt()`; o antigo
-// `fetch("/api/auth/token")` só devolvia JSON e nunca gravava o cookie.
-export async function fetchJwtToken(): Promise<void> {
+// Delega para Server Action httpOnly (mais seguro).
+// O JWT é gravado como cookie httpOnly `workdeal_jwt` via `syncJwt()`.
+// `sessionToken` é opcional — quando fornecido (via client response), bypassa a leitura
+// de cookie que pode falhar se o proxy não encaminhar Set-Cookie correctamente.
+export async function fetchJwtToken(sessionToken?: string): Promise<void> {
   const { syncJwt } = await import("@/app/actions/auth")
-  const res = await syncJwt()
+  const res = await syncJwt(sessionToken)
   if (!res.ok) throw new Error(res.error ?? "Falha ao sincronizar JWT")
 }
