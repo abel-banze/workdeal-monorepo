@@ -277,9 +277,9 @@ export async function sendEmailOtp(input: { email: string }): Promise<SendResult
   if (!r.ok || !r.code) return r;
   const code = r.code;
 
-  const apiUrl = (process.env.API_URL || process.env.BETTER_AUTH_URL || "http://localhost:4000").replace(/\/+$/, "");
   try {
-    const res = await fetch(`${apiUrl}/api/v1/email/otp`, {
+    // Route through local proxy to avoid Vercel Deployment Protection
+    const res = await fetch("/api/v1/email/otp", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
