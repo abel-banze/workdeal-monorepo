@@ -2,15 +2,13 @@
 
 import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
-import { env } from "@/lib/env";
+import { getWebOrigin } from "@/lib/api";
 
 export type UploadFileResult =
   | { ok: true; file: { id: string; url: string; publicId: string; resourceType: string; format: string | null; bytes: number | null; originalFilename: string | null } }
   | { ok: false; error: string; file?: undefined };
 
 export async function uploadFilesAction(formData: FormData): Promise<UploadFileResult> {
-  // Login opcional — convidados podem anexar ficheiros a cotações
-  // (a API restringe uploads anónimos a purpose=quote)
   const token = (await cookies()).get(JWT_COOKIE_NAME)?.value ?? null;
 
   const file = formData.get("file");
@@ -20,13 +18,13 @@ export async function uploadFilesAction(formData: FormData): Promise<UploadFileR
   const purpose = formData.get("purpose");
   const purposeValue = typeof purpose === "string" && purpose.length > 0 ? purpose : "generic";
 
-  const apiUrl = `${env.API_URL}/api/v1/files/upload`;
   const fd = new FormData();
   fd.set("file", file, file.name);
   fd.set("purpose", purposeValue);
 
   try {
-    const res = await fetch(apiUrl, {
+    // Route through local proxy to avoid Vercel Deployment Protection
+    const res = await fetch(`${getWebOrigin()}/api/v1/files/upload`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: fd,

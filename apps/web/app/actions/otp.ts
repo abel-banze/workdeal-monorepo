@@ -8,6 +8,7 @@ import {
   contactIdentifier,
   normalizeMzPhone,
 } from "@workdeal/shared/lib/phone";
+import { getWebOrigin } from "@/lib/api";
 import {
   signContactVerification,
   parseVerifiedContacts,
@@ -277,9 +278,9 @@ export async function sendEmailOtp(input: { email: string }): Promise<SendResult
   if (!r.ok || !r.code) return r;
   const code = r.code;
 
-  const apiUrl = (process.env.API_URL || process.env.BETTER_AUTH_URL || "http://localhost:4000").replace(/\/+$/, "");
   try {
-    const res = await fetch(`${apiUrl}/api/v1/email/otp`, {
+    // Route through local proxy to avoid Vercel Deployment Protection
+    const res = await fetch(`${getWebOrigin()}/api/v1/email/otp`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -298,7 +299,6 @@ export async function sendEmailOtp(input: { email: string }): Promise<SendResult
       return { ok: true };
     }
     const apiMessage = data?.error?.message ?? text.slice(0, 200) ?? `${res.status}`;
-    console.warn(`[Email] falha ${apiUrl}/api/v1/email/otp → ${res.status} ${apiMessage}`);
     if (!isProd() && !res.ok) {
       // dev: não bloquear onboarding local se API offline
       return { ok: true };

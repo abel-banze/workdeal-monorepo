@@ -23,11 +23,9 @@ export async function placesAutocompleteAction(input: string): Promise<PlacesSug
 
   try {
     const qs = new URLSearchParams({ input: parsed.data.input });
-    console.log(`[places:action] GET ${process.env.API_URL ?? "(api url default)"}/api/v1/places/autocomplete?input=${JSON.stringify(parsed.data.input)}`);
     const res = await apiFetchWithAuth<PlaceSuggestion[]>(`/api/v1/places/autocomplete?${qs.toString()}`, token, {
       cache: "no-store",
     });
-    console.log(`[places:action] resposta ok — ${Array.isArray(res.data) ? res.data.length : 0} sugestões`);
     return { ok: true, suggestions: Array.isArray(res.data) ? res.data : [] };
   } catch (e) {
     console.error("[places:action] falhou:", e instanceof Error ? e.message : e);

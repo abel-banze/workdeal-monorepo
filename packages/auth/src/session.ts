@@ -1,15 +1,16 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import type { AuthUser, SessionInfo } from "@workdeal/shared";
 
 const BETTER_AUTH_URL = process.env.BETTER_AUTH_URL ?? "http://localhost:4000";
 
-// better-auth expõe JWKS em /api/auth/jwks (404 em /.well-known/jwks.json)
+// On the API server, BETTER_AUTH_URL points to itself — JWKS is local.
+// On the web server, this module is no longer used (getServerSession uses the proxy).
 const JWKS_URL = new URL(`${BETTER_AUTH_URL}/api/auth/jwks`);
 const JWKS = createRemoteJWKSet(JWKS_URL, {
   cacheMaxAge: 60 * 60 * 1000,
 });
 
-interface JwtClaims {
+interface JwtClaims extends JWTPayload {
   sub?: string;
   sessionId?: string;
   email?: string;

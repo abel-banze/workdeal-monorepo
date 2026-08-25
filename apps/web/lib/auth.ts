@@ -1,14 +1,37 @@
 import "server-only"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { verifyJwt } from "@workdeal/auth/session"
-import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies"
+import { auth } from "@workdeal/auth/server"
 import type { SessionInfo } from "@workdeal/shared"
 
 export async function getServerSession(): Promise<SessionInfo | null> {
-  const token = (await cookies()).get(JWT_COOKIE_NAME)?.value
-  if (!token) return null
-  return verifyJwt(token)
+  try {
+    const store = await cookies()
+    const cookieHeader = store.getAll().map((c) => `${c.name}=${c.value}`).join("; ")
+    if (!cookieHeader) return null
+
+    const response = await auth.api.getSession({
+      headers: new Headers({ Cookie: cookieHeader }),
+    })
+
+    if (!response?.user?.id) return null
+
+    return {
+      sessionId: response.session?.id ?? null,
+      user: {
+        id: response.user.id,
+        email: response.user.email ?? "",
+        name: response.user.name ?? "",
+        image: (response.user as { image?: string | null }).image ?? null,
+        systemRole: response.user.systemRole === "moderator" || response.user.systemRole === "admin" ? response.user.systemRole : "user",
+        emailVerified: response.user.emailVerified === true,
+        phone: (response.user as { phone?: string | null }).phone ?? null,
+        locale: (response.user as { locale?: string }).locale ?? "pt-MZ",
+      },
+    }
+  } catch {
+    return null
+  }
 }
 
 export async function requireAuth(): Promise<SessionInfo> {

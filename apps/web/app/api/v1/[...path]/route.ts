@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 import { env } from "@/lib/env"
 
-async function proxy(req: NextRequest, ctx: { params: Promise<{ all: string[] }> }) {
-  const { all } = await ctx.params
-  const base = env.BETTER_AUTH_URL?.replace(/\/+$/, "") ?? "http://localhost:4000"
-  const target = new URL(`${base}/api/auth/${all.join("/")}`)
+async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+  const { path } = await ctx.params
+  const base = env.API_URL?.replace(/\/+$/, "") ?? "http://localhost:4000"
+  const target = new URL(`${base}/api/v1/${path.join("/")}`)
   target.search = req.nextUrl.search
 
   const headers = new Headers(req.headers)
   headers.set("host", target.host)
-  headers.set("x-forwarded-host", req.headers.get("host") ?? "")
-  headers.set("x-forwarded-proto", req.nextUrl.protocol.replace(":", ""))
   headers.delete("content-length")
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 10_000)
+  const timeout = setTimeout(() => controller.abort(), 15_000)
   const init: RequestInit = { method: req.method, headers, redirect: "manual", signal: controller.signal }
   if (req.method !== "GET" && req.method !== "HEAD") {
     init.body = await req.arrayBuffer()
@@ -31,12 +29,6 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ all: string[] }>
       if (k === "transfer-encoding" || k === "content-encoding" || k === "connection") return
       res.headers.set(key, value)
     })
-    for (const cookie of upstream.headers.getSetCookie()) {
-      const cleaned = cookie
-        .replace(/;\s*Domain=[^;]*/gi, "")
-        .replace(/;\s*Path=[^;]*/gi, "; Path=/")
-      res.headers.append("set-cookie", cleaned)
-    }
 
     return res
   } catch (e) {
@@ -46,9 +38,9 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ all: string[] }>
       {
         success: false,
         error: {
-          code: isAbort ? "AUTH_PROXY_TIMEOUT" : "AUTH_PROXY_ERROR",
-          message: "Serviço de autenticação indisponível",
-          details: isAbort ? `Timeout ao contactar auth backend (${base})` : e instanceof Error ? e.message : String(e),
+          code: isAbort ? "API_PROXY_TIMEOUT" : "API_PROXY_ERROR",
+          message: "Serviço indisponível",
+          details: isAbort ? `Timeout ao contactar API (${base})` : e instanceof Error ? e.message : String(e),
         },
       },
       { status: 502 },
