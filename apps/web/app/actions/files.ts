@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
-import { getWebOrigin } from "@/lib/api";
+import { env } from "@/lib/env";
 
 const TAG = "[files:action]"
 
@@ -24,8 +24,8 @@ export async function uploadFilesAction(formData: FormData): Promise<UploadFileR
   fd.set("file", file, file.name);
   fd.set("purpose", purposeValue);
 
-  const origin = getWebOrigin();
-  const uploadUrl = `${origin}/api/v1/files/upload`;
+  const base = env.API_URL.replace(/\/+$/, "");
+  const uploadUrl = `${base}/api/v1/files/upload`;
   console.log(`${TAG} upload("${file.name}", ${file.size}b, purpose="${purposeValue}") → ${uploadUrl} hasJwt=${!!token}`);
 
   try {

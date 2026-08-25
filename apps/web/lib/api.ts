@@ -1,5 +1,7 @@
+import "server-only";
 import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
+import { env } from "@/lib/env";
 
 export interface ApiEnvelope<T> {
   success: boolean;
@@ -9,9 +11,18 @@ export interface ApiEnvelope<T> {
 }
 
 /**
- * Build the absolute origin of this web deployment.
- * Server Components and Server Actions run on the server where relative URLs
- * don't resolve — we need an absolute URL that hits our own /api/v1/* proxy.
+ * Base da API Hono — via env.API_URL.
+ * SSR-first: Server Components e Server Actions correm no servidor e
+ * chamam a API directamente, sem passar por fetch ao próprio /api proxy.
+ * Evita 401 de "Protected deployment" do VERCEL_URL.
+ */
+function getApiBase(): string {
+  return env.API_URL.replace(/\/+$/, "");
+}
+
+/**
+ * Mantido para compatibilidade — não usado por apiFetch.
+ * @deprecated use API_URL directly
  */
 export function getWebOrigin(): string {
   const vercelUrl = process.env.VERCEL_URL;
@@ -19,19 +30,21 @@ export function getWebOrigin(): string {
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
 
-const TAG = "[apiFetch]"
+const TAG = "[apiFetch]";
 
 /**
- * Server-side fetch to the API via the local proxy (/api/v1/*).
- * The proxy forwards to BETTER_AUTH_URL with the JWT as Bearer token.
+ * Server-side fetch directo para a API Hono (env.API_URL).
+ * Lê o JWT do cookie e envia como Bearer.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<ApiEnvelope<T>> {
   const cookieStore = await cookies();
   const jwt = cookieStore.get(JWT_COOKIE_NAME)?.value;
   const authHeaders: Record<string, string> = jwt ? { Authorization: `Bearer ${jwt}` } : {};
 
-  const url = `${getWebOrigin()}${path}`;
+  const base = getApiBase();
+  const url = `${base}${path}`;
   console.log(`${TAG} → ${init?.method ?? "GET"} ${url} (hasJwt=${!!jwt})`);
+  console.log(`${TAG}   API_URL resolved: ${base}`);
   const t0 = Date.now();
   const res = await fetch(url, {
     ...init,
@@ -51,8 +64,10 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<Api
 export async function apiFetchWithAuth<T>(path: string, token: string | null, init?: RequestInit): Promise<ApiEnvelope<T>> {
   const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-  const url = `${getWebOrigin()}${path}`;
+  const base = getApiBase();
+  const url = `${base}${path}`;
   console.log(`${TAG} → ${init?.method ?? "GET"} ${url} (hasJwt=${!!token})`);
+  console.log(`${TAG}   API_URL resolved: ${base}`);
   const t0 = Date.now();
   const res = await fetch(url, {
     ...init,
