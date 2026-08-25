@@ -21,12 +21,37 @@ export async function signOut() {
   redirect("/login")
 }
 
-export async function syncJwt(sessionTokenOverride?: string): Promise<{ ok: boolean; error?: string }> {
+/**
+ * Store the JWT as an httpOnly cookie.
+ *
+ * When `jwtToken` is provided (from the client-side better-auth signIn/signUp
+ * response via the jwtClient plugin), we store it directly — no API call needed.
+ *
+ * When omitted, we fall back to reading the `better-auth.session_token` cookie
+ * and exchanging it via the API's /token endpoint. This path is used by the
+ * team-switcher / onboarding where the session cookie IS available server-side.
+ */
+export async function syncJwt(jwtToken?: string): Promise<{ ok: boolean; error?: string }> {
   const store = await cookies()
-  const sessionToken = sessionTokenOverride ?? store.get("better-auth.session_token")?.value
-  console.log("[syncJwt] override:", !!sessionTokenOverride, "cookie:", !!store.get("better-auth.session_token")?.value, "final:", !!sessionToken)
+
+  // Fast path: client already has the JWT from better-auth's signIn/signUp response.
+  if (jwtToken) {
+    console.log("[syncJwt] storing JWT from client, preview:", jwtToken.slice(0, 20) + "...")
+    const isSecure = env.BETTER_AUTH_URL.startsWith("https://")
+    await (store as unknown as { set: (n: string, v: string, o: unknown) => void }).set(
+      JWT_COOKIE_NAME,
+      jwtToken,
+      jwtCookieOptions(isSecure),
+    )
+    console.log("[syncJwt] JWT cookie set, ok")
+    return { ok: true }
+  }
+
+  // Fallback: exchange session cookie for JWT via API /token endpoint.
+  const sessionToken = store.get("better-auth.session_token")?.value
+  console.log("[syncJwt] fallback path, cookie present:", !!sessionToken)
   if (!sessionToken) {
-    console.log("[syncJwt] no session token — cookie names:", [...store.getAll().map((c) => c.name)])
+    console.log("[syncJwt] no token and no cookie — available:", store.getAll().map((c) => c.name))
     return { ok: false, error: "Sessão não encontrada" }
   }
 
@@ -45,7 +70,7 @@ export async function syncJwt(sessionTokenOverride?: string): Promise<{ ok: bool
     }
     const data = (txtBody ? JSON.parse(txtBody) : {}) as { token?: string }
     const token = data.token
-    console.log("[syncJwt] token present:", !!token, "type:", typeof token)
+    console.log("[syncJwt] token present:", !!token)
     if (!token || typeof token !== "string") return { ok: false, error: "Token vazio" }
 
     const isSecure = env.BETTER_AUTH_URL.startsWith("https://")
@@ -54,7 +79,6 @@ export async function syncJwt(sessionTokenOverride?: string): Promise<{ ok: bool
       token,
       jwtCookieOptions(isSecure),
     )
-    console.log("[syncJwt] JWT cookie set, ok")
     return { ok: true }
   } catch (e) {
     console.error("[syncJwt] exception:", e)
