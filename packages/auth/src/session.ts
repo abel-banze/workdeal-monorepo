@@ -1,11 +1,17 @@
-import { jwtVerify, type JWTPayload } from "jose";
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import type { AuthUser, SessionInfo } from "@workdeal/shared";
 
 const BETTER_AUTH_URL = process.env.BETTER_AUTH_URL ?? "http://localhost:4000";
 
-// better-auth uses HS256 (HMAC-SHA256). We verify locally with the shared secret
-// instead of fetching JWKS remotely (unreachable from web server to API in preview).
-const secret = new TextEncoder().encode(process.env.BETTER_AUTH_SECRET ?? "");
+// Fetch JWKS through the web proxy (browser → proxy → API) instead of directly
+// to the API. Direct server-to-server fetch fails in Vercel preview (returns HTML).
+const webOrigin = process.env.VERCEL_URL
+  ? `https://${process.env.VERCEL_URL}`
+  : `http://localhost:${process.env.PORT ?? 3000}`;
+const JWKS_URL = new URL("/api/auth/jwks", webOrigin);
+const JWKS = createRemoteJWKSet(JWKS_URL, {
+  cacheMaxAge: 60 * 60 * 1000,
+});
 
 interface JwtClaims extends JWTPayload {
   sub?: string;
@@ -21,7 +27,7 @@ interface JwtClaims extends JWTPayload {
 
 export async function verifyJwt(token: string): Promise<SessionInfo | null> {
   try {
-    const { payload } = await jwtVerify(token, secret, {
+    const { payload } = await jwtVerify(token, JWKS, {
       issuer: BETTER_AUTH_URL,
       audience: BETTER_AUTH_URL,
     });
