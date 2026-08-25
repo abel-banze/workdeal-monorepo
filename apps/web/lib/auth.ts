@@ -6,12 +6,12 @@ import type { SessionInfo } from "@workdeal/shared"
 
 const BETTER_AUTH_SESSION_COOKIES = ["__Secure-better-auth.session_token", "better-auth.session_token"] as const
 
-function readSessionToken(store: { get: (name: string) => { value?: string } | undefined }): string | undefined {
+function readSessionToken(store: { get: (name: string) => { value?: string } | undefined }): { name: string; value: string } | null {
   for (const name of BETTER_AUTH_SESSION_COOKIES) {
     const v = store.get(name)?.value
-    if (v) return v
+    if (v) return { name, value: v }
   }
-  return undefined
+  return null
 }
 
 /**
@@ -24,8 +24,8 @@ function readSessionToken(store: { get: (name: string) => { value?: string } | u
  */
 export async function getServerSession(): Promise<SessionInfo | null> {
   const store = await cookies()
-  const sessionToken = readSessionToken(store)
-  if (!sessionToken) return null
+  const session = readSessionToken(store)
+  if (!session) return null
 
   try {
     const protocol = process.env.VERCEL_URL ? "https" : "http"
@@ -33,7 +33,7 @@ export async function getServerSession(): Promise<SessionInfo | null> {
     const url = `${protocol}://${host}/api/auth/get-session`
 
     const res = await fetch(url, {
-      headers: { Cookie: `better-auth.session_token=${sessionToken}` },
+      headers: { Cookie: `${session.name}=${session.value}` },
       cache: "no-store",
     })
     if (!res.ok) return null

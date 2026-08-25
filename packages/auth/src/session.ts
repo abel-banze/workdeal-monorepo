@@ -3,12 +3,9 @@ import type { AuthUser, SessionInfo } from "@workdeal/shared";
 
 const BETTER_AUTH_URL = process.env.BETTER_AUTH_URL ?? "http://localhost:4000";
 
-// Fetch JWKS through the web proxy (browser → proxy → API) instead of directly
-// to the API. Direct server-to-server fetch fails in Vercel preview (returns HTML).
-const webOrigin = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : `http://localhost:${process.env.PORT ?? 3000}`;
-const JWKS_URL = new URL("/api/auth/jwks", webOrigin);
+// On the API server, BETTER_AUTH_URL points to itself — JWKS is local.
+// On the web server, this module is no longer used (getServerSession uses the proxy).
+const JWKS_URL = new URL(`${BETTER_AUTH_URL}/api/auth/jwks`);
 const JWKS = createRemoteJWKSet(JWKS_URL, {
   cacheMaxAge: 60 * 60 * 1000,
 });
