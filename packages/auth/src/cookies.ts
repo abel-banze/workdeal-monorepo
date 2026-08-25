@@ -14,7 +14,7 @@ export function jwtCookieOptions(secure: boolean): CookieOptions {
     secure,
     sameSite: "strict",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: 60 * 60 * 24 * 30, // 30 days
   };
 }
 

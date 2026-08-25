@@ -21,9 +21,9 @@ export async function signOut() {
   redirect("/login")
 }
 
-export async function syncJwt(): Promise<{ ok: boolean; error?: string }> {
+export async function syncJwt(sessionTokenOverride?: string): Promise<{ ok: boolean; error?: string }> {
   const store = await cookies()
-  const sessionToken = store.get("better-auth.session_token")?.value
+  const sessionToken = sessionTokenOverride ?? store.get("better-auth.session_token")?.value
   if (!sessionToken) return { ok: false, error: "Sessão não encontrada" }
 
   try {

@@ -33,9 +33,12 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ all: string[] }>
       res.headers.set(key, value)
     })
     for (const cookie of upstream.headers.getSetCookie()) {
-      // Remove Domain attribute — garante que o cookie fica no domínio do web (proxy),
-      // não no domínio da API (sandbox-api), para que Next.js server-side possa lê-lo.
-      const cleaned = cookie.replace(/;\s*Domain=[^;]*/gi, "")
+      // Remove Domain — garante que o cookie fica no domínio do web (proxy), não no da API.
+      // Remove Path — better-auth define Path=/api/auth por omissão, mas o browser só envia
+      // cookies para Server Actions se o Path incluir o caminho da action. Strip para Path=/.
+      const cleaned = cookie
+        .replace(/;\s*Domain=[^;]*/gi, "")
+        .replace(/;\s*Path=[^;]*/gi, "")
       res.headers.append("set-cookie", cleaned)
     }
 
