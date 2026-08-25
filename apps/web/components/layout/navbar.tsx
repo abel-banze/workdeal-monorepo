@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getServerSession } from "@/lib/auth";
 import { MobileNav } from "./mobile-nav";
+import { UserDropdown } from "./user-dropdown";
 
 type NavLink = { href: string; label: string };
 
@@ -17,20 +18,16 @@ export async function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[#D9D2C2] bg-[#F6F3EE]/90 backdrop-blur supports-[backdrop-filter]:bg-[#F6F3EE]/80">
-      {/* top hairline signal */}
       <div className="h-[3px] w-full bg-[#FF3B1F]" />
       <div className="mx-auto flex h-[64px] max-w-[1280px] items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
-        {/* brand */}
         <Link href="/" className="flex items-center gap-3 group">
           <Image src="/logo.png" alt="Workdeal" width={36} height={36} className="size-9 object-contain" priority />
           <span className="flex flex-col leading-none">
             <span className="font-black tracking-[-0.04em] text-[18px] text-[#0F1A2E]">WORKDEAL</span>
             <span className="text-[10px] tracking-[0.22em] font-semibold text-[#0B5E56] -mt-[1px]">PLATAFORMA GLOBAL</span>
           </span>
-
         </Link>
 
-        {/* desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
           {NAV_LINKS.map((l) => (
             <Link
@@ -43,7 +40,6 @@ export async function Navbar() {
           ))}
         </nav>
 
-        {/* actions */}
         <div className="hidden md:flex items-center gap-2">
           {session ? (
             <>
@@ -53,12 +49,7 @@ export async function Navbar() {
               >
                 Painel
               </Link>
-              <Link
-                href="/dashboard/profile"
-                className="inline-flex size-9 items-center justify-center rounded-full bg-[#0F1A2E] text-white text-xs font-bold"
-              >
-                {session.user.name.slice(0, 2).toUpperCase()}
-              </Link>
+              <UserDropdown user={{ name: session.user.name, email: session.user.email, image: (session.user as { image?: string | null }).image ?? null }} />
             </>
           ) : (
             <>
@@ -75,7 +66,6 @@ export async function Navbar() {
           )}
         </div>
 
-        {/* mobile */}
         <MobileNav session={session} links={NAV_LINKS} />
       </div>
     </header>

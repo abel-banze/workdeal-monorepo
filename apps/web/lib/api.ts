@@ -34,12 +34,12 @@ const TAG = "[apiFetch]";
 
 /**
  * Server-side fetch directo para a API Hono (env.API_URL).
- * Lê o JWT do cookie e envia como Bearer.
+ * Lê o JWT do cookie e envia como Bearer + Cookie (compatível com better-auth via header ou cookie).
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<ApiEnvelope<T>> {
   const cookieStore = await cookies();
   const jwt = cookieStore.get(JWT_COOKIE_NAME)?.value;
-  const authHeaders: Record<string, string> = jwt ? { Authorization: `Bearer ${jwt}` } : {};
+  const authHeaders: Record<string, string> = jwt ? { Authorization: `Bearer ${jwt}`, Cookie: `${JWT_COOKIE_NAME}=${jwt}` } : {};
 
   const base = getApiBase();
   const url = `${base}${path}`;
@@ -62,7 +62,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<Api
 
 /** Variante para Server Actions que já têm o JWT em mãos */
 export async function apiFetchWithAuth<T>(path: string, token: string | null, init?: RequestInit): Promise<ApiEnvelope<T>> {
-  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}`, Cookie: `${JWT_COOKIE_NAME}=${token}` } : {};
 
   const base = getApiBase();
   const url = `${base}${path}`;
