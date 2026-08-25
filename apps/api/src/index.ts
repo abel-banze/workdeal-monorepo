@@ -455,6 +455,79 @@ app.notFound(() => {
 
 app.onError(errorHandler);
 
+// Lê o body em qualquer um dos três formatos que a ponte da Vercel pode entregar:
+//  1. Web Request (.arrayBuffer)
+//  2. Stream com asyncIterator (r.body ou o próprio req)
+//  3. IncomingMessage Node-style (eventos "data"/"end"/"error" no req)
+function readBodyWithTimeout(r: {
+  arrayBuffer?: () => Promise<ArrayBuffer>;
+  body?: unknown;
+  headers?: Headers;
+  [k: string]: unknown;
+}): Promise<ArrayBuffer | undefined> {
+  type Stream = AsyncIterable<unknown> & { on?: Function; off?: Function; readableEnded?: boolean };
+  const bodyAsStream = r.body as Stream | undefined;
+  const selfAsStream = r as unknown as Stream;
+  const pick = (s: Stream | undefined): Stream | undefined =>
+    s && (typeof s[Symbol.asyncIterator] === "function" || typeof s.on === "function") ? s : undefined;
+  const stream = pick(bodyAsStream) ?? pick(selfAsStream);
+
+  if (typeof r.arrayBuffer === "function") return r.arrayBuffer();
+  if ((r.headers?.get("content-length") ?? "") === "0") return Promise.resolve(undefined);
+  if (!stream || stream.readableEnded) return Promise.resolve(undefined);
+
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const concat = (): ArrayBuffer => {
+      const buf = Buffer.concat(chunks);
+      return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new AppError(408, "BODY_TIMEOUT", "Tempo esgotado a ler o corpo do pedido"));
+    }, 10_000);
+    const onData = (c: unknown) => {
+      chunks.push(Buffer.from(c as Uint8Array));
+    };
+    const onEnd = () => {
+      cleanup();
+      resolve(concat());
+    };
+    const onError = (e: unknown) => {
+      cleanup();
+      reject(e instanceof Error ? e : new Error(String(e)));
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      stream.off?.("data", onData);
+      stream.off?.("end", onEnd);
+      stream.off?.("error", onError);
+    };
+
+    if (typeof stream[Symbol.asyncIterator] === "function") {
+      void (async () => {
+        try {
+          for await (const chunk of stream) chunks.push(Buffer.from(chunk as Uint8Array));
+          cleanup();
+          resolve(concat());
+        } catch (e) {
+          cleanup();
+          reject(e instanceof Error ? e : new Error(String(e)));
+        }
+      })();
+      return;
+    }
+    if (typeof stream.on !== "function") {
+      cleanup();
+      resolve(new ArrayBuffer(0));
+      return;
+    }
+    stream.on("data", onData);
+    stream.on("end", onEnd);
+    stream.on("error", onError);
+  });
+}
+
 // Exports Vercel Node.js — converte o pedido da Vercel num Request NATIVO.
 // Nenhum dos dois atalhos serve:
 //  - getRequestListener (@hono/node-server): os wrappers lazy de Request/Response
@@ -467,8 +540,7 @@ async function toNativeRequest(req: unknown): Promise<Request> {
     method?: string;
     url?: string;
     headers?: unknown;
-    body?: unknown;
-    arrayBuffer?: () => Promise<ArrayBuffer>;
+    [k: string]: unknown;
   };
   const method = (r.method ?? "GET").toUpperCase();
   let headers: Headers;
@@ -482,34 +554,7 @@ async function toNativeRequest(req: unknown): Promise<Request> {
 
   const hasBody = method !== "GET" && method !== "HEAD";
   let body: BodyInit | undefined;
-  if (hasBody) {
-    if (typeof r.arrayBuffer === "function") {
-      body = await r.arrayBuffer();
-    } else {
-      body = await new Promise<ArrayBuffer>((resolve, reject) => {
-        const chunks: Buffer[] = [];
-        const timer = setTimeout(() => reject(new AppError(408, "BODY_TIMEOUT", "Tempo esgotado a ler o corpo do pedido")), 10_000);
-        const stream = r.body as AsyncIterable<Buffer> | undefined;
-        const it = stream?.[Symbol.asyncIterator];
-        if (typeof it !== "function") {
-          clearTimeout(timer);
-          resolve(new ArrayBuffer(0));
-          return;
-        }
-        void (async () => {
-          try {
-            for await (const chunk of stream as AsyncIterable<Buffer>) chunks.push(Buffer.from(chunk));
-            clearTimeout(timer);
-            const buf = Buffer.concat(chunks);
-            resolve(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
-          } catch (e) {
-            clearTimeout(timer);
-            reject(e);
-          }
-        })();
-      });
-    }
-  }
+  if (hasBody) body = await readBodyWithTimeout({ ...r, headers });
   return new Request(url, { method, headers, ...(hasBody ? { body } : {}) });
 }
 
