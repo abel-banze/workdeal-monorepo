@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
 import { getWebOrigin } from "@/lib/api";
 
+const TAG = "[files:action]"
+
 export type UploadFileResult =
   | { ok: true; file: { id: string; url: string; publicId: string; resourceType: string; format: string | null; bytes: number | null; originalFilename: string | null } }
   | { ok: false; error: string; file?: undefined };
@@ -22,20 +24,29 @@ export async function uploadFilesAction(formData: FormData): Promise<UploadFileR
   fd.set("file", file, file.name);
   fd.set("purpose", purposeValue);
 
+  const origin = getWebOrigin();
+  const uploadUrl = `${origin}/api/v1/files/upload`;
+  console.log(`${TAG} upload("${file.name}", ${file.size}b, purpose="${purposeValue}") → ${uploadUrl} hasJwt=${!!token}`);
+
   try {
-    // Route through local proxy to avoid Vercel Deployment Protection
-    const res = await fetch(`${getWebOrigin()}/api/v1/files/upload`, {
+    const t0 = Date.now();
+    const res = await fetch(uploadUrl, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: fd,
       cache: "no-store",
     });
-    const json = (await res.json().catch(() => null)) as { success?: boolean; data?: unknown; error?: { message?: string } } | null;
+    const elapsed = Date.now() - t0;
+    const rawBody = await res.text();
+    console.log(`${TAG} ← ${res.status} in ${elapsed}ms, body[0..500]: ${rawBody.slice(0, 500)}`);
+    const json = (() => { try { return JSON.parse(rawBody) } catch { return null } })() as { success?: boolean; data?: unknown; error?: { message?: string } } | null;
     if (!res.ok || !json?.success) {
       const msg = json?.error?.message ?? `Falha no upload: ${res.status}`;
+      console.error(`${TAG} upload FAILED: ${msg}`);
       return { ok: false, error: msg.slice(0, 500) };
     }
     const data = json.data as { id: string; url: string; public_id?: string; publicId?: string; resource_type?: string; resourceType?: string; format?: string | null; bytes?: number | null; original_filename?: string | null; originalFilename?: string | null };
+    console.log(`${TAG} upload OK: id=${data.id}`);
     return {
       ok: true,
       file: {
@@ -49,6 +60,7 @@ export async function uploadFilesAction(formData: FormData): Promise<UploadFileR
       },
     };
   } catch (e) {
+    console.error(`${TAG} upload ERROR:`, e instanceof Error ? e.message : String(e));
     return { ok: false, error: e instanceof Error ? e.message.slice(0, 500) : String(e).slice(0, 500) };
   }
 }
