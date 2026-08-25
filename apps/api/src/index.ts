@@ -10,6 +10,7 @@ import { formatAllowedOrigins } from "@workdeal/shared/lib/env";
 import { logger } from "@workdeal/shared/lib/logger";
 import { env } from "./env.js";
 import { AppError, errorHandler } from "./lib/errors.js";
+import { fail } from "./lib/api-response.js";
 import { authV1Route } from "./routes/auth.route.js";
 import { profilesRoute } from "./routes/profiles.route.js";
 import { categoriesRoute } from "./routes/categories.route.js";
@@ -454,11 +455,91 @@ app.notFound(() => {
 
 app.onError(errorHandler);
 
-// Exports Vercel Node.js — handlers Web-standard nativos (a Vercel faz a ponte req/res).
-// NÃO usar getRequestListener do @hono/node-server aqui: os wrappers lazy de
-// Request/Response que ele instala nos globals penduram os POST /api/auth/* no
-// runtime da Vercel (body nunca resolve → 504 FUNCTION_INVOCATION_TIMEOUT sem logs).
-const vercelHandler = (request: Request) => app.fetch(request);
+// Exports Vercel Node.js — converte o pedido da Vercel num Request NATIVO.
+// Nenhum dos dois atalhos serve:
+//  - getRequestListener (@hono/node-server): os wrappers lazy de Request/Response
+//    que instala nos globals penduram POST /api/auth/* no runtime Vercel (504 sem logs)
+//  - exportar app.fetch directamente: a ponte da Vercel entrega um objecto Node-style
+//    ("this.raw.headers.get is not a function")
+// Por isso construímos o Request nós próprios, com buffer de body protegido por timeout.
+async function toNativeRequest(req: unknown): Promise<Request> {
+  const r = req as {
+    method?: string;
+    url?: string;
+    headers?: unknown;
+    body?: unknown;
+    arrayBuffer?: () => Promise<ArrayBuffer>;
+  };
+  const method = (r.method ?? "GET").toUpperCase();
+  let headers: Headers;
+  try {
+    headers = new Headers(r.headers as HeadersInit | undefined);
+  } catch {
+    headers = new Headers();
+  }
+  let url = r.url ?? "/";
+  if (!url.startsWith("http")) url = `https://${headers.get("host") ?? "localhost"}${url}`;
+
+  const hasBody = method !== "GET" && method !== "HEAD";
+  let body: BodyInit | undefined;
+  if (hasBody) {
+    if (typeof r.arrayBuffer === "function") {
+      body = await r.arrayBuffer();
+    } else {
+      body = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        const timer = setTimeout(() => reject(new AppError(408, "BODY_TIMEOUT", "Tempo esgotado a ler o corpo do pedido")), 10_000);
+        const stream = r.body as AsyncIterable<Buffer> | undefined;
+        const it = stream?.[Symbol.asyncIterator];
+        if (typeof it !== "function") {
+          clearTimeout(timer);
+          resolve(new ArrayBuffer(0));
+          return;
+        }
+        void (async () => {
+          try {
+            for await (const chunk of stream as AsyncIterable<Buffer>) chunks.push(Buffer.from(chunk));
+            clearTimeout(timer);
+            const buf = Buffer.concat(chunks);
+            resolve(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
+          } catch (e) {
+            clearTimeout(timer);
+            reject(e);
+          }
+        })();
+      });
+    }
+  }
+  return new Request(url, { method, headers, ...(hasBody ? { body } : {}) });
+}
+
+const vercelHandler = async (req: unknown, res?: unknown) => {
+  try {
+    const response = await app.fetch(await toNativeRequest(req));
+    const rs = res as { writeHead?: Function; end?: Function } | undefined;
+    if (rs && typeof rs.writeHead === "function") {
+      // modo Node-style: escreve na resposta da Vercel
+      const isHead = ((req as { method?: string }).method ?? "").toUpperCase() === "HEAD";
+      const buf = isHead ? undefined : new Uint8Array(await response.arrayBuffer());
+      const h: Record<string, string | string[]> = {};
+      response.headers.forEach((v, k) => {
+        h[k] = v;
+      });
+      const setCookies = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
+      if (setCookies.length > 0) h["set-cookie"] = setCookies;
+      rs.writeHead!(response.status, h);
+      rs.end!(buf);
+      return;
+    }
+    return response;
+  } catch (e) {
+    logger.error("vercelHandler falhou", { error: e instanceof Error ? e.message : String(e), stack: e instanceof Error ? e.stack : undefined });
+    return new Response(JSON.stringify(fail("INTERNAL_ERROR", "Erro interno do servidor")), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
+  }
+};
 
 export const GET = vercelHandler;
 export const POST = vercelHandler;
