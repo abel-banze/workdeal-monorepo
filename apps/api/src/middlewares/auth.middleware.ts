@@ -1,5 +1,6 @@
 import { createMiddleware } from "hono/factory";
-import { JWT_COOKIE_NAME, parseCookies, verifyJwt } from "@workdeal/auth";
+import { JWT_COOKIE_NAME, parseCookies } from "@workdeal/auth/cookies";
+import { verifyJwt } from "@workdeal/auth/verify";
 import type { AuthUser } from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 

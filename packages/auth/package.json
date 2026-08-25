@@ -30,6 +30,7 @@
     "./client": "./dist/client.js",
     "./session": "./dist/session.js",
     "./cookies": "./dist/cookies.js",
+    "./verify": "./dist/session.js",
     "./repository": "./dist/repository.js"
   }
 }

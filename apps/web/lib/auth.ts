@@ -4,11 +4,6 @@ import { redirect } from "next/navigation"
 import { auth } from "@workdeal/auth/server"
 import type { SessionInfo } from "@workdeal/shared"
 
-/**
- * Verify the session by calling better-auth's auth.api.getSession() directly.
- * This hits the database directly — no HTTP call, no JWKS fetch, no proxy.
- * Works on Vercel because it doesn't need to reach any URL.
- */
 export async function getServerSession(): Promise<SessionInfo | null> {
   try {
     const store = await cookies()
@@ -34,8 +29,7 @@ export async function getServerSession(): Promise<SessionInfo | null> {
         locale: (response.user as { locale?: string }).locale ?? "pt-MZ",
       },
     }
-  } catch (e) {
-    console.error("[getServerSession] failed:", e instanceof Error ? e.message : String(e))
+  } catch {
     return null
   }
 }

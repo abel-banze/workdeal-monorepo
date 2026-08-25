@@ -29,8 +29,7 @@ export async function verifyJwt(token: string): Promise<SessionInfo | null> {
       audience: BETTER_AUTH_URL,
     });
     return claimsToSessionInfo(payload as JwtClaims);
-  } catch (e) {
-    console.error("[verifyJwt] FAILED:", e instanceof Error ? e.message : String(e))
+  } catch {
     return null;
   }
 }
