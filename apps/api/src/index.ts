@@ -1,6 +1,8 @@
 import "./load-env.js";
 import { Hono } from "hono";
-import { getRequestListener } from "@hono/node-server";
+import { env as _envDiag } from "./env.js";
+// força validação e log de diagnóstico (o import acima já fez log, mas este garante que o Proxy de env valida e mostra host)
+void _envDiag.BETTER_AUTH_URL;
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { auth } from "@workdeal/auth";
@@ -8,6 +10,7 @@ import { formatAllowedOrigins } from "@workdeal/shared/lib/env";
 import { logger } from "@workdeal/shared/lib/logger";
 import { env } from "./env.js";
 import { AppError, errorHandler } from "./lib/errors.js";
+import { fail } from "./lib/api-response.js";
 import { authV1Route } from "./routes/auth.route.js";
 import { profilesRoute } from "./routes/profiles.route.js";
 import { categoriesRoute } from "./routes/categories.route.js";
@@ -34,6 +37,10 @@ const app = new Hono();
 app.use("*", requestId());
 app.use("*", async (c, next) => {
   const start = Date.now();
+  // Log de entrada em mutações — se um handler pendurar, vê-se aqui que chegou a iniciar
+  if (c.req.method !== "GET") {
+    logger.info(`${c.req.method} ${c.req.path} inicio`, { requestId: c.req.header("X-Request-Id"), route: c.req.path, method: c.req.method });
+  }
   await next();
   const durationMs = Date.now() - start;
   const requestIdVal = c.req.header("X-Request-Id") ?? (c.get("requestId" as never) as string | undefined) ?? "-";
@@ -207,6 +214,18 @@ app.get("/", (c) => {
         <div class="s-meta">CORS: <code style="max-width:18ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom">${formatAllowedOrigins(env.ALLOWED_ORIGINS)[0] ?? "—"}</code></div>
       </div>
     </div>
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+      <button class="copy" id="btn-test-db-full" onclick="testDbFull()" title="Testa conexão, leitura e escrita (rollback)">🧪 Testar DB (conexão + leitura + escrita)</button>
+      <span id="test-db-full-result" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted)"></span>
+    </div>
+    <div id="test-db-full-panel" style="display:none; margin-top:12px; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel)">
+      <div style="display:flex; border-bottom:1px solid var(--line)">
+        <button id="tab-btn-ui" onclick="switchDbTab('ui')" style="flex:1; padding:10px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; background:var(--panel2); color:var(--text); border:none; border-right:1px solid var(--line); cursor:pointer">Visão</button>
+        <button id="tab-btn-json" onclick="switchDbTab('json')" style="flex:1; padding:10px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; background:transparent; color:var(--muted); border:none; cursor:pointer">JSON</button>
+      </div>
+      <div id="tab-ui" style="padding:14px; background:var(--panel)"></div>
+      <pre id="tab-json" style="display:none; margin:0; padding:12px; background:#0E121A; overflow:auto; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5; white-space:pre-wrap; word-break:break-all; max-height:420px"></pre>
+    </div>
   </section>
 
   <div class="grid">
@@ -291,6 +310,117 @@ async function checkStatus(){
 }
 checkStatus();
 setInterval(checkStatus, 30000);
+
+let _dbTab='ui';
+function switchDbTab(tab){
+  _dbTab=tab;
+  const uiBtn=document.getElementById('tab-btn-ui');
+  const jsonBtn=document.getElementById('tab-btn-json');
+  const ui=document.getElementById('tab-ui');
+  const json=document.getElementById('tab-json');
+  if(tab==='ui'){
+    if(ui) ui.style.display='block';
+    if(json) json.style.display='none';
+    if(uiBtn){ uiBtn.style.background='var(--panel2)'; uiBtn.style.color='var(--text)'; }
+    if(jsonBtn){ jsonBtn.style.background='transparent'; jsonBtn.style.color='var(--muted)'; }
+  } else {
+    if(ui) ui.style.display='none';
+    if(json) json.style.display='block';
+    if(jsonBtn){ jsonBtn.style.background='var(--panel2)'; jsonBtn.style.color='var(--text)'; }
+    if(uiBtn){ uiBtn.style.background='transparent'; uiBtn.style.color='var(--muted)'; }
+  }
+}
+function renderDbUi(data){
+  if(!data) return '<p style="color:var(--muted); font-family:JetBrains Mono,monospace; font-size:11px">Sem dados</p>';
+  const ok = data.success ?? data.data?.success;
+  const d = data.data ?? data;
+  const env = d.env ?? {};
+  const tests = d.tests ?? {};
+  const summary = d.summary ?? {};
+  const esc = (s)=> String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const pill = (okB, label)=> \`<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-family:JetBrains Mono,monospace; font-size:10px; letter-spacing:.06em; text-transform:uppercase; border:1px solid \${okB ? 'rgba(20,184,166,.35)' : 'rgba(239,68,68,.35)'}; background:\${okB ? 'rgba(20,184,166,.12)' : 'rgba(239,68,68,.12)'}; color:\${okB ? 'var(--teal)' : 'var(--red)'}">\${okB ? '✓' : '✗'} \${esc(label)}</span>\`;
+  const row = (title, obj)=>{
+    if(!obj) return '';
+    const isOk = obj.ok;
+    return \`<div style="border:1px solid var(--line); border-radius:10px; padding:10px; background:rgba(255,255,255,.02)">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap">
+        <b style="font-size:12px; letter-spacing:-.02em">\${esc(title)}</b>
+        \${pill(isOk, isOk ? 'OK' : 'FALHOU')} <span style="font-family:JetBrains Mono,monospace; font-size:11px; color:var(--muted)">\${obj.ms ? obj.ms+'ms' : ''}</span>
+      </div>
+      \${obj.details ? \`<p style="margin:6px 0 0; color:var(--muted); font-size:11px; line-height:1.5">\${esc(obj.details)}</p>\` : ''}
+      \${obj.error ? \`<p style="margin:6px 0 0; color:#FCA5A5; font-family:JetBrains Mono,monospace; font-size:11px; word-break:break-all">\${esc(obj.error)}</p>\` : ''}
+      \${obj.code ? \`<p style="margin:4px 0 0; color:var(--muted); font-family:JetBrains Mono,monospace; font-size:10px">code: \${esc(obj.code)}</p>\` : ''}
+      \${obj.cause ? \`<p style="margin:4px 0 0; color:#FCA5A5; font-family:JetBrains Mono,monospace; font-size:10px; word-break:break-all">cause: \${esc(obj.cause)}</p>\` : ''}
+      \${obj.detail ? \`<p style="margin:4px 0 0; color:var(--muted); font-family:JetBrains Mono,monospace; font-size:10px; word-break:break-all">detail: \${esc(obj.detail)}</p>\` : ''}
+      \${obj.stack ? \`<p style="margin:4px 0 0; color:var(--muted); font-family:JetBrains Mono,monospace; font-size:9px; opacity:.7; word-break:break-all">stack: \${esc(obj.stack)}</p>\` : ''}
+      \${obj.hint ? \`<p style="margin:6px 0 0; color:var(--amber); font-size:11px; line-height:1.4">💡 \${esc(obj.hint)}</p>\` : ''}
+    </div>\`;
+  };
+  let html = '';
+  html += \`<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px">
+    \${pill(!!d.summary?.allOk || !!data.success, d.summary?.allOk || data.success ? 'TUDO OK' : 'COM FALHAS')}
+    <span style="font-family:JetBrains Mono,monospace; font-size:11px; color:var(--muted)">\${d.totalMs ? d.totalMs+'ms total' : ''} · \${esc(d.startedAt ?? '')}</span>
+  </div>\`;
+  if(summary.cause && !summary.allOk){
+    html += \`<div style="margin-bottom:10px; padding:8px 10px; border-radius:8px; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.25); color:var(--amber); font-size:11px; line-height:1.4">⚠️ \${esc(summary.cause)}</div>\`;
+  }
+  // Env string
+  const dbUrl = env.DATABASE_URL ?? {};
+  html += \`<div style="margin-bottom:10px; padding:10px; border-radius:10px; background:rgba(255,255,255,.03); border:1px solid var(--line)">
+    <p style="margin:0 0 6px; font-family:JetBrains Mono,monospace; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)">String de conexão</p>
+    <p style="margin:0; font-family:JetBrains Mono,monospace; font-size:11px; word-break:break-all">
+      <span style="color:var(--muted)">DB:</span> <b>\${esc(dbUrl.database ?? '∅')}</b> <span style="color:var(--muted)">· host</span> \${esc(dbUrl.host ?? '∅')}:\${esc(dbUrl.port ?? '')} \${dbUrl.isPgbouncer ? '<span style="padding:2px 6px; border-radius:6px; background:rgba(20,184,166,.15); border:1px solid rgba(20,184,166,.25); font-size:10px">pgbouncer</span>' : ''}
+    </p>
+    <p style="margin:4px 0 0; font-family:JetBrains Mono,monospace; font-size:11px; color:var(--muted); word-break:break-all">\${esc(dbUrl.masked ?? '')} · user \${esc(dbUrl.user ?? '')} · \${esc(dbUrl.passwordLength ?? '')}</p>
+    \${dbUrl.error ? \`<p style="margin:6px 0 0; color:var(--red); font-family:JetBrains Mono,monospace; font-size:11px">\${esc(dbUrl.error)}</p>\` : ''}
+    <p style="margin:6px 0 0; font-family:JetBrains Mono,monospace; font-size:10px; color:var(--muted)">BETTER_AUTH_URL: \${esc(env.BETTER_AUTH_URL?.value ?? '∅')} · ALLOWED_ORIGINS: \${esc(env.ALLOWED_ORIGINS?.value ?? env.ALLOWED_ORIGINS?.masked ?? '∅')}</p>
+  </div>\`;
+  html += \`<div style="display:grid; gap:8px">\`;
+  html += row('Conexão', tests.connection);
+  html += row('Leitura', tests.read);
+  html += row('Escrita', tests.write);
+  html += \`</div>\`;
+  return html;
+}
+async function testDbFull(){
+  const btn=document.getElementById('btn-test-db-full');
+  const resEl=document.getElementById('test-db-full-result');
+  const panel=document.getElementById('test-db-full-panel');
+  const uiEl=document.getElementById('tab-ui');
+  const jsonEl=document.getElementById('tab-json');
+  if(btn) { btn.disabled=true; btn.textContent='a testar…'; }
+  if(resEl) resEl.textContent='a sondar /health/db/full…';
+  if(panel) panel.style.display='none';
+  const t0=performance.now();
+  try{
+    const r=await fetch('/health/db/full', {headers:{'Accept':'application/json'}, cache:'no-store'});
+    const ms=Math.round(performance.now()-t0);
+    const j=await r.json().catch(()=>null);
+    const ok = r.ok && j && j.success;
+    if(resEl) {
+      resEl.textContent = ok ? '✓ DB OK ('+ms+'ms) — conexão, leitura e escrita' : '✗ DB falhou ('+ms+'ms) — HTTP '+r.status;
+      resEl.style.color = ok ? 'var(--teal)' : 'var(--red)';
+    }
+    if(panel) panel.style.display='block';
+    if(jsonEl) jsonEl.textContent = j ? JSON.stringify(j, null, 2) : 'Sem JSON — HTTP '+r.status;
+    if(uiEl) uiEl.innerHTML = j ? renderDbUi(j) : '<p style="color:var(--red)">Sem JSON</p>';
+    switchDbTab('ui');
+  }catch(e){
+    const ms=Math.round(performance.now()-t0);
+    if(resEl) { resEl.textContent='✗ erro de rede ('+ms+'ms) — '+ (e instanceof Error ? e.message : String(e)); resEl.style.color='var(--red)'; }
+    const panel2=document.getElementById('test-db-full-panel');
+    const ui2=document.getElementById('tab-ui');
+    const json2=document.getElementById('tab-json');
+    if(panel2) panel2.style.display='block';
+    if(json2) json2.textContent = String(e);
+    if(ui2) ui2.innerHTML = '<p style="color:var(--red); font-family:JetBrains Mono,monospace; font-size:11px">'+String(e).replace(/</g,'&lt;')+'</p>';
+    if(json2) json2.style.display='none';
+    if(ui2) ui2.style.display='block';
+    switchDbTab('ui');
+  }finally{
+    if(btn) { btn.disabled=false; btn.textContent='🧪 Testar DB (conexão + leitura + escrita)'; }
+  }
+}
 </script>
 </body>
 </html>`);
@@ -325,9 +455,138 @@ app.notFound(() => {
 
 app.onError(errorHandler);
 
-// Exports Vercel Node.js - getRequestListener converte Node IncomingMessage -> Fetch Request
-// Corrige "this.raw.headers.get is not a function" e o WARN de default export Response
-const vercelHandler = getRequestListener(app.fetch);
+// Lê o body em qualquer um dos três formatos que a ponte da Vercel pode entregar:
+//  1. Web Request (.arrayBuffer)
+//  2. Stream com asyncIterator (r.body ou o próprio req)
+//  3. IncomingMessage Node-style (eventos "data"/"end"/"error" no req)
+function readBodyWithTimeout(r: {
+  arrayBuffer?: () => Promise<ArrayBuffer>;
+  body?: unknown;
+  headers?: Headers;
+  [k: string]: unknown;
+}): Promise<ArrayBuffer | undefined> {
+  type Stream = AsyncIterable<unknown> & { on?: Function; off?: Function; readableEnded?: boolean };
+  const bodyAsStream = r.body as Stream | undefined;
+  const selfAsStream = r as unknown as Stream;
+  const pick = (s: Stream | undefined): Stream | undefined =>
+    s && (typeof s[Symbol.asyncIterator] === "function" || typeof s.on === "function") ? s : undefined;
+  const stream = pick(bodyAsStream) ?? pick(selfAsStream);
+
+  if (typeof r.arrayBuffer === "function") return r.arrayBuffer();
+  if ((r.headers?.get("content-length") ?? "") === "0") return Promise.resolve(undefined);
+  if (!stream || stream.readableEnded) return Promise.resolve(undefined);
+
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const concat = (): ArrayBuffer => {
+      const buf = Buffer.concat(chunks);
+      return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new AppError(408, "BODY_TIMEOUT", "Tempo esgotado a ler o corpo do pedido"));
+    }, 10_000);
+    const onData = (c: unknown) => {
+      chunks.push(Buffer.from(c as Uint8Array));
+    };
+    const onEnd = () => {
+      cleanup();
+      resolve(concat());
+    };
+    const onError = (e: unknown) => {
+      cleanup();
+      reject(e instanceof Error ? e : new Error(String(e)));
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      stream.off?.("data", onData);
+      stream.off?.("end", onEnd);
+      stream.off?.("error", onError);
+    };
+
+    if (typeof stream[Symbol.asyncIterator] === "function") {
+      void (async () => {
+        try {
+          for await (const chunk of stream) chunks.push(Buffer.from(chunk as Uint8Array));
+          cleanup();
+          resolve(concat());
+        } catch (e) {
+          cleanup();
+          reject(e instanceof Error ? e : new Error(String(e)));
+        }
+      })();
+      return;
+    }
+    if (typeof stream.on !== "function") {
+      cleanup();
+      resolve(new ArrayBuffer(0));
+      return;
+    }
+    stream.on("data", onData);
+    stream.on("end", onEnd);
+    stream.on("error", onError);
+  });
+}
+
+// Exports Vercel Node.js — converte o pedido da Vercel num Request NATIVO.
+// Nenhum dos dois atalhos serve:
+//  - getRequestListener (@hono/node-server): os wrappers lazy de Request/Response
+//    que instala nos globals penduram POST /api/auth/* no runtime Vercel (504 sem logs)
+//  - exportar app.fetch directamente: a ponte da Vercel entrega um objecto Node-style
+//    ("this.raw.headers.get is not a function")
+// Por isso construímos o Request nós próprios, com buffer de body protegido por timeout.
+async function toNativeRequest(req: unknown): Promise<Request> {
+  const r = req as {
+    method?: string;
+    url?: string;
+    headers?: unknown;
+    [k: string]: unknown;
+  };
+  const method = (r.method ?? "GET").toUpperCase();
+  let headers: Headers;
+  try {
+    headers = new Headers(r.headers as HeadersInit | undefined);
+  } catch {
+    headers = new Headers();
+  }
+  let url = r.url ?? "/";
+  if (!url.startsWith("http")) url = `https://${headers.get("host") ?? "localhost"}${url}`;
+
+  const hasBody = method !== "GET" && method !== "HEAD";
+  let body: BodyInit | undefined;
+  if (hasBody) body = await readBodyWithTimeout({ ...r, headers });
+  return new Request(url, { method, headers, ...(hasBody ? { body } : {}) });
+}
+
+const vercelHandler = async (req: unknown, res?: unknown) => {
+  try {
+    const response = await app.fetch(await toNativeRequest(req));
+    const rs = res as { writeHead?: Function; end?: Function } | undefined;
+    if (rs && typeof rs.writeHead === "function") {
+      // modo Node-style: escreve na resposta da Vercel
+      const isHead = ((req as { method?: string }).method ?? "").toUpperCase() === "HEAD";
+      const buf = isHead ? undefined : new Uint8Array(await response.arrayBuffer());
+      const h: Record<string, string | string[]> = {};
+      response.headers.forEach((v, k) => {
+        const lower = k.toLowerCase();
+        if (lower === "transfer-encoding" || lower === "content-encoding" || lower === "connection") return;
+        h[k] = v;
+      });
+      const setCookies = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
+      if (setCookies.length > 0) h["set-cookie"] = setCookies;
+      rs.writeHead!(response.status, h);
+      rs.end!(buf);
+      return;
+    }
+    return response;
+  } catch (e) {
+    logger.error("vercelHandler falhou", { error: e instanceof Error ? e.message : String(e), stack: e instanceof Error ? e.stack : undefined });
+    return new Response(JSON.stringify(fail("INTERNAL_ERROR", "Erro interno do servidor")), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
+  }
+};
 
 export const GET = vercelHandler;
 export const POST = vercelHandler;
@@ -340,7 +599,9 @@ export default vercelHandler;
 
 // Compat Bun dev — mantém `bun run src/index.ts` a funcionar
 // @ts-ignore
-if (typeof Bun !== "undefined" && (import.meta as unknown as { main?: boolean }).main) {
+if (typeof Bun !== "undefined") {
+  const _port = Number(env.PORT ?? 4000);
   // @ts-ignore
-  Bun.serve({ fetch: app.fetch, port: Number(env.PORT ?? 4000) });
+  Bun.serve({ fetch: app.fetch as never, port: _port });
+  console.log(`[api] listening on http://localhost:${_port} — env=${env.NODE_ENV} db=${(() => { try { return new URL(env.DATABASE_URL).host; } catch { return "invalid-url"; } })()}`);
 }

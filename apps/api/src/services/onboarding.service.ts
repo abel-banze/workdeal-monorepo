@@ -92,6 +92,20 @@ class OnboardingService {
       tagSlugs: input.tagSlugs ?? [],
     });
 
+    // Boas-vindas da empresa — só no primeiro publish (created), não em re-edits
+    if (result.created) {
+      // fire-and-forget: não bloqueia resposta, não falha onboarding se email falhar
+      void import("../services/email.service.js").then(({ sendWelcomeCompanyEmail }) =>
+        sendWelcomeCompanyEmail({
+          to: user.email,
+          name: user.name ?? user.email,
+          companyName: input.profile.name,
+          profileSlug: slug || result.profileId,
+          profileId: result.profileId,
+        }).catch((e) => console.error("[Onboarding] Falha welcome empresa:", e)),
+      );
+    }
+
     return result;
   }
 

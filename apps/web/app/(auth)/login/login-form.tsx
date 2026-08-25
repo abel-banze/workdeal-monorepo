@@ -56,9 +56,9 @@ export function LoginForm({ next }: { next?: string }) {
           <label htmlFor="password" className={labelCls}>
             PALAVRA-PASSE
           </label>
-          <span className="text-xs font-semibold text-[#0F1A2E]/30" title="Recuperação brevemente disponível">
-            Esqueceu? (breve)
-          </span>
+          <Link href="/forgot-password" className="text-xs font-semibold text-[#0B5E56] hover:text-[#0F1A2E] hover:underline">
+            Esqueceu?
+          </Link>
         </div>
         <input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className={inputCls} />
       </div>

@@ -17,6 +17,22 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 8,
     requireEmailVerification: false,
+    sendResetPassword: async ({ user, url, token }) => {
+      const { sendResetPasswordEmailAuth } = await import("./email.js");
+      await sendResetPasswordEmailAuth(user.email, user.name ?? "", token, url);
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        // Não-bloqueante: erro/timeout de Resend nunca deve falhar o signup nem pendurar o request
+        after: async (user) => {
+          void import("./email.js")
+            .then((m) => m.sendWelcomeAccountEmailAuth(user.email, (user as { name?: string }).name ?? user.email))
+            .catch((e) => console.error("[Auth DB Hook] welcome after hook failed:", e instanceof Error ? e.message : String(e)));
+        },
+      },
+    },
   },
   user: {
     additionalFields: {

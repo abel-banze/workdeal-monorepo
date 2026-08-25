@@ -9,7 +9,19 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 function getPool(): Pool {
   if (_pool) return _pool;
-  _pool = new Pool({ connectionString: env.DATABASE_URL, max: 10 });
+  _pool = new Pool({
+    connectionString: env.DATABASE_URL,
+    max: 10,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 10000,
+    // Fail-fast: sem isto, uma query presa (ex.: PgBouncer em fila) pendura o
+    // request até ao timeout da Vercel (300s de 504) sem nenhum erro nos logs
+    statement_timeout: 10_000,
+    query_timeout: 10_000,
+  });
+  _pool.on("error", (err) => {
+    console.error("[db] Pool error:", err.message);
+  });
   return _pool;
 }
 function getDb(): ReturnType<typeof drizzle> {

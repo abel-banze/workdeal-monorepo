@@ -3,13 +3,13 @@ import Link from "next/link";
 import { getServerSession } from "@/lib/auth";
 import { MobileNav } from "./mobile-nav";
 
-type NavLink = { href: string; label: string; badge?: string };
+type NavLink = { href: string; label: string };
 
 const NAV_LINKS: NavLink[] = [
   { href: "/companies", label: "Empresas" },
-  { href: "/#concursos", label: "Concursos", badge: "breve" },
-  { href: "/#requisicoes", label: "Requisições", badge: "breve" },
-  { href: "/#eventos", label: "Eventos", badge: "breve" },
+  { href: "/#concursos", label: "Concursos" },
+  { href: "/#requisicoes", label: "Requisições" },
+  { href: "/#eventos", label: "Eventos" },
 ];
 
 export async function Navbar() {
@@ -27,10 +27,7 @@ export async function Navbar() {
             <span className="font-black tracking-[-0.04em] text-[18px] text-[#0F1A2E]">WORKDEAL</span>
             <span className="text-[10px] tracking-[0.22em] font-semibold text-[#0B5E56] -mt-[1px]">PLATAFORMA GLOBAL</span>
           </span>
-          <span className="hidden lg:inline-flex ml-2 items-center gap-1.5 rounded-full border border-[#0B5E56]/20 bg-white px-2.5 py-1 text-[10px] font-bold tracking-widest text-[#0B5E56]">
-            <span className="size-1.5 rounded-full bg-[#0B5E56] animate-pulse" />
-            ONDE OS NEGÓCIOS SE ENCONTRAM
-          </span>
+
         </Link>
 
         {/* desktop nav */}
@@ -42,16 +39,8 @@ export async function Navbar() {
               className="inline-flex items-center gap-1.5 px-3 py-2 text-[13.5px] font-medium text-[#0F1A2E]/70 hover:text-[#0F1A2E] transition-colors"
             >
               {l.label}
-              {l.badge && (
-                <span className="rounded-full bg-[#0F1A2E]/5 px-1.5 py-0.5 text-[9px] font-bold tracking-widest text-[#0F1A2E]/40">{l.badge}</span>
-              )}
             </Link>
           ))}
-          <span className="mx-2 h-4 w-px bg-[#D9D2C2]" />
-          <Link href="/#selos" className="px-3 py-2 text-[13.5px] font-medium text-[#0F1A2E]/50 hover:text-[#0F1A2E] flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-[#FF3B1F]" />
-            Selos
-          </Link>
         </nav>
 
         {/* actions */}

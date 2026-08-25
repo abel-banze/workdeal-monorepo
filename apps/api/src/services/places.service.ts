@@ -1,5 +1,6 @@
 import { businessHoursSchema, openingPeriodSchema, placeSuggestionSchema } from "@workdeal/shared";
 import type { BusinessHours, PlaceDetails, PlaceSuggestion } from "@workdeal/shared";
+import { logger } from "@workdeal/shared/lib/logger";
 import { env } from "../env.js";
 import { AppError } from "../lib/errors.js";
 
@@ -82,6 +83,8 @@ class PlacesService {
   async autocomplete(input: string): Promise<PlaceSuggestion[]> {
     const key = assertKey();
     const b = bias();
+    const startedAt = Date.now();
+    logger.info("places.autocomplete inicio", { inputLen: input.length, keySource: env.GOOGLE_PLACES_API_KEY ? "GOOGLE_PLACES_API_KEY" : "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY", bias: `${b.latitude},${b.longitude}@${b.radiusMeters}m` });
     const res = await callGoogle(`${BASE}/places:autocomplete`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key },
@@ -103,7 +106,9 @@ class PlacesService {
       });
       if (parsed.success) out.push(parsed.data);
     }
-    return out.slice(0, 5);
+    const top = out.slice(0, 5);
+    logger.info("places.autocomplete fim", { count: top.length, googleTotal: json.suggestions?.length ?? 0, durationMs: Date.now() - startedAt });
+    return top;
   }
 
   async details(placeId: string): Promise<PlaceDetails> {

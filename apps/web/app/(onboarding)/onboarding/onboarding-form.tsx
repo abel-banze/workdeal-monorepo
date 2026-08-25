@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { requestVerification } from "@/app/actions/verifications";
 import { completeOnboardingAction } from "@/app/actions/onboarding";
@@ -121,7 +121,9 @@ export function OnboardingForm({
   const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
   const [placeQuery, setPlaceQuery] = useState("");
   const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [placeSearching, setPlaceSearching] = useState(false);
+  // idle | loading | empty | error — alimenta o feedback visual sob o input
+  const [placeStatus, setPlaceStatus] = useState<"idle" | "loading" | "empty" | "error">("idle");
+  const suppressPlaceSearchRef = useRef(false);
   const [pickedPlaceLabel, setPickedPlaceLabel] = useState<string | null>(null);
 
   // Horários — formato canónico (Google periods); presets convertem via normalizeBusinessHours
@@ -177,16 +179,29 @@ export function OnboardingForm({
     const q = placeQuery.trim();
     if (q.length < 3) {
       setPlaceSuggestions([]);
-      setPlaceSearching(false);
+      setPlaceStatus("idle");
+      return;
+    }
+    if (suppressPlaceSearchRef.current) {
+      suppressPlaceSearchRef.current = false;
+      setPlaceSuggestions([]);
+      setPlaceStatus("idle");
       return;
     }
     let cancelled = false;
-    setPlaceSearching(true);
+    setPlaceStatus("loading");
+    console.log(`[places] a pesquisar "${q}"…`);
     const id = setTimeout(async () => {
       const res = await placesAutocompleteAction(q);
       if (!cancelled) {
-        setPlaceSuggestions(res.ok ? res.suggestions : []);
-        setPlaceSearching(false);
+        const suggestions = res.ok ? res.suggestions : [];
+        if (res.ok) {
+          console.log(`[places] ${suggestions.length} sugestões para "${q}"`);
+        } else {
+          console.error(`[places] falhou para "${q}":`, res.error);
+        }
+        setPlaceSuggestions(suggestions);
+        setPlaceStatus(!res.ok ? "error" : suggestions.length > 0 ? "idle" : "empty");
       }
     }, 300);
     return () => {
@@ -203,6 +218,8 @@ export function OnboardingForm({
   }
 
   async function pickPlaceSuggestion(s: PlaceSuggestion) {
+    suppressPlaceSearchRef.current = true;
+    setProfileName(s.mainText);
     setPlaceSuggestions([]);
     setPickedPlaceLabel(s.mainText);
     setPlaceQuery(s.secondaryText ? `${s.mainText} — ${s.secondaryText}` : s.mainText);
@@ -856,6 +873,74 @@ export function OnboardingForm({
               <p className="text-sm text-[#0F1A2E]/60">Como a empresa aparece no ecossistema. O nome aqui cria a organização e o perfil público.</p>
             </div>
 
+            {/* Pesquisa Google Places — pré-preenche nome, morada, contactos e horário (tudo editável) */}
+            <div className="space-y-2 rounded-2xl border border-[#D9D2C2] bg-[#F6F3EE] p-4">
+              <div className="flex items-center justify-between">
+                <p className={labelCls}>Pesquisar no Google Maps</p>
+                <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#0F1A2E]/50">Opcional</span>
+              </div>
+              <div className="relative">
+                <input
+                  value={placeQuery}
+                  onChange={(e) => setPlaceQuery(e.target.value)}
+                  placeholder="Pesquisar nome da empresa ou endereço…"
+                  className={inputCls}
+                  autoComplete="off"
+                />
+                {placeStatus === "loading" && (
+                  <span
+                    className="absolute right-3 top-1/2 size-3 -translate-y-1/2 animate-spin rounded-full border-2 border-[#0F1A2E]/20 border-t-[#0B5E56]"
+                    aria-hidden="true"
+                  />
+                )}
+                {(placeSuggestions.length > 0 || placeStatus !== "idle") && (
+                  <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-[#D9D2C2] bg-white shadow-[0_12px_32px_rgba(15,26,46,0.14)]">
+                    {placeSuggestions.length > 0 ? (
+                      placeSuggestions.map((s) => (
+                        <button
+                          key={s.placeId}
+                          type="button"
+                          onClick={() => void pickPlaceSuggestion(s)}
+                          className="block w-full px-3 py-2.5 text-left transition hover:bg-[#0B5E56]/5"
+                        >
+                          <span className="block text-[13px] font-semibold text-[#0F1A2E]">{s.mainText}</span>
+                          {s.secondaryText && <span className="block truncate text-xs text-[#0F1A2E]/50">{s.secondaryText}</span>}
+                        </button>
+                      ))
+                    ) : placeStatus === "loading" ? (
+                      <div className="flex items-center gap-2 px-3 py-2.5">
+                        <span
+                          className="size-3 shrink-0 animate-spin rounded-full border-2 border-[#0F1A2E]/20 border-t-[#0B5E56]"
+                          aria-hidden="true"
+                        />
+                        <span className="text-[13px] text-[#0F1A2E]/60">A pesquisar no Google Maps…</span>
+                      </div>
+                    ) : placeStatus === "empty" ? (
+                      <div className="px-3 py-2.5">
+                        <span className="block text-[13px] font-semibold text-[#0F1A2E]/70">
+                          Nada encontrado no Google Maps para “{placeQuery.trim()}”
+                        </span>
+                        <span className="mt-0.5 block text-xs text-[#0F1A2E]/50">Sem problema — continua o preenchimento manual abaixo.</span>
+                      </div>
+                    ) : (
+                      <div className="px-3 py-2.5 text-[13px] font-medium text-[#7A1A0A]">A pesquisa falhou — tenta novamente.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              {pickedPlaceLabel && (
+                <p className="inline-flex flex-wrap items-center gap-2 rounded-full bg-[#0B5E56]/10 px-3 py-1.5 text-xs font-medium text-[#0B5E56]">
+                  ✓ Dados pré-preenchidos de “{pickedPlaceLabel}” — revê e ajusta nos campos
+                  <button type="button" onClick={clearLocation} className="font-bold hover:underline">
+                    limpar
+                  </button>
+                </p>
+              )}
+              <p className="text-xs leading-relaxed text-[#0F1A2E]/50">
+                Se a empresa existe no Google, poupas tempo: morada, telefone, site e horário ficam preenchidos automaticamente.
+              </p>
+            </div>
+
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <label htmlFor="onb-profileName" className={labelCls}>Nome da empresa *</label>
@@ -1283,40 +1368,12 @@ export function OnboardingForm({
               </button>
             </div>
 
-            {/* Localização Google — opcional, podes pular e completar depois no dashboard */}
+            {/* Localização Google — opcional, podes pular e completar depois no dashboard.
+                A pesquisa por nome vive no passo 1; aqui só se ajusta a localização. */}
             <div className="space-y-3 rounded-2xl border border-[#D9D2C2] bg-[#F6F3EE] p-4">
               <div className="flex items-center justify-between">
                 <p className={labelCls}>Localização no mapa</p>
                 <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#0F1A2E]/50">Opcional</span>
-              </div>
-
-              {/* Pesquisa Google Places via proxy autenticado */}
-              <div className="relative">
-                <input
-                  value={placeQuery}
-                  onChange={(e) => setPlaceQuery(e.target.value)}
-                  placeholder="Pesquisar nome da empresa ou endereço…"
-                  className={inputCls}
-                  autoComplete="off"
-                />
-                {placeSearching && (
-                  <span className="absolute right-3 top-1/2 size-3 -translate-y-1/2 animate-spin rounded-full border-2 border-[#0F1A2E]/20 border-t-[#0B5E56]" />
-                )}
-                {placeSuggestions.length > 0 && (
-                  <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-[#D9D2C2] bg-white shadow-[0_12px_32px_rgba(15,26,46,0.14)]">
-                    {placeSuggestions.map((s) => (
-                      <button
-                        key={s.placeId}
-                        type="button"
-                        onClick={() => void pickPlaceSuggestion(s)}
-                        className="block w-full px-3 py-2.5 text-left transition hover:bg-[#0B5E56]/5"
-                      >
-                        <span className="block text-[13px] font-semibold text-[#0F1A2E]">{s.mainText}</span>
-                        {s.secondaryText && <span className="block truncate text-xs text-[#0F1A2E]/50">{s.secondaryText}</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
               {pickedPlaceLabel && (
