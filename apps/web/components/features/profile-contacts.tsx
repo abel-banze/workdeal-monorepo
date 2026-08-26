@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { FaWhatsapp } from "react-icons/fa";
 import { FiPhone, FiMail, FiGlobe, FiCopy, FiExternalLink, FiCheck } from "react-icons/fi";
 import { BsShieldCheck } from "react-icons/bs";
@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@workspace/ui/components/dialog";
 import { Button } from "@workspace/ui/components/button";
+import { trackEvent } from "@/components/features/analytics";
 
 type ContactProps = {
   whatsapp: string | null;
@@ -20,6 +21,7 @@ type ContactProps = {
   email: string | null;
   website: string | null;
   name: string;
+  profileId?: string;
 };
 
 function CopyButton({ value }: { value: string }) {
@@ -41,7 +43,7 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
-function EmailForm({ to, profileName }: { to: string; profileName: string }) {
+function EmailForm({ to, profileName, profileId }: { to: string; profileName: string; profileId?: string }) {
   const [fromName, setFromName] = useState("");
   const [fromEmail, setFromEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -97,7 +99,7 @@ function EmailForm({ to, profileName }: { to: string; profileName: string }) {
         <Button type="submit" disabled={status === "sending"} className="h-11 flex-1 rounded-full bg-[#0B5E56] px-4 text-sm font-bold text-white hover:bg-[#0A4A44] disabled:opacity-50">
           {status === "sending" ? "A enviar..." : "Enviar mensagem"}
         </Button>
-        <a href={`mailto:${to}?subject=${encodeURIComponent(`Contacto via Workdeal — ${profileName}`)}`} className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-[#D9D2C2] bg-white px-4 text-sm font-bold text-[#0F1A2E] hover:bg-[#F6F3EE]">
+        <a href={`mailto:${to}?subject=${encodeURIComponent(`Contacto via Workdeal — ${profileName}`)}`} onClick={() => { if (profileId) trackEvent({ profileId, eventType: "email_click" }); }} className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-[#D9D2C2] bg-white px-4 text-sm font-bold text-[#0F1A2E] hover:bg-[#F6F3EE]">
           Abrir app
         </a>
       </div>
@@ -106,11 +108,16 @@ function EmailForm({ to, profileName }: { to: string; profileName: string }) {
   );
 }
 
-export function ProfileContacts({ whatsapp, phone, email, website, name }: ContactProps) {
+export function ProfileContacts({ whatsapp, phone, email, website, name, profileId }: ContactProps) {
   const wa = whatsapp ?? phone ?? "+258820000000";
   const waDigits = wa.replace(/\D/g, "");
   const tel = phone ?? "+258840000000";
   const mail = email ?? "geral@empresa.co.mz";
+
+  const trackWhatsApp = useCallback(() => { if (profileId) trackEvent({ profileId, eventType: "whatsapp_click" }); }, [profileId]);
+  const trackPhone = useCallback(() => { if (profileId) trackEvent({ profileId, eventType: "phone_click" }); }, [profileId]);
+  const trackEmail = useCallback(() => { if (profileId) trackEvent({ profileId, eventType: "email_click" }); }, [profileId]);
+  const trackWebsite = useCallback(() => { if (profileId) trackEvent({ profileId, eventType: "website_click" }); }, [profileId]);
 
   return (
     <div className="space-y-3">
@@ -145,6 +152,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name }: Conta
               href={`https://wa.me/${waDigits}`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={trackWhatsApp}
               className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0B5E56] px-4 py-3 text-sm font-bold text-white hover:bg-[#0A4A44]"
             >
               <FaWhatsapp className="size-4" /> Abrir WhatsApp
@@ -153,6 +161,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name }: Conta
               href={`https://wa.me/${waDigits}?text=${encodeURIComponent(`Olá ${name}, vim pelo Workdeal.`)}`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={trackWhatsApp}
               className="inline-flex items-center justify-center rounded-full border border-[#D9D2C2] bg-white px-4 py-3 text-sm font-bold text-[#0F1A2E] hover:bg-[#F6F3EE]"
             >
               Mensagem pronta
@@ -190,7 +199,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name }: Conta
             <span className="font-mono text-sm font-bold text-[#0F1A2E]">{tel}</span>
             <CopyButton value={tel} />
           </div>
-          <a href={`tel:${tel}`} className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[#0F1A2E] px-5 py-3 text-sm font-bold text-white hover:bg-black">
+          <a href={`tel:${tel}`} onClick={trackPhone} className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[#0F1A2E] px-5 py-3 text-sm font-bold text-white hover:bg-black">
             <FiPhone className="size-4" /> Ligar agora
           </a>
         </DialogContent>
@@ -224,7 +233,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name }: Conta
             <CopyButton value={mail} />
           </div>
 
-          <EmailForm to={mail} profileName={name} />
+          <EmailForm to={mail} profileName={name} profileId={profileId} />
         </DialogContent>
       </Dialog>
 
@@ -234,6 +243,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name }: Conta
           href={website}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={trackWebsite}
           className="flex items-center gap-3 rounded-2xl border border-[#0B5E56]/15 bg-[#0B5E56]/5 px-4 py-3.5 transition hover:bg-[#0B5E56]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5E56]/20"
         >
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white border border-[#0B5E56]/15 text-[#0B5E56]">
@@ -250,7 +260,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name }: Conta
   );
 }
 
-export function HeroEmailButton({ to, profileName }: { to: string; profileName: string }) {
+export function HeroEmailButton({ to, profileName, profileId }: { to: string; profileName: string; profileId?: string }) {
   const mail = to;
   return (
     <Dialog>
@@ -275,7 +285,7 @@ export function HeroEmailButton({ to, profileName }: { to: string; profileName: 
           <span className="truncate font-mono text-xs font-bold text-[#0F1A2E]">{mail}</span>
           <CopyButton value={mail} />
         </div>
-        <EmailForm to={mail} profileName={profileName} />
+        <EmailForm to={mail} profileName={profileName} profileId={profileId} />
       </DialogContent>
     </Dialog>
   );

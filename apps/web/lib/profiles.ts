@@ -1,5 +1,13 @@
-import type { ProfileView, CategoryView } from "@workdeal/shared";
+import type { ProfileView, CategoryView, PublicProfileView } from "@workdeal/shared";
 import { apiFetch } from "@/lib/api";
+
+export type PortfolioItem = {
+  id: string;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  sortOrder: number;
+};
 
 export async function getProfiles(params: Record<string, string | undefined>) {
   const search = new URLSearchParams();
@@ -16,8 +24,20 @@ export async function getProfileBySlug(slug: string) {
   });
 }
 
+export async function getPublicProfile(slug: string) {
+  return apiFetch<PublicProfileView>(`/api/v1/profiles/${slug}/public`, {
+    next: { revalidate: 3600, tags: [`profile:${slug}`] },
+  });
+}
+
 export async function getCategories() {
   return apiFetch<CategoryView[]>(`/api/v1/categories`, {
     next: { revalidate: 3600, tags: ["categories"] },
+  });
+}
+
+export async function getPortfolioItems(profileId: string) {
+  return apiFetch<PortfolioItem[]>(`/api/v1/portfolio/${profileId}`, {
+    next: { revalidate: 3600, tags: [`portfolio:${profileId}`] },
   });
 }

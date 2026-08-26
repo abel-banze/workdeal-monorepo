@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getProfileBySlug } from "@/lib/profiles";
+import { getPublicProfile, getPortfolioItems } from "@/lib/profiles";
 import Link from "next/link";
 import { FaWhatsapp } from "react-icons/fa";
 import { FiPhone, FiGlobe } from "react-icons/fi";
@@ -8,11 +8,13 @@ import { HeroEmailButton, ProfileContacts } from "@/components/features/profile-
 import { ProfileServices } from "@/components/features/profile-services";
 import { ProfilePortfolio } from "@/components/features/profile-portfolio";
 import { QuoteDialog } from "@/components/features/profile-quote-dialog";
+import { Analytics } from "@/components/features/analytics";
+import type { PublicProfileView } from "@workdeal/shared";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   try {
-    const { data: profile } = await getProfileBySlug(slug);
+    const { data: profile } = await getPublicProfile(slug);
     return {
       title: `${profile.name} — Workdeal`,
       description: profile.tagline ?? profile.description?.slice(0, 160) ?? "Perfil verificado no Workdeal.",
@@ -38,46 +40,68 @@ function JsonLd({ profile }: { profile: { name: string; description: string | nu
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(json) }} />;
 }
 
-// Mock — selos separados por natureza (qualidade vs. membresia). Alvará/NUIT não entram em Credibilidade.
-const MOCK_QUALITY = [
-  { id: "iso9001", label: "ISO 9001:2015", org: "IQNet · MZ-2023-1841", desc: "Gestão da qualidade", status: "verified" as const, year: "2023" },
-  { id: "iso14001", label: "ISO 14001", org: "Gestão ambiental", desc: "Em auditoria externa", status: "pending" as const, year: "2024" },
-  { id: "inage", label: "INAGE · Classe 3", org: "Construção civil", desc: "Alvará de empreiteiro válido", status: "verified" as const, year: "2022" },
-] as const;
+function formatBusinessHours(hours: Record<string, unknown> | null): string | null {
+  if (!hours) return null;
+  const periods = (hours as { periods?: Array<{ open?: { day?: number; time?: string }; close?: { day?: number; time?: string } }> }).periods;
+  if (!Array.isArray(periods) || periods.length === 0) return null;
+  const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const segments = periods.slice(0, 2).map((p) => {
+    const openDay = p.open?.day != null ? dayNames[p.open.day] : "";
+    const openTime = p.open?.time ?? "";
+    const closeTime = p.close?.time ?? "";
+    return openDay ? `${openDay} ${openTime}–${closeTime}` : `${openTime}–${closeTime}`;
+  });
+  return segments.join(" · ");
+}
 
-const MOCK_MEMBERSHIPS = [
-  { id: "cta", label: "CTA", org: "Confederação das Associações Económicas", since: "2021", status: "verified" as const },
-  { id: "ccm", label: "CCM", org: "Câmara de Comércio de Moçambique", since: "2020", status: "verified" as const },
-  { id: "apme", label: "APME", org: "Assoc. das Pequenas e Médias Empresas", since: "2022", status: "verified" as const },
-  { id: "acis", label: "ACIS", org: "Assoc. Comercial e Industrial de Sofala", since: "2024", status: "pending" as const },
-] as const;
+function companySizeLabel(size: string | null): string | null {
+  if (!size) return null;
+  const map: Record<string, string> = { micro: "Micro Empresa", pequena: "Pequena Empresa", media: "Média Empresa", grande: "Grande Empresa" };
+  return map[size] ?? size;
+}
 
-
+function renderStars(rating: number | null): string {
+  if (!rating) return "";
+  const full = Math.floor(rating);
+  const half = rating - full >= 0.5 ? 1 : 0;
+  return "★".repeat(full) + (half ? "½" : "");
+}
 
 export default async function ProfilePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  let profile: Awaited<ReturnType<typeof getProfileBySlug>>["data"];
+  let p: PublicProfileView;
   try {
-    const res = await getProfileBySlug(slug);
-    profile = res.data;
+    const res = await getPublicProfile(slug);
+    p = res.data;
   } catch {
     notFound();
   }
-  if (!profile) notFound();
 
-  // Enriquecimento com mock onde API é minimal
-  const p = profile!;
-  const isVerified = p.status === "active"; // mock: active = verificado
-  const displayProvince = "Maputo Cidade";
-  const displayDistrict = "KaMpfumo";
-  const displayBairro = "Sommerschield";
-  const founded = "2012";
-  const responseTime = "~2h";
-  const jobsDone = 147;
+  const isVerified = p.status === "active";
+  const loc = p.location;
+  const qual = p.qualification;
+  const founded = qual?.foundedYear ? String(qual.foundedYear) : null;
+  const sizeLabel = companySizeLabel(qual?.companySize ?? null);
+  const memberSince = p.createdAt ? String(new Date(p.createdAt).getFullYear()) : null;
+  const reviewAvg = p.reviews.count > 0 ? p.reviews.average : null;
+  const hoursStr = formatBusinessHours(p.businessHours as Record<string, unknown> | null);
+  const displayAddress = p.formattedAddress ?? loc?.address ?? null;
+  const displayProvince = loc?.province ?? null;
+  const displayDistrict = loc?.district ?? null;
+  const displayBairro = loc?.bairro ?? null;
+  const displayLat = loc?.latitude ?? p.latitude;
+  const displayLng = loc?.longitude ?? p.longitude;
+
+  let portfolioItems: Awaited<ReturnType<typeof getPortfolioItems>>["data"] = [];
+  try {
+    const portRes = await getPortfolioItems(p.id);
+    portfolioItems = portRes.data ?? [];
+  } catch {}
 
   return (
     <div className="bg-[#F6F3EE] min-h-screen">
       <JsonLd profile={p} />
+      <Analytics profileId={p.id} province={loc?.province ?? undefined} district={loc?.district ?? undefined} />
 
       {/* ALERTA verificação — preview sempre visível */}
       <div role="alert" className="mx-auto max-w-[1160px] px-4 pt-6 sm:px-6">
@@ -149,7 +173,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
           <div className="grid gap-6 px-5 pb-6 pt-12 sm:grid-cols-[1.35fr_0.7fr] sm:px-7 sm:pb-7">
             <div className="min-w-0">
               <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-[#0B5E56]">
-                {displayDistrict} · {displayProvince} · {p.type === "company" ? "Empresa" : "Perfil"} · desde {founded}
+                {[displayDistrict, displayProvince].filter(Boolean).join(" · ") || null}
+                {([displayDistrict, displayProvince].filter(Boolean).length > 0 ? " · " : "") + (p.type === "company" ? "Empresa" : "Perfil")}
+                {founded ? ` · desde ${founded}` : ""}
               </p>
               <h1 className="mt-2 inline-flex flex-wrap items-center gap-2 text-[26px] font-black leading-[0.95] tracking-[-0.05em] text-[#0F1A2E] sm:text-[32px]" style={{ fontFamily: "var(--font-display)" }}>
                 <span>{p.name}</span>
@@ -170,7 +196,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                     {c.name}
                   </span>
                 ))}
-                <span className="rounded-full bg-[#0F1A2E] px-3 py-1 text-xs font-bold text-white">Média Empresa</span>
+                {sizeLabel ? <span className="rounded-full bg-[#0F1A2E] px-3 py-1 text-xs font-bold text-white">{sizeLabel}</span> : null}
               </div>
             </div>
 
@@ -193,7 +219,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                 >
                   <FiPhone className="size-[18px]" aria-hidden />
                 </a>
-                <HeroEmailButton to={p.email ?? "geral@empresa.co.mz"} profileName={p.name} />
+                <HeroEmailButton to={p.email ?? "geral@empresa.co.mz"} profileName={p.name} profileId={p.id} />
                 {p.website ? (
                   <a
                     href={p.website}
@@ -208,7 +234,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                 ) : null}
               </div>
               <p className="text-center font-mono text-[11px] text-[#0F1A2E]/40 sm:text-right">
-                Responde {responseTime} · {jobsDone} trabalhos
+                {reviewAvg ? `${reviewAvg} ★ · ${p.reviews.count} avaliação${p.reviews.count !== 1 ? "ões" : ""}` : null}
+                {!reviewAvg && p.reviews.count === 0 ? "Sem avaliações ainda" : null}
               </p>
             </div>
           </div>
@@ -217,18 +244,24 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
           <div className="grid grid-cols-3 divide-x divide-[#D9D2C2] border-t border-[#D9D2C2] bg-[#F6F3EE]/70 text-center">
             <div className="px-3 py-4">
               <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/50">Membro desde</p>
-              <p className="font-black text-[#0F1A2E]">{founded}</p>
+              <p className="font-black text-[#0F1A2E]">{memberSince ?? "—"}</p>
               <p className="text-xs text-[#0F1A2E]/50">Workdeal</p>
             </div>
             <div className="px-3 py-4">
-              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/50">Concluídos</p>
-              <p className="font-black text-[#0F1A2E]">{jobsDone}</p>
-              <p className="text-xs text-[#0F1A2E]/50">trabalhos</p>
+              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/50">Avaliação</p>
+              {reviewAvg ? (
+                <>
+                  <p className="font-black text-[#0F1A2E]">{reviewAvg} <span className="font-normal text-[#0B5E56]">{renderStars(reviewAvg)}</span></p>
+                  <p className="text-xs text-[#0F1A2E]/50">{p.reviews.count} avaliação{p.reviews.count !== 1 ? "ões" : ""}</p>
+                </>
+              ) : (
+                <p className="font-black text-[#0F1A2E]/40">—</p>
+              )}
             </div>
             <div className="px-3 py-4">
-              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/50">Avaliação</p>
-              <p className="font-black text-[#0F1A2E]">4.8 <span className="font-normal text-[#0B5E56]">★★★★★</span></p>
-              <p className="text-xs text-[#0F1A2E]/50">38 avaliações</p>
+              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/50">Trabalhadores</p>
+              <p className="font-black text-[#0F1A2E]">{qual?.workers ?? "—"}</p>
+              {sizeLabel ? <p className="text-xs text-[#0F1A2E]/50">{sizeLabel}</p> : null}
             </div>
           </div>
         </div>
@@ -251,8 +284,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                 </p>
               )}
               <div className="mt-5 flex flex-wrap gap-2">
-                <span className="rounded-full bg-[#0F1A2E] px-3 py-1.5 text-xs font-bold text-white">Alvará 4471/2024</span>
-                <span className="rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-1.5 text-xs font-medium">NUIT 100812337</span>
+                {qual?.alvara ? <span className="rounded-full bg-[#0F1A2E] px-3 py-1.5 text-xs font-bold text-white">Alvará {qual.alvara}</span> : null}
+                {qual?.nuit ? <span className="rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-1.5 text-xs font-medium">NUIT {qual.nuit}</span> : null}
+                {!qual?.alvara && !qual?.nuit ? null : null}
               </div>
             </section>
 
@@ -265,7 +299,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                     Selo & pertença
                   </h2>
                 </div>
-                <span className="rounded-full bg-[#0B5E56] px-3 py-1 font-mono text-[11px] font-bold tracking-[0.08em] text-white">5/7 verificados</span>
+                <span className="rounded-full bg-[#0B5E56] px-3 py-1 font-mono text-[11px] font-bold tracking-[0.08em] text-white">
+                  {p.badges.length > 0 ? `${p.badges.filter((b) => b.status === "active").length}/${p.badges.length} verificados` : "Sem selos"}
+                </span>
               </div>
 
               <div className="flex flex-col gap-6 p-6 sm:p-7">
@@ -313,63 +349,67 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                 </div>
 
                 {/* 2ª linha — selos de qualidade e conformidade */}
+                {p.badges.filter((b) => ["trust", "quality", "specialization", "performance"].includes(b.type)).length > 0 && (
                 <div>
                   <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/60">
                     <span className="size-1.5 rounded-full bg-[#0B5E56]" aria-hidden /> Qualidade & conformidade
                   </p>
                   <ul className="mt-3 grid gap-2.5 sm:grid-cols-3">
-                    {MOCK_QUALITY.map((s) => (
+                    {p.badges.filter((b) => ["trust", "quality", "specialization", "performance"].includes(b.type)).map((s) => (
                       <li
                         key={s.id}
-                        className={`flex gap-3 rounded-2xl border p-3.5 ${s.status === "verified" ? "border-[#0B5E56]/15 bg-[#F6F3EE]" : "border-[#D9D2C2] bg-white"}`}
+                        className={`flex gap-3 rounded-2xl border p-3.5 ${s.status === "active" ? "border-[#0B5E56]/15 bg-[#F6F3EE]" : "border-[#D9D2C2] bg-white"}`}
                       >
-                        <span className={`mt-1 size-2 shrink-0 rounded-full ${s.status === "verified" ? "bg-[#0B5E56]" : "bg-[#FF3B1F]"}`} aria-hidden />
+                        <span className={`mt-1 size-2 shrink-0 rounded-full ${s.status === "active" ? "bg-[#0B5E56]" : "bg-[#FF3B1F]"}`} aria-hidden />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold leading-none text-[#0F1A2E]">{s.label}</p>
-                          <p className="mt-1 text-xs leading-snug text-[#0F1A2E]/55">{s.org}</p>
+                          <p className="text-sm font-bold leading-none text-[#0F1A2E]">{s.name}</p>
+                          {s.description ? <p className="mt-1 text-xs leading-snug text-[#0F1A2E]/55">{s.description}</p> : null}
                           <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#0F1A2E]/40">
-                            {s.year} · {s.desc}
+                            {new Date(s.awardedAt).getFullYear()} · {s.type}
                           </p>
                         </div>
                         <span
-                          className={`ml-auto flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${s.status === "verified" ? "bg-[#0B5E56] text-white" : "bg-[#FF3B1F] text-white"}`}
-                          aria-label={s.status === "verified" ? "Verificado" : "Pendente"}
+                          className={`ml-auto flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${s.status === "active" ? "bg-[#0B5E56] text-white" : "bg-[#FF3B1F] text-white"}`}
+                          aria-label={s.status === "active" ? "Activo" : "Revogado"}
                         >
-                          {s.status === "verified" ? "✓" : "…"}
+                          {s.status === "active" ? "✓" : "…"}
                         </span>
                       </li>
                     ))}
                   </ul>
                 </div>
+                )}
 
                 {/* 3ª linha — membro de */}
+                {p.badges.filter((b) => ["network", "commercial", "reputation"].includes(b.type)).length > 0 && (
                 <div>
                   <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/60">
                     <span className="size-1.5 rounded-full bg-[#0F1A2E]" aria-hidden /> Membro de
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-[#0F1A2E]/45">Câmaras e associações sectoriais</p>
                   <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-                    {MOCK_MEMBERSHIPS.map((m) => (
+                    {p.badges.filter((b) => ["network", "commercial", "reputation"].includes(b.type)).map((m) => (
                       <li
                         key={m.id}
-                        className={`flex gap-3 rounded-2xl border p-3.5 ${m.status === "verified" ? "border-[#0F1A2E]/10 bg-white" : "border-[#D9D2C2] bg-[#F6F3EE]/60"}`}
+                        className={`flex gap-3 rounded-2xl border p-3.5 ${m.status === "active" ? "border-[#0F1A2E]/10 bg-white" : "border-[#D9D2C2] bg-[#F6F3EE]/60"}`}
                       >
-                        <span className={`mt-1 size-2 shrink-0 rounded-full ${m.status === "verified" ? "bg-[#0F1A2E]" : "bg-[#FF3B1F]"}`} aria-hidden />
+                        <span className={`mt-1 size-2 shrink-0 rounded-full ${m.status === "active" ? "bg-[#0F1A2E]" : "bg-[#FF3B1F]"}`} aria-hidden />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold leading-none text-[#0F1A2E]">{m.label}</p>
-                          <p className="mt-1 line-clamp-2 text-xs leading-snug text-[#0F1A2E]/55">{m.org}</p>
-                          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#0F1A2E]/40">desde {m.since}</p>
+                          <p className="text-sm font-bold leading-none text-[#0F1A2E]">{m.name}</p>
+                          {m.description ? <p className="mt-1 line-clamp-2 text-xs leading-snug text-[#0F1A2E]/55">{m.description}</p> : null}
+                          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#0F1A2E]/40">desde {new Date(m.awardedAt).getFullYear()}</p>
                         </div>
                         <span
-                          className={`ml-auto flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${m.status === "verified" ? "bg-[#0F1A2E] text-white" : "bg-[#FF3B1F] text-white"}`}
-                          aria-label={m.status === "verified" ? "Activa" : "Pendente"}
+                          className={`ml-auto flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${m.status === "active" ? "bg-[#0F1A2E] text-white" : "bg-[#FF3B1F] text-white"}`}
+                          aria-label={m.status === "active" ? "Activa" : "Pendente"}
                         >
-                          {m.status === "verified" ? "✓" : "…"}
+                          {m.status === "active" ? "✓" : "…"}
                         </span>
                       </li>
                     ))}
                   </ul>
                 </div>
+                )}
               </div>
 
               <div className="border-t border-[#D9D2C2] bg-[#0F1A2E] px-6 py-3 sm:px-7">
@@ -381,7 +421,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
 
             <ProfileServices targetProfileId={p.id} profileName={p.name} profileEmail={p.email} />
 
-            <ProfilePortfolio targetProfileId={p.id} profileName={p.name} profileEmail={p.email} />
+            <ProfilePortfolio targetProfileId={p.id} profileName={p.name} profileEmail={p.email} items={portfolioItems} />
           </div>
 
           {/* DIREITA — sticky */}
@@ -394,26 +434,31 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
               </h2>
 
               <div className="mt-4">
-                <ProfileContacts whatsapp={p.whatsapp} phone={p.phone} email={p.email} website={p.website} name={p.name} />
+                <ProfileContacts whatsapp={p.whatsapp} phone={p.phone} email={p.email} website={p.website} name={p.name} profileId={p.id} />
               </div>
 
               <div className="mt-4 rounded-2xl border border-[#D9D2C2] bg-[#F6F3EE] p-4">
                 <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/50">Morada</p>
-                <p className="mt-1 text-sm font-semibold text-[#0F1A2E]">
-                  Av. 25 de Setembro, 1234 — {displayBairro}, {displayDistrict}
-                </p>
-                <p className="text-sm text-[#0F1A2E]/60">{displayProvince} · Moçambique</p>
-                <div className="mt-3 h-[132px] overflow-hidden rounded-xl border border-[#D9D2C2] bg-white">
-                  {/* placeholder mapa — sem API key leak */}
-                  <div className="flex size-full items-center justify-center bg-[linear-gradient(135deg,#F6F3EE_0%,#FFFFFF_100%)] p-4 text-center">
-                    <div>
-                      <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0B5E56]">Mapa</p>
-                      <p className="mt-1 text-xs text-[#0F1A2E]/60">Sommerschield · KaMpfumo</p>
-                      <p className="text-xs text-[#0F1A2E]/40">-25.95, 32.58 · raio 5km</p>
+                {displayAddress || displayBairro || displayDistrict ? (
+                  <p className="mt-1 text-sm font-semibold text-[#0F1A2E]">
+                    {[displayAddress, displayBairro, displayDistrict].filter(Boolean).join(" — ")}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm font-semibold text-[#0F1A2E]/40">Sem morada registada</p>
+                )}
+                {displayProvince ? <p className="text-sm text-[#0F1A2E]/60">{displayProvince} · Moçambique</p> : null}
+                {displayLat != null && displayLng != null ? (
+                  <div className="mt-3 h-[132px] overflow-hidden rounded-xl border border-[#D9D2C2] bg-white">
+                    <div className="flex size-full items-center justify-center bg-[linear-gradient(135deg,#F6F3EE_0%,#FFFFFF_100%)] p-4 text-center">
+                      <div>
+                        <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0B5E56]">Mapa</p>
+                        {displayBairro && displayDistrict ? <p className="mt-1 text-xs text-[#0F1A2E]/60">{displayBairro} · {displayDistrict}</p> : null}
+                        <p className="text-xs text-[#0F1A2E]/40">{displayLat.toFixed(2)}, {displayLng.toFixed(2)}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <p className="mt-2 font-mono text-[11px] text-[#0F1A2E]/40">Horário: Seg–Sex 08:00–17:30 · Sáb 08:00–12:00</p>
+                ) : null}
+                {hoursStr ? <p className="mt-2 font-mono text-[11px] text-[#0F1A2E]/40">Horário: {hoursStr}</p> : null}
               </div>
             </section>
 

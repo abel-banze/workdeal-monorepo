@@ -4,7 +4,6 @@ import { requireAuth } from "@/lib/auth"
 import { getOrgRole } from "@workdeal/auth/repository"
 import { SignOutButton } from "../sign-out-button"
 import { AdvancedLocationSettings } from "../advanced-location-settings"
-import { generateOrgAnalytics, getOrgAnalyticsWithReal } from "@/lib/org-analytics-data"
 import { VisitsTimeChart, OriginsChart, SizeChart, ProvinceBars, VisitorsTable } from "@/components/features/org-analytics"
 
 export default async function OrgDashboardPage({
@@ -95,20 +94,55 @@ export default async function OrgDashboardPage({
     grande: "Grande Empresa",
   }
 
-  // P1-5: tenta enriquecer mock com cotações reais (se houver token e profile)
-  let analytics = generateOrgAnalytics(organizationId, orgName ?? profileName)
-  try {
-    const { cookies } = await import("next/headers")
-    const { JWT_COOKIE_NAME } = await import("@workdeal/auth/cookies")
-    const token = (await cookies()).get(JWT_COOKIE_NAME)?.value ?? null
-    if (profileId && token) {
-      const real = await getOrgAnalyticsWithReal(organizationId, orgName ?? profileName, profileId, token)
-      analytics = real as typeof analytics
+  // Fetch real analytics from API
+  type AnalyticsData = {
+    days: { date: string; label: string; visitas: number; unicos: number }[]
+    origins: { origin: string; value: number; fill: string }[]
+    sizes: { size: string; value: number; fill: string }[]
+    provinces: { province: string; value: number }[]
+    visitors: { id: string; name: string; company: string; size: string; origin: string; province: string; action: string; time: string; avatar: string }[]
+    total30: number
+    unicos30: number
+    growth: number
+    realQuotesCount: number
+    quotesCount: number
+  }
+  let analytics: AnalyticsData | null = null
+  if (profileId) {
+    try {
+      const { apiFetch } = await import("@/lib/api")
+      const aRes = await apiFetch<AnalyticsData>(`/api/v1/analytics/${profileId}/dashboard`, { cache: "no-store" })
+      analytics = aRes.data ?? null
+    } catch {}
+  }
+
+  // Fallback: empty analytics when no profile or no data yet
+  if (!analytics) {
+    const emptyDays = Array.from({ length: 90 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (89 - i))
+      return { date: d.toISOString().slice(0, 10), label: `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`, visitas: 0, unicos: 0 }
+    })
+    analytics = {
+      days: emptyDays,
+      origins: [],
+      sizes: [
+        { size: "Micro", value: 0, fill: "#0F1A2E" },
+        { size: "Pequena", value: 0, fill: "#0B5E56" },
+        { size: "Média", value: 0, fill: "#4A6B7C" },
+        { size: "Grande", value: 0, fill: "#FF3B1F" },
+      ],
+      provinces: [],
+      visitors: [],
+      total30: 0,
+      unicos30: 0,
+      growth: 0,
+      realQuotesCount: 0,
+      quotesCount: 0,
     }
-  } catch {}
+  }
+
   const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
   const hasLocation = locations.length > 0
-  const hasRealQuotes = (analytics as { realQuotesCount?: number }).realQuotesCount !== undefined
 
   return (
     <div className="mx-auto w-full max-w-[1160px] space-y-5 pb-10">
@@ -211,7 +245,7 @@ export default async function OrgDashboardPage({
                 <p className="text-[10px] font-bold tracking-wide text-[#0F1A2E]/50">RETORNO</p>
               </div>
               <div className="rounded-xl bg-[#0F1A2E] px-2 py-2">
-                <p className="font-mono text-sm font-bold text-white">{analytics.visitors.filter((v) => v.action !== "viu perfil").length * 3 + 8}</p>
+                <p className="font-mono text-sm font-bold text-white">{analytics.quotesCount}</p>
                 <p className="text-[10px] font-bold tracking-wide text-white/60">ACÇÕES</p>
               </div>
             </div>
@@ -240,14 +274,14 @@ export default async function OrgDashboardPage({
           <p className="mt-1 text-xs text-white/50">Visitantes que voltam para contactar.</p>
         </div>
         <div className="rounded-[18px] border border-[#D9D2C2] bg-[#F6F3EE] p-4">
-          <p className="text-[11px] font-bold tracking-[0.1em] text-[#0F1A2E]/50">CONVERSÃO {(analytics as { realQuotesCount?: number }).realQuotesCount ? "REAL" : "EST."}</p>
+          <p className="text-[11px] font-bold tracking-[0.1em] text-[#0F1A2E]/50">CONVERSÃO {analytics.realQuotesCount > 0 ? "REAL" : "EST."}</p>
           <p className="mt-2 text-sm font-bold text-[#0F1A2E]">
-            {(analytics as { realQuotesCount?: number }).realQuotesCount !== undefined && (analytics as { realQuotesCount?: number }).realQuotesCount! > 0
-              ? `${(analytics as { realQuotesCount?: number }).realQuotesCount} cotações / 30d (real)`
-              : `${Math.round(analytics.total30 * 0.14)} contactos / 30d`}
+            {analytics.realQuotesCount > 0
+              ? `${analytics.realQuotesCount} cotações / 30d (real)`
+              : `${analytics.quotesCount} contactos / 30d`}
           </p>
           <p className="mt-1 text-xs text-[#0F1A2E]/55">
-            {(analytics as { realQuotesCount?: number }).realQuotesCount ? "Cotações via /api/v1/quotes (real)" : "Cliques em WhatsApp/telefone (estimativa · sem pixel)"}
+            {analytics.realQuotesCount > 0 ? "Cotações via /api/v1/quotes" : "Cliques em WhatsApp/telefone/email"}
           </p>
         </div>
         <div className="rounded-[18px] border border-[#D9D2C2] bg-white p-4">
@@ -269,14 +303,12 @@ export default async function OrgDashboardPage({
         <ProvinceBars data={analytics.provinces} />
       </div>
 
-      {/* ── Visitors table — real quando há cotações, senão estimado (P1-5) */}
-      {(analytics as { realQuotesCount?: number }).realQuotesCount !== undefined && (
-        <p className="text-xs text-[#0F1A2E]/40">
-          {(analytics as { realQuotesCount?: number }).realQuotesCount! > 0
-            ? `Visitantes baseados em ${ (analytics as { realQuotesCount?: number }).realQuotesCount } cotações reais (30d). Visitas totais ainda estimadas — tracking PostHog em P2-6.`
-            : "Sem cotações nos últimos 30d — visiteurs são estimativa determinística até PostHog."}
-        </p>
-      )}
+      {/* ── Visitors table — real analytics data */}
+      <p className="text-xs text-[#0F1A2E]/40">
+        {analytics.total30 > 0
+          ? `${analytics.total30} visitas nos últimos 30d · ${analytics.unicos30} visitantes únicos.`
+          : "Sem visitas registadas ainda — os dados aparecem quando utilizadores visitarem o vosso perfil."}
+      </p>
       <VisitorsTable rows={analytics.visitors} />
 
       {/* ── Operations row — qualification + locations + shortcuts ── */}

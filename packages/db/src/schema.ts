@@ -11,7 +11,6 @@ import {
   doublePrecision,
   integer,
   primaryKey,
-  customType,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
@@ -195,14 +194,6 @@ export const category = pgTable(
   (table) => [index("category_slug_idx").on(table.slug)],
 );
 
-const geographyPoint = customType<{ data: string; driverData: string }>({
-  dataType() {
-    // Drizzle-kit push não entende geography(Point,4326) e gera "undefined"."geography" — mantém text para push
-    // O tipo real geography é criado via SQL em 0002_enable_postgis.sql + 0014_reactivate_postgis.sql
-    return "text";
-  },
-});
-
 export const profile = pgTable(
   "profile",
   {
@@ -220,8 +211,6 @@ export const profile = pgTable(
     coverUrl: text("cover_url"),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
-    // PostGIS geography — mantido em sincronia com latitude/longitude via trigger/migração (fallback text quando sem PostGIS)
-    geom: geographyPoint("geom"),
     // tsvector gerado para busca full-text (fallback text quando sem postgis/pg_trgm)
     searchTsv: text("search_tsv"),
     whatsapp: text("whatsapp"),
@@ -456,7 +445,6 @@ export const profileLocation = pgTable(
     address: text("address"),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
-    geom: geographyPoint("geom"),
     isPrimary: boolean("is_primary").notNull().default(false),
     visibility: visibilityEnum("visibility").notNull().default("zone"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -585,5 +573,43 @@ export const otpChallenge = pgTable(
   },
   (table) => [
     index("otp_challenge_identifier_idx").on(table.channel, table.identifier, table.createdAt),
+  ],
+);
+
+// --- Analytics ---
+
+export const analyticsEventTypeEnum = pgEnum("analytics_event_type", [
+  "page_view",
+  "contact_click",
+  "whatsapp_click",
+  "phone_click",
+  "email_click",
+  "website_click",
+  "save",
+  "quote_request",
+  "search_impression",
+]);
+
+export const analyticsEvent = pgTable(
+  "analytics_event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    profileId: text("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    eventType: analyticsEventTypeEnum("event_type").notNull(),
+    visitorId: text("visitor_id"), // anonymous cookie-based ID
+    province: text("province"),
+    district: text("district"),
+    referrer: text("referrer"),
+    metadata: jsonb("metadata"), // extra context: which contact, search query, etc.
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("analytics_event_profile_idx").on(table.profileId, table.createdAt),
+    index("analytics_event_type_idx").on(table.eventType, table.createdAt),
+    index("analytics_event_visitor_idx").on(table.visitorId),
   ],
 );

@@ -106,3 +106,49 @@ export type CreateProfileInput = z.infer<typeof createProfileSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ProfileView = z.infer<typeof profileViewSchema>;
 export type CategoryView = z.infer<typeof categorySchema>;
+
+// --- Public profile (página /profiles/:slug) ---
+
+export const publicLocationSchema = z.object({
+  province: z.string().nullable(),
+  district: z.string().nullable(),
+  bairro: z.string().nullable(),
+  address: z.string().nullable(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+  formattedAddress: z.string().nullable(),
+});
+
+export const publicQualificationSchema = z.object({
+  foundedYear: z.number().nullable(),
+  companySize: z.string().nullable(),
+  workers: z.number().nullable(),
+  legalForm: z.string().nullable(),
+  nuit: z.string().nullable(),
+  alvara: z.string().nullable(),
+});
+
+export const publicBadgeSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  type: z.string(),
+  status: z.string(),
+  awardedAt: z.date(),
+});
+
+export const publicReviewsSchema = z.object({
+  average: z.number().nullable(),
+  count: z.number(),
+});
+
+export const publicProfileViewSchema = profileViewSchema.extend({
+  location: publicLocationSchema.nullable(),
+  qualification: publicQualificationSchema.nullable(),
+  badges: z.array(publicBadgeSchema),
+  reviews: publicReviewsSchema,
+});
+
+export type PublicProfileView = z.infer<typeof publicProfileViewSchema>;
+export type PublicBadge = z.infer<typeof publicBadgeSchema>;
