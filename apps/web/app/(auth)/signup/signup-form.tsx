@@ -43,7 +43,7 @@ export function SignUpForm() {
 
     try {
       const data = parsed.data;
-      const res = await authClient.signUp.email({ name: data.name, email: data.email, password: data.password, phone: data.phone });
+      const res = await authClient.signUp.email({ name: data.name, email: data.email, password: data.password, phone: data.phone } as any);
       if (res.error) throw new Error(res.error.message ?? "Falha ao criar conta");
       console.log("[signup] signUp ok, token:", !!res.data?.token);
 
