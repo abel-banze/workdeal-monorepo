@@ -1,0 +1,71 @@
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env.local // tip: ⌘ override existing { override: true }
+◇ injected env (17) from ..\..\.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from ..\..\.env.local // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from ..\..\..\.env // tip: ⌘ suppress logs { quiet: true }
+[env:api] runtime=development commit=-
+[env:api] DATABASE_URL=post...prod (70ch) host=148.230.109.53:5432
+[env:api] BETTER_AUTH_URL=http://localhost:4000 host=localhost:4000
+[env:api] BETTER_AUTH_SECRET=chan...ABCD (44ch) host=-
+[env:api] ALLOWED_ORIGINS=http://localhost:3000 host=localhost:3000
+[env:api] RESEND_API_KEY=re_d...UByg (36ch) host=-
+[env:api] INTERNAL_API_SECRET=∅ VAZIA host=-
+[env:api] NODE_ENV=development host=URL inválida
+[env:api] VERCEL_ENV=∅ VAZIA host=∅
+[env:api] VERCEL_GIT_COMMIT_REF=∅ VAZIA host=∅
+[api] listening on http://localhost:4000 — env=development db=148.230.109.53:5432
+{"level":"info","message":"GET /api/v1/profiles","timestamp":"2026-08-26T11:12:29.998Z","requestId":"e94b0f13-fed9-4630-965d-c4f8f9fb4283","route":"/api/v1/profiles","method":"GET","status":200,"durationMs":3894}
+{"level":"info","message":"GET /api/v1/profiles","timestamp":"2026-08-26T11:12:57.222Z","requestId":"bbae0dac-a11c-4295-95d3-3e0cd9f78a07","route":"/api/v1/profiles","method":"GET","status":200,"durationMs":1269}
+{"level":"info","message":"GET /api/v1/profiles","timestamp":"2026-08-26T11:13:19.538Z","requestId":"e4e3bfe5-5d40-42a4-a3ae-82720dc77196","route":"/api/v1/profiles","method":"GET","status":200,"durationMs":1172}
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env.local // tip: ⌘ override existing { override: true }
+◇ injected env (0) from ..\..\.env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from ..\..\.env.local // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from ..\..\..\.env // tip: ⌁ auth for agents [www.vestauth.com]
+[env:api] runtime=development commit=-
+[env:api] DATABASE_URL=post...prod (70ch) host=148.230.109.53:5432
+[env:api] BETTER_AUTH_URL=http://localhost:4000 host=localhost:4000
+[env:api] BETTER_AUTH_SECRET=chan...ABCD (44ch) host=-
+[env:api] ALLOWED_ORIGINS=http://localhost:3000 host=localhost:3000
+[env:api] RESEND_API_KEY=re_d...UByg (36ch) host=-
+[env:api] INTERNAL_API_SECRET=∅ VAZIA host=-
+[env:api] NODE_ENV=development host=URL inválida
+[env:api] VERCEL_ENV=∅ VAZIA host=∅
+[env:api] VERCEL_GIT_COMMIT_REF=∅ VAZIA host=∅
+[api] listening on http://localhost:4000 — env=development db=148.230.109.53:5432
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env.local // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from ..\..\.env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from ..\..\.env.local // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from ..\..\..\.env // tip: ⌘ enable debugging { debug: true }
+[env:api] runtime=development commit=-
+[env:api] DATABASE_URL=post...prod (70ch) host=148.230.109.53:5432
+[env:api] BETTER_AUTH_URL=http://localhost:4000 host=localhost:4000
+[env:api] BETTER_AUTH_SECRET=chan...ABCD (44ch) host=-
+[env:api] ALLOWED_ORIGINS=http://localhost:3000 host=localhost:3000
+[env:api] RESEND_API_KEY=re_d...UByg (36ch) host=-
+[env:api] INTERNAL_API_SECRET=∅ VAZIA host=-
+[env:api] NODE_ENV=development host=URL inválida
+[env:api] VERCEL_ENV=∅ VAZIA host=∅
+[env:api] VERCEL_GIT_COMMIT_REF=∅ VAZIA host=∅
+[api] listening on http://localhost:4000 — env=development db=148.230.109.53:5432
+{"level":"info","message":"GET /","timestamp":"2026-08-26T11:18:48.447Z","requestId":"2f8f273b-36fe-4e3b-9f1b-85af5c47e211","route":"/","method":"GET","status":200,"durationMs":65}
+{"level":"info","message":"GET /health","timestamp":"2026-08-26T11:18:52.399Z","requestId":"f1e00815-95a5-4af6-8487-84fc4c6b811d","route":"/health","method":"GET","status":200,"durationMs":17}
+{"level":"info","message":"GET /favicon.ico","timestamp":"2026-08-26T11:18:55.344Z","requestId":"e61cdcb8-823a-437a-8580-7783d23f4a57","route":"/favicon.ico","method":"GET","status":404,"durationMs":66}
+{"level":"info","message":"GET /health/db","timestamp":"2026-08-26T11:18:56.656Z","requestId":"8012f50f-739c-4d88-8518-6b2de8773a8d","route":"/health/db","method":"GET","status":200,"durationMs":4126}
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env.local // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from ..\..\.env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from ..\..\.env.local // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from ..\..\..\.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+[env:api] runtime=development commit=-
+[env:api] DATABASE_URL=post...prod (70ch) host=148.230.109.53:5432
+[env:api] BETTER_AUTH_URL=http://localhost:4000 host=localhost:4000
+[env:api] BETTER_AUTH_SECRET=chan...ABCD (44ch) host=-
+[env:api] ALLOWED_ORIGINS=http://localhost:3000 host=localhost:3000
+[env:api] RESEND_API_KEY=re_d...UByg (36ch) host=-
+[env:api] INTERNAL_API_SECRET=∅ VAZIA host=-
+[env:api] NODE_ENV=development host=URL inválida
+[env:api] VERCEL_ENV=∅ VAZIA host=∅
+[env:api] VERCEL_GIT_COMMIT_REF=∅ VAZIA host=∅
+[api] listening on http://localhost:4000 — env=development db=148.230.109.53:5432

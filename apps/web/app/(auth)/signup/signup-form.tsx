@@ -13,6 +13,7 @@ export function SignUpForm() {
   const [form, setForm] = useState({
     name: "",
     email: "",
+    phone: "",
     password: "",
   });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -42,7 +43,7 @@ export function SignUpForm() {
 
     try {
       const data = parsed.data;
-      const res = await authClient.signUp.email({ name: data.name, email: data.email, password: data.password });
+      const res = await authClient.signUp.email({ name: data.name, email: data.email, password: data.password, phone: data.phone });
       if (res.error) throw new Error(res.error.message ?? "Falha ao criar conta");
       console.log("[signup] signUp ok, token:", !!res.data?.token);
 
@@ -82,6 +83,23 @@ export function SignUpForm() {
           placeholder="nome@empresa.co.mz"
           className={inputCls}
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="phone" className={labelCls}>
+          TELEMOVEL
+        </label>
+        <input
+          id="phone"
+          type="tel"
+          autoComplete="tel"
+          required
+          value={form.phone}
+          onChange={(e) => update("phone", e.target.value)}
+          placeholder="84 123 4567"
+          className={inputCls}
+        />
+        <p className="text-xs text-[#0F1A2E]/40">Número de telemóvel moçambicano.</p>
       </div>
 
       <div className="space-y-1.5">

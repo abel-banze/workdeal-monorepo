@@ -43,7 +43,7 @@ export const auth = betterAuth({
       },
       phone: {
         type: "string",
-        required: false,
+        required: true,
       },
       locale: {
         type: "string",

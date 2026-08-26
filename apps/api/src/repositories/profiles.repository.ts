@@ -1,7 +1,38 @@
 import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db, profile, profileCategory, category } from "@workdeal/db";
-import type { ListProfilesQuery, ProfileType } from "@workdeal/shared";
+import type { ListProfilesQuery } from "@workdeal/shared";
 import { boundingBox, isValidCoordinates } from "@workdeal/shared/lib/geo";
+
+/**
+ * Colunas seguras para SELECT — exclui geom (geography) e searchTsv (tsvector)
+ * que o Drizzle não consegue serializar como texto. Estes campos são usados
+ * apenas em SQL raw para ordenação por distância e busca full-text.
+ */
+export const profileColumns = {
+  id: profile.id,
+  type: profile.type,
+  userId: profile.userId,
+  organizationId: profile.organizationId,
+  slug: profile.slug,
+  name: profile.name,
+  tagline: profile.tagline,
+  description: profile.description,
+  logoUrl: profile.logoUrl,
+  coverUrl: profile.coverUrl,
+  latitude: profile.latitude,
+  longitude: profile.longitude,
+  whatsapp: profile.whatsapp,
+  phone: profile.phone,
+  email: profile.email,
+  website: profile.website,
+  googlePlaceId: profile.googlePlaceId,
+  formattedAddress: profile.formattedAddress,
+  businessHours: profile.businessHours,
+  status: profile.status,
+  createdAt: profile.createdAt,
+  updatedAt: profile.updatedAt,
+  deletedAt: profile.deletedAt,
+} as const;
 
 type ProfileRow = typeof profile.$inferSelect;
 type CategoryRow = typeof category.$inferSelect;
@@ -24,14 +55,14 @@ class ProfilesRepository {
   ): Promise<ProfileWithCategories> {
     return db.transaction(async (tx) => {
       const id = crypto.randomUUID();
-      const [row] = await tx.insert(profile).values({ id, ...data }).returning();
-      if (!row) throw new Error("Falha ao criar perfil");
+      await tx.insert(profile).values({ id, ...data });
       // P0-7: mantém geom em sincronia com latitude/longitude (PostGIS)
       if (data.latitude != null && data.longitude != null) {
-        await tx.execute(sql`UPDATE ${profile} SET geom = ST_SetSRID(ST_MakePoint(${data.longitude}, ${data.latitude}), 4326)::geography WHERE ${profile.id} = ${row.id}`);
-        (row as unknown as Record<string, unknown>).geom = `SRID=4326;POINT(${data.longitude} ${data.latitude})`;
+        await tx.execute(sql`UPDATE ${profile} SET geom = ST_SetSRID(ST_MakePoint(${data.longitude}, ${data.latitude}), 4326)::geography WHERE ${profile.id} = ${id}`);
       }
-      await this.insertCategories(tx, row.id, categories);
+      await this.insertCategories(tx, id, categories);
+      const [row] = await tx.select(profileColumns).from(profile).where(eq(profile.id, id)).limit(1);
+      if (!row) throw new Error("Falha ao criar perfil");
       const links = categories.map((cat, i) => ({
         id: cat.id,
         slug: cat.slug,
@@ -48,11 +79,10 @@ class ProfilesRepository {
     categories: CategoryRow[] | undefined,
   ): Promise<ProfileWithCategories | null> {
     return db.transaction(async (tx) => {
-      const [row] = await tx.update(profile).set(data).where(eq(profile.id, profileId)).returning();
-      if (!row) return null;
+      await tx.update(profile).set(data).where(eq(profile.id, profileId));
       // P0-7: sincroniza geom se latitude/longitude foram atualizados
-      const lat = (data.latitude as number | null | undefined) ?? row.latitude;
-      const lng = (data.longitude as number | null | undefined) ?? row.longitude;
+      const lat = (data.latitude as number | null | undefined);
+      const lng = (data.longitude as number | null | undefined);
       if (lat != null && lng != null && (data.latitude !== undefined || data.longitude !== undefined)) {
         await tx.execute(sql`UPDATE ${profile} SET geom = ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography WHERE ${profile.id} = ${profileId}`);
       } else if ((data.latitude === null || data.longitude === null) && (data.latitude !== undefined || data.longitude !== undefined)) {
@@ -62,6 +92,8 @@ class ProfilesRepository {
         await tx.delete(profileCategory).where(eq(profileCategory.profileId, profileId));
         await this.insertCategories(tx, profileId, categories);
       }
+      const [row] = await tx.select(profileColumns).from(profile).where(eq(profile.id, profileId)).limit(1);
+      if (!row) return null;
       const links = await tx
         .select({ id: category.id, slug: category.slug, name: category.name, isPrimary: profileCategory.isPrimary })
         .from(profileCategory)
@@ -74,18 +106,18 @@ class ProfilesRepository {
 
   async findBySlug(slug: string, opts: { includeDeleted: boolean } = { includeDeleted: false }): Promise<ProfileWithCategories | null> {
     const cond = opts.includeDeleted ? eq(profile.slug, slug) : and(eq(profile.slug, slug), isNull(profile.deletedAt));
-    const [row] = await db.select().from(profile).where(cond).limit(1);
+    const [row] = await db.select(profileColumns).from(profile).where(cond).limit(1);
     if (!row) return null;
     return { ...row, categories: await this.findCategoriesForProfile(row.id) };
   }
 
   async findByUserId(userId: string): Promise<ProfileRow | null> {
-    const [row] = await db.select().from(profile).where(eq(profile.userId, userId)).limit(1);
+    const [row] = await db.select(profileColumns).from(profile).where(eq(profile.userId, userId)).limit(1);
     return row ?? null;
   }
 
   async findByOrganizationId(organizationId: string): Promise<ProfileRow | null> {
-    const [row] = await db.select().from(profile).where(eq(profile.organizationId, organizationId)).limit(1);
+    const [row] = await db.select(profileColumns).from(profile).where(eq(profile.organizationId, organizationId)).limit(1);
     return row ?? null;
   }
 
@@ -176,11 +208,11 @@ class ProfilesRepository {
       query.sort === "name"
         ? asc(profile.name)
         : query.sort === "distance" && nearCoords
-          ? sql`ST_Distance(${profile.geom}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC`
+          ? sql`ST_Distance(${sql.raw('"profile"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC`
           : desc(profile.updatedAt);
 
     const [rows, countRows] = await Promise.all([
-      db.select().from(profile).where(where).orderBy(orderBy).limit(limit).offset(offset),
+      db.select(profileColumns).from(profile).where(where).orderBy(orderBy).limit(limit).offset(offset),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(profile)
