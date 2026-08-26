@@ -19,9 +19,8 @@ function getPool(): Pool {
     statement_timeout: 10_000,
     query_timeout: 10_000,
     // Desactiva prepared statements — obrigatório com PgBouncer em pool_mode=transaction
-    // (prepared statements não são partilháveis entre transações diferentes no mesmo canal)
     prepareThreshold: 0,
-  });
+  } as ConstructorParameters<typeof Pool>[0] & { prepareThreshold?: number });
   _pool.on("error", (err) => {
     console.error("[db] Pool error:", err.message);
   });
