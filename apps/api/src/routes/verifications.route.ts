@@ -23,7 +23,8 @@ verificationsRoute.post("/request", requireAuth, zValidator("json", requestSchem
   // Verifica propriedade: individual (userId) ou empresa (organizationId + permissão)
   const { db, profile } = await import("@workdeal/db");
   const { eq } = await import("drizzle-orm");
-  const [row] = await db.select().from(profile).where(eq(profile.id, profileId)).limit(1);
+  const { profileColumns } = await import("../repositories/profiles.repository.js");
+  const [row] = await db.select(profileColumns).from(profile).where(eq(profile.id, profileId)).limit(1);
   if (!row) throw new AppError(404, "NOT_FOUND", "Perfil não encontrado");
 
   if (row.userId) {
@@ -55,7 +56,7 @@ verificationsRoute.get("/my", requireAuth, async (c) => {
     // Tenta via organização (pega primeira org do user)
     const { getOrgRole: _ } = await import("@workdeal/auth");
     // Fallback: lista perfis onde user é owner via org (consulta simples)
-    const allProfiles = await db.select().from(profile).limit(20);
+    const allProfiles = await db.select(profileColumns).from(profile).limit(20);
     const owned = allProfiles.find((p) => p.organizationId && p.userId === null);
     // Melhor: busca directa por organizationId se existir membership; simplifica retornando vazio se não há perfil
     profileId = null;

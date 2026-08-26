@@ -34,21 +34,22 @@ const TAG = "[apiFetch]";
 
 /**
  * Server-side fetch directo para a API Hono (env.API_URL).
- * Lê o JWT do cookie e envia como Bearer + Cookie (compatível com better-auth via header ou cookie).
+ * Encaminha todos os cookies para a API — o auth middleware decide
+ * se usa JWT ou sessão better-auth.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<ApiEnvelope<T>> {
   const cookieStore = await cookies();
-  const jwt = cookieStore.get(JWT_COOKIE_NAME)?.value;
-  const authHeaders: Record<string, string> = jwt ? { Authorization: `Bearer ${jwt}`, Cookie: `${JWT_COOKIE_NAME}=${jwt}` } : {};
+  const allCookies = cookieStore.getAll();
+  const cookieHeader = allCookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  const hasJwt = allCookies.some((c) => c.name === JWT_COOKIE_NAME);
 
   const base = getApiBase();
   const url = `${base}${path}`;
-  console.log(`${TAG} → ${init?.method ?? "GET"} ${url} (hasJwt=${!!jwt})`);
-  console.log(`${TAG}   API_URL resolved: ${base}`);
+  console.log(`${TAG} → ${init?.method ?? "GET"} ${url} (hasJwt=${hasJwt}, cookieCount=${allCookies.length})`);
   const t0 = Date.now();
   const res = await fetch(url, {
     ...init,
-    headers: { "Content-Type": "application/json", ...authHeaders, ...(init?.headers ?? {}) },
+    headers: { "Content-Type": "application/json", Cookie: cookieHeader, ...(init?.headers ?? {}) },
   });
   const elapsed = Date.now() - t0;
   const bodySnippet = (await res.clone().text()).slice(0, 500);
@@ -67,7 +68,6 @@ export async function apiFetchWithAuth<T>(path: string, token: string | null, in
   const base = getApiBase();
   const url = `${base}${path}`;
   console.log(`${TAG} → ${init?.method ?? "GET"} ${url} (hasJwt=${!!token})`);
-  console.log(`${TAG}   API_URL resolved: ${base}`);
   const t0 = Date.now();
   const res = await fetch(url, {
     ...init,

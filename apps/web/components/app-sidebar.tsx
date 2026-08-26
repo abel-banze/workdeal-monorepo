@@ -14,7 +14,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@workspace/ui/components/sidebar"
-import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon, TerminalSquareIcon, BotIcon, BookOpenIcon, Settings2Icon, FrameIcon, PieChartIcon, MapIcon, LayoutDashboardIcon, Building2Icon, StarIcon, BriefcaseIcon } from "lucide-react"
+import { GalleryVerticalEndIcon, Settings2Icon, FrameIcon, LayoutDashboardIcon, Building2Icon } from "lucide-react"
 
 function buildNavMain(activeId: string | null) {
   const base = activeId ? `/dashboard/${activeId}` : "/dashboard"
@@ -37,23 +37,8 @@ function buildNavMain(activeId: string | null) {
       ],
     },
     {
-      title: "Avaliações (breve)",
-      url: "#",
-      icon: <StarIcon />,
-    },
-    {
-      title: "Oportunidades",
-      url: "#",
-      icon: <BriefcaseIcon />,
-      items: [
-        { title: "Tarefas (breve)", url: "#" },
-        { title: "Eventos (breve)", url: "#" },
-        { title: "Concursos (breve)", url: "#" },
-      ],
-    },
-    {
       title: "Definições",
-      url: "#",
+      url: `${base}/settings`,
       icon: <Settings2Icon />,
       items: [
         { title: "Conta", url: `${base}/settings` },
@@ -64,10 +49,9 @@ function buildNavMain(activeId: string | null) {
   ]
 }
 
-function buildProjects(activeId: string | null) {
+function buildProjects() {
   return [
     { name: "Directório", url: "/", icon: <FrameIcon /> },
-    { name: "Explorar (breve)", url: "#", icon: <MapIcon /> },
   ]
 }
 
@@ -101,13 +85,11 @@ export function AppSidebar({
   const activeId = urlOrgId ?? (pathname?.startsWith("/dashboard/") ? pathname.split("/")[2] ?? null : null)
   const isValidActive = activeId && activeId !== "personal" && teams?.some((t) => t.id === activeId) ? activeId : null
   const navMain = buildNavMain(isValidActive)
-  const projects = buildProjects(isValidActive)
+  const projects = buildProjects()
 
-  const safeUser = user ?? { name: "shadcn", email: "m@example.com", avatar: "/avatars/shadcn.jpg" }
+  const safeUser = user ?? { name: "Utilizador", email: "dev@workdeal.co.mz", avatar: "" }
   const safeTeams = teams ?? [
-    { id: "personal", name: "Acme Inc", logo: <GalleryVerticalEndIcon />, plan: "Enterprise", type: "personal" as const },
-    { id: "company-1", name: "Acme Corp.", logo: <AudioLinesIcon />, plan: "Startup", type: "company" as const },
-    { id: "company-2", name: "Evil Corp.", logo: <TerminalIcon />, plan: "Free", type: "company" as const },
+    { id: "personal", name: "Pessoal", logo: <GalleryVerticalEndIcon />, plan: "Pessoal", type: "personal" as const },
   ]
   // O layout já garante equipa pessoal como primeiro item; fallback só para preview isolado
   const effectiveTeams =

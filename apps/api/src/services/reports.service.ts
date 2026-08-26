@@ -3,6 +3,7 @@ import { AppError } from "../lib/errors.js";
 import { reportsRepository } from "../repositories/reports.repository.js";
 import { db, profile, review } from "@workdeal/db";
 import { eq } from "drizzle-orm";
+import { profileColumns } from "../repositories/profiles.repository.js";
 
 function newId(): string {
   return `rep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -12,7 +13,7 @@ class ReportsService {
   async create(userId: string, input: CreateReportInput) {
     // Valida alvo existe para profile|review (task|event validado quando existirem)
     if (input.targetType === "profile") {
-      const [row] = await db.select().from(profile).where(eq(profile.id, input.targetId)).limit(1);
+      const [row] = await db.select(profileColumns).from(profile).where(eq(profile.id, input.targetId)).limit(1);
       if (!row) throw new AppError(404, "NOT_FOUND", "Perfil alvo não encontrado");
     } else if (input.targetType === "review") {
       const [row] = await db.select().from(review).where(eq(review.id, input.targetId)).limit(1);

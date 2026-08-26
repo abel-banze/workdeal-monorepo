@@ -11,6 +11,7 @@ import { hasOrgPermission } from "@workdeal/shared";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
 import { db, profile } from "@workdeal/db";
 import { eq } from "drizzle-orm";
+import { profileColumns } from "../repositories/profiles.repository.js";
 
 const createLocationSchema = z.object({
   profileId: z.string().min(1),
@@ -56,7 +57,7 @@ export const profileLocationsRoute = new Hono<Env>();
 profileLocationsRoute.post("/", requireAuth, zValidator("json", createLocationSchema), async (c) => {
   const user = c.get("user");
   const input = c.req.valid("json");
-  const [row] = await db.select().from(profile).where(eq(profile.id, input.profileId)).limit(1);
+  const [row] = await db.select(profileColumns).from(profile).where(eq(profile.id, input.profileId)).limit(1);
   if (!row) throw new AppError(404, "NOT_FOUND", "Perfil não encontrado");
   // P0-2: valida vínculo profile ↔ organization para evitar cross-org write
   if (row.organizationId) {
@@ -106,7 +107,7 @@ profileLocationsRoute.patch("/:id", requireAuth, rateLimit(locLimiter), zValidat
   const input = c.req.valid("json");
   const existing = await profileLocationRepository.findById(id);
   if (!existing) throw new AppError(404, "NOT_FOUND", "Localização não encontrada");
-  const [profileRow] = await db.select().from(profile).where(eq(profile.id, existing.profileId)).limit(1);
+  const [profileRow] = await db.select(profileColumns).from(profile).where(eq(profile.id, existing.profileId)).limit(1);
   if (!profileRow) throw new AppError(404, "NOT_FOUND", "Perfil não encontrado");
   // RBAC — mesmo critério do POST
   if (profileRow.organizationId) {
@@ -139,7 +140,7 @@ profileLocationsRoute.delete("/:id", requireAuth, rateLimit(locLimiter), async (
   const id = c.req.param("id");
   const existing = await profileLocationRepository.findById(id);
   if (!existing) throw new AppError(404, "NOT_FOUND", "Localização não encontrada");
-  const [profileRow] = await db.select().from(profile).where(eq(profile.id, existing.profileId)).limit(1);
+  const [profileRow] = await db.select(profileColumns).from(profile).where(eq(profile.id, existing.profileId)).limit(1);
   if (!profileRow) throw new AppError(404, "NOT_FOUND", "Perfil não encontrado");
   if (profileRow.organizationId) {
     if (!existing.organizationId || existing.organizationId !== profileRow.organizationId) {

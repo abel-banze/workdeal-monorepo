@@ -28,7 +28,8 @@ tagsRoute.post("/profile", requireAuth, zValidator("json", setTagsSchema), async
   // verifica permissao
   const { db, profile } = await import("@workdeal/db");
   const { eq } = await import("drizzle-orm");
-  const [row] = await db.select().from(profile).where(eq(profile.id, profileId)).limit(1);
+  const { profileColumns } = await import("../repositories/profiles.repository.js");
+  const [row] = await db.select(profileColumns).from(profile).where(eq(profile.id, profileId)).limit(1);
   if (!row) return c.json(ok(null), 404);
   let allowed = row.userId === user.id;
   if (!allowed && organizationId) {

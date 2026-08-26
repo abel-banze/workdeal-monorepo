@@ -20,8 +20,10 @@ export const errorHandler: ErrorHandler = (err, c) => {
     logger.warn(err.message, { code: err.code, status: err.status, requestId: c.get("requestId" as never) as string | undefined });
     return c.json(fail(err.code, err.message, err.details), err.status as ContentfulStatusCode);
   }
+  const cause = (err as { cause?: { message?: string; code?: string; detail?: string; hint?: string } }).cause;
   logger.error((err as Error).message ?? "Erro interno", {
     stack: (err as Error).stack,
+    ...(cause && { cause: { message: cause.message, code: cause.code, detail: cause.detail, hint: cause.hint } }),
     requestId: c.get("requestId" as never) as string | undefined,
   });
   return c.json(fail("INTERNAL_ERROR", "Erro interno do servidor"), 500);

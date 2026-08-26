@@ -1,8 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { authClient } from "@workdeal/auth/client";
+import { signOut } from "@/app/actions/auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,22 +11,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
-import { LogOutIcon, LayoutDashboardIcon, UserIcon, SettingsIcon, UsersIcon } from "lucide-react";
+import { LogOutIcon, LayoutDashboardIcon, UserIcon, SettingsIcon } from "lucide-react";
 
 export function UserDropdown({ user }: { user: { name: string; email: string; image?: string | null } }) {
-  const router = useRouter();
-
-  const handleSignOut = async () => {
-    await authClient.signOut({
-      fetchOptions: {
-        onSuccess: () => {
-          router.push("/");
-          router.refresh();
-        },
-      },
-    });
-  };
-
   const initials = user.name.slice(0, 2).toUpperCase();
 
   return (
@@ -60,7 +46,7 @@ export function UserDropdown({ user }: { user: { name: string; email: string; im
             <LayoutDashboardIcon className="size-4" />
             Painel
           </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href="/dashboard/profile" />}>
+          <DropdownMenuItem render={<Link href="/dashboard/profile/edit" />}>
             <UserIcon className="size-4" />
             Perfil
           </DropdownMenuItem>
@@ -68,13 +54,9 @@ export function UserDropdown({ user }: { user: { name: string; email: string; im
             <SettingsIcon className="size-4" />
             Definições
           </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href="/dashboard" />}>
-            <UsersIcon className="size-4" />
-            Minhas organizações
-          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
+        <DropdownMenuItem onClick={() => signOut()} className="text-red-600 focus:text-red-600">
           <LogOutIcon className="size-4" />
           Sair
         </DropdownMenuItem>

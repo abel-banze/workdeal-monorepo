@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidMzPhone } from "../lib/phone.js";
 
 export const emailSchema = z.string().trim().email().max(255);
 export const passwordSchema = z.string().min(8, "A palavra-passe deve ter pelo menos 8 caracteres").max(128);
@@ -7,6 +8,11 @@ export const signUpSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: emailSchema,
   password: passwordSchema,
+  phone: z
+    .string()
+    .trim()
+    .min(1, "Número de telemóvel é obrigatório")
+    .refine((v) => isValidMzPhone(v), "Número de telemóvel inválido. Ex: 84 123 4567"),
   profileType: z.enum(["individual", "company"]).default("individual"),
   organizationName: z.string().trim().min(2).max(120).optional(),
   organizationSlug: z
@@ -15,7 +21,6 @@ export const signUpSchema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido: apenas minúsculas, números e hífens")
     .max(64)
     .optional(),
-  phone: z.string().trim().max(32).optional(),
 });
 
 export const signInSchema = z.object({

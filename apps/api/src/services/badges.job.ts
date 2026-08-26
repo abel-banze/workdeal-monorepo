@@ -1,5 +1,6 @@
 import { db, badge, profileBadge, profile, review, follow } from "@workdeal/db";
 import { and, eq, sql } from "drizzle-orm";
+import { profileColumns } from "../repositories/profiles.repository.js";
 
 /**
  * Job diário de selos automáticos — idempotente.
@@ -85,7 +86,7 @@ export async function runBadgeJob() {
 export async function ensureProfileCompleteForProfile(profileId: string) {
   const profileComplete = await db.select().from(badge).where(eq(badge.slug, "profile-complete")).limit(1).then((r) => r[0]);
   if (!profileComplete) return;
-  const [p] = await db.select().from(profile).where(eq(profile.id, profileId)).limit(1);
+  const [p] = await db.select(profileColumns).from(profile).where(eq(profile.id, profileId)).limit(1);
   if (!p || p.status !== "active" || p.deletedAt) return;
   const hasCategory = await db
     .select({ one: sql`1` })
