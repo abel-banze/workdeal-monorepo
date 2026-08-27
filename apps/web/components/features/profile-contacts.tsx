@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { FaWhatsapp } from "react-icons/fa";
 import { FiPhone, FiMail, FiGlobe, FiCopy, FiExternalLink, FiCheck } from "react-icons/fi";
 import { BsShieldCheck } from "react-icons/bs";
+import type { PublicContactVerification } from "@workdeal/shared";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,31 @@ type ContactProps = {
   website: string | null;
   name: string;
   profileId?: string;
+  contactVerifications?: PublicContactVerification[];
 };
+
+type ContactVerification = PublicContactVerification;
+
+function normalizeId(channel: string, value: string): string {
+  const v = value.trim().toLowerCase();
+  return channel === "email" || channel === "website" ? v : v.replace(/\D/g, "");
+}
+
+function isChannelVerified(channel: string, value: string | null, verifications: ContactVerification[]): boolean {
+  if (!value) return false;
+  return verifications.some((v) => {
+    if (v.channel !== channel) return false;
+    return normalizeId(channel, value) === normalizeId(channel, v.identifier);
+  });
+}
+
+function VerifiedPill() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#0B5E56]/10 px-2 py-0.5 text-[10px] font-bold text-[#0B5E56]">
+      <FiCheck className="size-3" /> Verificado
+    </span>
+  );
+}
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -108,11 +133,16 @@ function EmailForm({ to, profileName, profileId }: { to: string; profileName: st
   );
 }
 
-export function ProfileContacts({ whatsapp, phone, email, website, name, profileId }: ContactProps) {
+export function ProfileContacts({ whatsapp, phone, email, website, name, profileId, contactVerifications = [] }: ContactProps) {
   const wa = whatsapp ?? phone ?? "+258820000000";
   const waDigits = wa.replace(/\D/g, "");
   const tel = phone ?? "+258840000000";
   const mail = email ?? "geral@empresa.co.mz";
+
+  const waVerified = isChannelVerified("whatsapp", whatsapp, contactVerifications);
+  const phoneVerified = isChannelVerified("phone", phone, contactVerifications);
+  const emailVerified = isChannelVerified("email", email, contactVerifications);
+  const webVerified = isChannelVerified("website", website, contactVerifications);
 
   const trackWhatsApp = useCallback(() => { if (profileId) trackEvent({ profileId, eventType: "whatsapp_click" }); }, [profileId]);
   const trackPhone = useCallback(() => { if (profileId) trackEvent({ profileId, eventType: "phone_click" }); }, [profileId]);
@@ -131,6 +161,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none">WhatsApp</span>
             <span className="font-mono text-xs font-normal text-white/80">{wa}</span>
           </span>
+          {waVerified ? <VerifiedPill /> : null}
           <FiExternalLink className="size-4 shrink-0 text-white/60" aria-hidden />
         </DialogTrigger>
         <DialogContent className="max-w-[420px] rounded-[20px] border-[#D9D2C2] bg-white p-6">
@@ -183,6 +214,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none text-[#0F1A2E]">Telefone</span>
             <span className="font-mono text-xs text-[#0F1A2E]/60">{tel}</span>
           </span>
+          {phoneVerified ? <VerifiedPill /> : null}
           <FiExternalLink className="size-4 shrink-0 text-[#0F1A2E]/30" aria-hidden />
         </DialogTrigger>
         <DialogContent className="max-w-[420px] rounded-[20px] border-[#D9D2C2] bg-white p-6">
@@ -215,6 +247,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none text-[#0F1A2E]">Email</span>
             <span className="truncate font-mono text-xs text-[#0F1A2E]/60">{mail}</span>
           </span>
+          {emailVerified ? <VerifiedPill /> : null}
           <FiCopy className="size-4 shrink-0 text-[#0F1A2E]/30" aria-hidden />
         </DialogTrigger>
         <DialogContent className="max-w-[460px] rounded-[20px] border-[#D9D2C2] bg-white p-6">
@@ -253,6 +286,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none text-[#0B5E56]">Website</span>
             <span className="truncate text-xs text-[#0B5E56]/70">{website.replace(/^https?:\/\//, "")}</span>
           </span>
+          {webVerified ? <VerifiedPill /> : null}
           <FiExternalLink className="size-4 shrink-0 text-[#0B5E56]/40" aria-hidden />
         </a>
       ) : null}

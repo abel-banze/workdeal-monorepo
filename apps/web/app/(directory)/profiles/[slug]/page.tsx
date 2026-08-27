@@ -3,7 +3,6 @@ import { getPublicProfile, getPortfolioItems } from "@/lib/profiles";
 import Link from "next/link";
 import { FaWhatsapp } from "react-icons/fa";
 import { FiPhone, FiGlobe } from "react-icons/fi";
-import { BsPatchCheckFill, BsExclamationTriangleFill } from "react-icons/bs";
 import { HeroEmailButton, ProfileContacts } from "@/components/features/profile-contacts";
 import { ProfileServices } from "@/components/features/profile-services";
 import { ProfilePortfolio } from "@/components/features/profile-portfolio";
@@ -77,7 +76,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
     notFound();
   }
 
-  const isVerified = p.status === "active";
+  // Selo de verificação Workdeal — apenas quando a DB confirma (badge "verified" ativo)
+  const verifiedBadge = p.badges.find((b) => b.slug === "verified" && b.status === "active") ?? null;
   const loc = p.location;
   const qual = p.qualification;
   const founded = qual?.foundedYear ? String(qual.foundedYear) : null;
@@ -103,32 +103,10 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
       <JsonLd profile={p} />
       <Analytics profileId={p.id} province={loc?.province ?? undefined} district={loc?.district ?? undefined} />
 
-      {/* ALERTA verificação — preview sempre visível */}
-      <div role="alert" className="mx-auto max-w-[1160px] px-4 pt-6 sm:px-6">
-        <div className="flex items-start gap-3 rounded-[16px] border border-[#E8B86A]/40 bg-[#FFF8E7] px-4 py-3.5 sm:items-center sm:px-5">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#FF3B1F] text-white">
-            <BsExclamationTriangleFill className="size-[14px]" aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold leading-none text-[#7A1A0A]">Identidade não verificada</p>
-            <p className="mt-1 text-xs leading-relaxed text-[#0F1A2E]/70">
-              Este perfil não apresentou qualquer documento legal para validação da sua identidade (NUIT, alvará ou documento com fotografia). A Workdeal ainda não pôde confirmar a sua autenticidade. Qualquer contacto é da sua responsabilidade — esta entidade pode não corresponder a uma empresa legalmente constituída.
-            </p>
-          </div>
-          <Link
-            href="/dashboard/profile/edit"
-            className="hidden shrink-0 rounded-full bg-[#0F1A2E] px-4 py-2 text-xs font-bold text-white hover:bg-black sm:inline-flex"
-          >
-            Verificar agora
-          </Link>
-        </div>
-      </div>
-
       {/* HERO — thesis: identidade + selo em relevo, não hero centrado genérico */}
       <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-6">
         <div className="overflow-hidden rounded-[28px] border border-[#D9D2C2] bg-white">
-          {/* barra de verificação */}
-          <div className={`h-[4px] w-full ${isVerified ? "bg-[#0B5E56]" : "bg-[#D9D2C2]/60"}`} />
+          <div className="h-[4px] w-full bg-[#D9D2C2]/60" />
 
           {/* cover — replica card "sem perfil" de /dashboard/profile/edit quando não há coverUrl */}
           <div className="relative h-[132px] overflow-hidden bg-[#0F1A2E] sm:h-[168px]">
@@ -160,13 +138,6 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                   </div>
                 )}
               </div>
-              {isVerified ? (
-                <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[#0B5E56] px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow">
-                  <span className="size-1.5 rounded-full bg-white" /> Verificado
-                </span>
-              ) : (
-                <span className="mb-2 rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[#0F1A2E]/60">Em verificação</span>
-              )}
             </div>
           </div>
 
@@ -179,15 +150,6 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
               </p>
               <h1 className="mt-2 inline-flex flex-wrap items-center gap-2 text-[26px] font-black leading-[0.95] tracking-[-0.05em] text-[#0F1A2E] sm:text-[32px]" style={{ fontFamily: "var(--font-display)" }}>
                 <span>{p.name}</span>
-                {isVerified ? (
-                  <span
-                    title="Identidade verificada — Workdeal"
-                    aria-label="Identidade verificada"
-                    className="inline-flex items-center justify-center rounded-full bg-[#0B5E56]/10 p-1 text-[#0B5E56]"
-                  >
-                    <BsPatchCheckFill className="size-5 sm:size-6" aria-hidden />
-                  </span>
-                ) : null}
               </h1>
               {p.tagline ? <p className="mt-2 max-w-[56ch] text-[14px] leading-snug text-[#0F1A2E]/70">{p.tagline}</p> : null}
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -279,9 +241,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
               {p.description ? (
                 <p className="mt-3 whitespace-pre-wrap text-[14px] leading-relaxed text-[#0F1A2E]/75">{p.description}</p>
               ) : (
-                <p className="mt-3 text-[14px] leading-relaxed text-[#0F1A2E]/70">
-                  Empresa moçambicana especializada em construção civil, fornecimento e serviços técnicos. Opera em Maputo e províncias, com equipa própria e frota dedicada. Foco em prazos, conformidade e acompanhamento pós-entrega — é por isso que 7 em 10 clientes voltam a contratar.
-                </p>
+                <p className="mt-3 text-[14px] leading-relaxed text-[#0F1A2E]/45">Esta entidade ainda não descreveu a sua atividade.</p>
               )}
               <div className="mt-5 flex flex-wrap gap-2">
                 {qual?.alvara ? <span className="rounded-full bg-[#0F1A2E] px-3 py-1.5 text-xs font-bold text-white">Alvará {qual.alvara}</span> : null}
@@ -300,53 +260,57 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                   </h2>
                 </div>
                 <span className="rounded-full bg-[#0B5E56] px-3 py-1 font-mono text-[11px] font-bold tracking-[0.08em] text-white">
-                  {p.badges.length > 0 ? `${p.badges.filter((b) => b.status === "active").length}/${p.badges.length} verificados` : "Sem selos"}
+                  {verifiedBadge ? "Certificado Workdeal" : "Sem certificação Workdeal"}
                 </span>
               </div>
 
               <div className="flex flex-col gap-6 p-6 sm:p-7">
-                {/* 1ª linha — selo de validação de identidade */}
-                <div className="flex flex-col items-center text-center">
-                  <div className="relative size-[148px] shrink-0 sm:size-[168px]">
-                    <div className="absolute inset-0 overflow-hidden rounded-full border border-[#D9D2C2] bg-white shadow-[0_8px_24px_rgba(15,26,46,0.10)]" aria-hidden>
+                {/* 1ª linha — selo de validação Workdeal (só se a DB confirmar badge "verified") */}
+                {verifiedBadge ? (
+                  <div className="flex flex-col items-center text-center">
+                    <div className="relative size-[148px] shrink-0 sm:size-[168px]">
+                      <div className="absolute inset-0 overflow-hidden rounded-full border border-[#D9D2C2] bg-white shadow-[0_8px_24px_rgba(15,26,46,0.10)]" aria-hidden>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/logo.png" alt="" aria-hidden className="absolute inset-0 size-full object-contain p-8 opacity-[0.08] select-none" />
+                        <div
+                          aria-hidden
+                          className="absolute inset-0 rounded-full opacity-[0.04]"
+                          style={{
+                            backgroundImage: "linear-gradient(to right, #0F1A2E 1px, transparent 1px), linear-gradient(to bottom, #0F1A2E 1px, transparent 1px)",
+                            backgroundSize: "22px 22px",
+                          }}
+                        />
+                      </div>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/logo.png" alt="" aria-hidden className="absolute inset-0 size-full object-contain p-8 opacity-[0.08] select-none" />
-                      <div
-                        aria-hidden
-                        className="absolute inset-0 rounded-full opacity-[0.04]"
-                        style={{
-                          backgroundImage: "linear-gradient(to right, #0F1A2E 1px, transparent 1px), linear-gradient(to bottom, #0F1A2E 1px, transparent 1px)",
-                          backgroundSize: "22px 22px",
-                        }}
+                      <img
+                        src="/seal-workdeal.png"
+                        alt="Selo Workdeal Verificado — selo circular"
+                        width={168}
+                        height={168}
+                        className="relative size-full rounded-full object-cover p-1.5"
                       />
-                    </div>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/seal-workdeal.png"
-                      alt="Selo Workdeal Verificado — selo circular"
-                      width={168}
-                      height={168}
-                      className="relative size-full rounded-full object-cover p-1.5"
-                    />
-                    <div className="pointer-events-none absolute inset-[11px] flex flex-col items-center justify-center rounded-full border-[1.5px] border-[#0B5E56]/15 text-center">
-                      <span className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-[#0B5E56]">Workdeal</span>
-                      <span className="mt-0.5 font-black tracking-[-0.04em] text-[#0F1A2E] text-[15px] leading-none" style={{ fontFamily: "var(--font-display)" }}>
-                        VERIFICADO
+                      <div className="pointer-events-none absolute inset-[11px] flex flex-col items-center justify-center rounded-full border-[1.5px] border-[#0B5E56]/15 text-center">
+                        <span className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-[#0B5E56]">Workdeal</span>
+                        <span className="mt-0.5 font-black tracking-[-0.04em] text-[#0F1A2E] text-[15px] leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                          VERIFICADO
+                        </span>
+                        <span className="mt-1 h-px w-10 bg-[#D9D2C2]" aria-hidden />
+                        <span className="mt-1 font-mono text-[10px] font-bold tracking-[0.14em] text-[#0F1A2E]/40">
+                          {new Date(verifiedBadge.awardedAt).getFullYear()} · {displayProvince ? displayProvince.toUpperCase() : "MOÇAMBIQUE"}
+                        </span>
+                      </div>
+                      <span className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-[#0B5E56] px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-white shadow">
+                        ✓ Verificado
                       </span>
-                      <span className="mt-1 h-px w-10 bg-[#D9D2C2]" aria-hidden />
-                      <span className="mt-1 font-mono text-[10px] font-bold tracking-[0.14em] text-[#0F1A2E]/40">2024 · MAPUTO</span>
                     </div>
-                    <span className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-[#0B5E56] px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-white shadow">
-                      ✓ Verificado
-                    </span>
+                    <p className="mt-4 font-mono text-[11px] leading-relaxed text-[#0F1A2E]/50">
+                      Selo de validação Workdeal · verificação de identidade
+                    </p>
+                    <Link href="/dashboard/profile/edit" className="mt-2 text-xs font-bold text-[#0B5E56] hover:underline">
+                      Ver dossiê →
+                    </Link>
                   </div>
-                  <p className="mt-4 font-mono text-[11px] leading-relaxed text-[#0F1A2E]/50">
-                    Selo de validação de identidade · <span className="font-bold text-[#0F1A2E]/70">Balcão Único · 2024</span>
-                  </p>
-                  <Link href="/dashboard/profile/edit" className="mt-2 text-xs font-bold text-[#0B5E56] hover:underline">
-                    Ver dossiê →
-                  </Link>
-                </div>
+                ) : null}
 
                 {/* 2ª linha — selos de qualidade e conformidade */}
                 {p.badges.filter((b) => ["trust", "quality", "specialization", "performance"].includes(b.type)).length > 0 && (
@@ -419,7 +383,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
               </div>
             </section>
 
-            <ProfileServices targetProfileId={p.id} profileName={p.name} profileEmail={p.email} />
+            <ProfileServices services={p.services} targetProfileId={p.id} profileName={p.name} profileEmail={p.email} />
 
             <ProfilePortfolio targetProfileId={p.id} profileName={p.name} profileEmail={p.email} items={portfolioItems} />
           </div>
@@ -434,7 +398,15 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
               </h2>
 
               <div className="mt-4">
-                <ProfileContacts whatsapp={p.whatsapp} phone={p.phone} email={p.email} website={p.website} name={p.name} profileId={p.id} />
+                <ProfileContacts
+                  whatsapp={p.whatsapp}
+                  phone={p.phone}
+                  email={p.email}
+                  website={p.website}
+                  name={p.name}
+                  profileId={p.id}
+                  contactVerifications={p.contactVerifications}
+                />
               </div>
 
               <div className="mt-4 rounded-2xl border border-[#D9D2C2] bg-[#F6F3EE] p-4">

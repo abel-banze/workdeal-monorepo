@@ -34,11 +34,13 @@ class ProfilesService {
     const profileView = this.toProfileView(row);
 
     // Fetch related data in parallel
-    const [locations, qualification, badges, reviewStats] = await Promise.all([
+    const [locations, qualification, badges, reviewStats, services, contactVerifications] = await Promise.all([
       this.fetchLocation(row.id),
       this.fetchQualification(row.organizationId),
       this.fetchBadges(row.id),
       this.fetchReviewStats(row.id),
+      this.fetchServices(row.id),
+      this.fetchContactVerifications(row.id),
     ]);
 
     return {
@@ -47,6 +49,8 @@ class ProfilesService {
       qualification,
       badges,
       reviews: reviewStats,
+      services,
+      contactVerifications,
     };
   }
 
@@ -379,6 +383,39 @@ class ProfilesService {
       average: stats?.avg ? Math.round(stats.avg * 10) / 10 : null,
       count: stats?.count ?? 0,
     };
+  }
+
+  private async fetchServices(profileId: string): Promise<PublicProfileView["services"]> {
+    const { db, service } = await import("@workdeal/db");
+    const { eq, asc } = await import("drizzle-orm");
+    const rows = await db
+      .select({
+        id: service.id,
+        title: service.title,
+        description: service.description,
+        priceMzn: service.priceMzn,
+        imageUrl: service.imageUrl,
+        categoryId: service.categoryId,
+      })
+      .from(service)
+      .where(eq(service.profileId, profileId))
+      .orderBy(asc(service.sortOrder), asc(service.createdAt));
+    return rows;
+  }
+
+  private async fetchContactVerifications(profileId: string): Promise<PublicProfileView["contactVerifications"]> {
+    const { db, profileContactVerification } = await import("@workdeal/db");
+    const { eq, desc } = await import("drizzle-orm");
+    const rows = await db
+      .select({
+        channel: profileContactVerification.channel,
+        identifier: profileContactVerification.identifier,
+        verifiedAt: profileContactVerification.verifiedAt,
+      })
+      .from(profileContactVerification)
+      .where(eq(profileContactVerification.profileId, profileId))
+      .orderBy(desc(profileContactVerification.verifiedAt));
+    return rows;
   }
 
   private toProfileView(row: ProfileWithCategories): ProfileView {

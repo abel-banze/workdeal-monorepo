@@ -7,6 +7,7 @@ import {
   companyQualification,
   profileLocation,
   profileTag,
+  profileContactVerification,
   tag,
 } from "@workdeal/db";
 
@@ -17,6 +18,7 @@ export interface CompleteOnboardingParams {
   organizationId: string;
   profileData: typeof profile.$inferInsert;
   categoryIds: string[];
+  verifiedContacts?: { channel: "whatsapp" | "phone" | "email"; identifier: string }[];
   qualification?:
     | (Pick<QualificationInsert, "workers" | "companySize"> &
         Partial<Omit<QualificationInsert, "id" | "organizationId" | "profileId" | "workers" | "companySize">>)
@@ -112,6 +114,20 @@ class OnboardingRepository {
         if (tags.length > 0) {
           await tx.insert(profileTag).values(tags.map((t) => ({ profileId, tagId: t.id })));
         }
+      }
+
+      // Contactos verificados — persistência do estado "verificado" por canal
+      await tx.delete(profileContactVerification).where(eq(profileContactVerification.profileId, profileId));
+      if (params.verifiedContacts && params.verifiedContacts.length > 0) {
+        await tx.insert(profileContactVerification).values(
+          params.verifiedContacts.map((v) => ({
+            id: crypto.randomUUID(),
+            profileId,
+            channel: v.channel,
+            identifier: v.identifier,
+            verifiedAt: new Date(),
+          })),
+        );
       }
 
       return { profileId, created };

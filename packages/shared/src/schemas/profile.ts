@@ -143,12 +143,32 @@ export const publicReviewsSchema = z.object({
   count: z.number(),
 });
 
+export const publicServiceSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  priceMzn: z.number().nullable(),
+  imageUrl: z.string().nullable(),
+  categoryId: z.string().nullable(),
+});
+
+export const publicContactVerificationSchema = z.object({
+  channel: z.enum(["whatsapp", "phone", "email", "website"]),
+  identifier: z.string(),
+  verifiedAt: z.date(),
+});
+
 export const publicProfileViewSchema = profileViewSchema.extend({
   location: publicLocationSchema.nullable(),
   qualification: publicQualificationSchema.nullable(),
-  badges: z.array(publicBadgeSchema),
+  badges: publicBadgeSchema.array(),
   reviews: publicReviewsSchema,
+  services: publicServiceSchema.array(),
+  contactVerifications: publicContactVerificationSchema.array(),
 });
 
 export type PublicProfileView = z.infer<typeof publicProfileViewSchema>;
 export type PublicBadge = z.infer<typeof publicBadgeSchema>;
+export type PublicService = z.infer<typeof publicServiceSchema>;
+export type PublicContactVerification = z.infer<typeof publicContactVerificationSchema>;
+
