@@ -17,6 +17,7 @@ import {
   SidebarTrigger,
 } from "@workspace/ui/components/sidebar"
 import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon } from "lucide-react"
+import { DashboardVerificationButton } from "@/components/layout/dashboard-verification-button"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAuth()
@@ -102,7 +103,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <SidebarProvider>
       <AppSidebar teams={teams} user={user} />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-[#D9D2C2]/60 bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/75 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
@@ -117,6 +118,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+          </div>
+          <div className="flex items-center gap-2 px-4">
+            <DashboardVerificationButton />
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-5 bg-[#F6F3EE] p-5 pt-2">{children}</div>
