@@ -18,30 +18,39 @@ export function loadGoogleMaps(): Promise<typeof google> {
   const key = getApiKey();
   if (!key) return Promise.reject(new Error("NEXT_PUBLIC_GOOGLE_MAPS_API_KEY em falta"));
 
+  const g = (window as unknown as { google?: typeof google }).google;
+  // Já carregado e com os construtores prontos — resolve de imediato.
+  // (verificar maps.Map, não só maps: com loading=async o namespace aparece antes dos construtores)
+  if (g?.maps?.Map) return Promise.resolve(g);
+
   if (loaderPromise) return loaderPromise;
-  if ((window as unknown as { google?: typeof google }).google?.maps) {
-    loaderPromise = Promise.resolve((window as unknown as { google: typeof google }).google);
-    return loaderPromise;
-  }
 
   loaderPromise = new Promise((resolve, reject) => {
+    const w = window as unknown as typeof globalThis & { __gmBoot?: () => void };
+    // Callback chamado pelo Google apenas quando o Maps JS API está totalmente carregado
+    // (construtores Map/Marker/places disponíveis). Sem callback, o onload do <script>
+    // dispara cedo demais e g.maps.Map ainda é undefined → "g.maps.Map is not a constructor".
+    w.__gmBoot = () => {
+      const gg = (window as unknown as { google: typeof google }).google;
+      resolve(gg);
+    };
+
     const id = "google-maps-script";
     const existing = document.getElementById(id) as HTMLScriptElement | null;
     if (existing) {
-      existing.addEventListener("load", () => resolve((window as unknown as { google: typeof google }).google));
+      existing.addEventListener("load", () => {
+        const gg = (window as unknown as { google: typeof google }).google;
+        if (gg?.maps?.Map) resolve(gg);
+      });
       existing.addEventListener("error", () => reject(new Error("Falha a carregar Google Maps")));
       return;
     }
+
     const script = document.createElement("script");
     script.id = id;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&callback=__gmBoot`;
     script.async = true;
     script.defer = true;
-    script.onload = () => {
-      const g = (window as unknown as { google?: typeof google }).google;
-      if (g?.maps) resolve(g);
-      else reject(new Error("Google Maps não carregou"));
-    };
     script.onerror = () => reject(new Error("Falha a carregar Google Maps"));
     document.head.appendChild(script);
   });

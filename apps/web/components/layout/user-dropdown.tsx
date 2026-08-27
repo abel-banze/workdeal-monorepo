@@ -29,18 +29,20 @@ export function UserDropdown({ user }: { user: { name: string; email: string; im
         }
       />
       <DropdownMenuContent align="end" sideOffset={8} className="w-56">
-        <DropdownMenuLabel className="p-0 font-normal">
-          <div className="flex items-center gap-2 px-2 py-2">
-            <div className="flex size-8 items-center justify-center rounded-full bg-[#0F1A2E] text-white text-xs font-bold">
-              {initials}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="p-0 font-normal">
+            <div className="flex items-center gap-2 px-2 py-2">
+              <div className="flex size-8 items-center justify-center rounded-full bg-[#0F1A2E] text-white text-xs font-bold">
+                {initials}
+              </div>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-medium">{user.name}</span>
+                <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+              </div>
             </div>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">{user.name}</span>
-              <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-            </div>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+        </DropdownMenuGroup>
         <DropdownMenuGroup>
           <DropdownMenuItem render={<Link href="/dashboard" />}>
             <LayoutDashboardIcon className="size-4" />
