@@ -14,9 +14,10 @@ function getPool(): Pool {
     max: 10,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 10000,
-    // Fail-fast: sem isto, uma query presa (ex.: PgBouncer em fila) pendura o
-    // request até ao timeout da Vercel (300s de 504) sem nenhum erro nos logs
-    statement_timeout: 10_000,
+    // query_timeout é client-side (nunca vai como startup parameter) — safa o request
+    // de uma query presa. NÃO usar statement_timeout: o `pg` envia-o como startup
+    // parameter na conexão e o PgBouncer (pool_mode=transaction sem whitelist) rejeita
+    // com "unsupported startup parameter: statement_timeout" (08P01) — ver 234e57e.
     query_timeout: 10_000,
     // Desactiva prepared statements — obrigatório com PgBouncer em pool_mode=transaction
     prepareThreshold: 0,
