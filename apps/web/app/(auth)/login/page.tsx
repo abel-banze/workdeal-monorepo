@@ -1,12 +1,21 @@
 import Image from "next/image";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
 import { getServerSession } from "@/lib/auth";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const session = await getServerSession().catch(() => null);
-  if (session) redirect("/dashboard");
+  if (session) {
+    const store = await cookies();
+    const hasJwt = store.has(JWT_COOKIE_NAME);
+    if (hasJwt) redirect("/dashboard");
+    // Sessão sem JWT (logout parcial ou JWT expirado) — não bloqueia o render com fetch
+    // a BETTER_AUTH_URL (812ms-3s). Apenas mostra o login; o client (fetchJwtToken) ou o
+    // próximo acesso a /dashboard trata de re-sincronizar. Evita GET /login 3.6s.
+  }
 
   const { next } = await searchParams;
 

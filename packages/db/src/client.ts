@@ -11,9 +11,9 @@ function getPool(): Pool {
   if (_pool) return _pool;
   _pool = new Pool({
     connectionString: env.DATABASE_URL,
-    max: 10,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 10000,
+    max: 20,
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
     // query_timeout é client-side (nunca vai como startup parameter) — safa o request
     // de uma query presa. NÃO usar statement_timeout: o `pg` envia-o como startup
     // parameter na conexão e o PgBouncer (pool_mode=transaction sem whitelist) rejeita
@@ -21,9 +21,14 @@ function getPool(): Pool {
     query_timeout: 10_000,
     // Desactiva prepared statements — obrigatório com PgBouncer em pool_mode=transaction
     prepareThreshold: 0,
-  } as ConstructorParameters<typeof Pool>[0] & { prepareThreshold?: number });
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+  } as ConstructorParameters<typeof Pool>[0] & { prepareThreshold?: number; keepAlive?: boolean; keepAliveInitialDelayMillis?: number });
   _pool.on("error", (err) => {
     console.error("[db] Pool error:", err.message);
+  });
+  _pool.on("connect", () => {
+    // Evita "Connection terminated unexpectedly" em idle longo (NAT/firewall fecha TCP)
   });
   return _pool;
 }
