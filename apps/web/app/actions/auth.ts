@@ -36,7 +36,7 @@ export async function signOut() {
 }
 
 /**
- * Store the JWT (fetched by the client via /api/auth/token proxy) as an httpOnly cookie.
+ * Store the JWT as an httpOnly cookie.
  * Always receives the JWT directly — no fallback, no server-to-server API call.
  */
 export async function syncJwt(jwtToken: string): Promise<{ ok: boolean; error?: string }> {
@@ -48,6 +48,45 @@ export async function syncJwt(jwtToken: string): Promise<{ ok: boolean; error?: 
   await (store as unknown as { set: (n: string, v: string, o: unknown) => void }).set(
     JWT_COOKIE_NAME,
     jwtToken,
+    jwtCookieOptions(isSecure),
+  )
+  return { ok: true }
+}
+
+/**
+ * Obtain the JWT server-side (from the auth backend) using the session cookies of the
+ * current request and store it as the httpOnly `workdeal_jwt` cookie.
+ *
+ * Avoids the redundant browser → proxy → backend roundtrip of the old client fetch:
+ * the whole exchange now happens in a single Server Action, on the server, using only
+ * the better-auth session cookies that are already present on the request.
+ */
+export async function syncSessionJwt(): Promise<{ ok: boolean; error?: string }> {
+  const store = await cookies()
+  const all = store.getAll()
+  if (all.length === 0) return { ok: false, error: "Sem sessão" }
+
+  const cookieHeader: string = all.map((c) => `${c.name}=${c.value}`).join("; ")
+
+  const res = await fetch(`${env.BETTER_AUTH_URL}/api/auth/token`, {
+    method: "GET",
+    headers: { Cookie: cookieHeader },
+    cache: "no-store",
+  }).catch(() => undefined)
+
+  if (!res || !res.ok) {
+    return { ok: false, error: res ? `Falha ao obter JWT: ${res.status}` : "Auth backend indisponível" }
+  }
+
+  const data = await res.json().catch(() => ({})) as { token?: unknown }
+  if (typeof data.token !== "string" || !data.token) {
+    return { ok: false, error: "Token vazio no /api/auth/token" }
+  }
+
+  const isSecure = env.BETTER_AUTH_URL.startsWith("https://")
+  await (store as unknown as { set: (n: string, v: string, o: unknown) => void }).set(
+    JWT_COOKIE_NAME,
+    data.token,
     jwtCookieOptions(isSecure),
   )
   return { ok: true }

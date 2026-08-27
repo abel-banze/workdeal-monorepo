@@ -6,19 +6,12 @@ export const authClient = createAuthClient({
 })
 
 /**
- * Fetch the JWT from /api/auth/token via the proxy (browser → proxy → API),
- * then store it as httpOnly `workdeal_jwt` cookie via the syncJwt server action.
+ * Obtain the JWT server-side and store it as the httpOnly `workdeal_jwt` cookie.
+ * A single Server Action does the whole exchange (backend fetch + cookie store),
+ * avoiding the extra browser → proxy → API roundtrip of the previous flow.
  */
 export async function fetchJwtToken(): Promise<void> {
-  const res = await fetch("/api/auth/token", { cache: "no-store", credentials: "include" })
-  if (!res.ok) {
-    throw new Error(`Falha ao obter JWT: ${res.status}`)
-  }
-  const data = await res.json().catch(() => ({})) as { token?: string }
-  if (!data.token || typeof data.token !== "string") {
-    throw new Error("Token vazio no /api/auth/token")
-  }
-  const { syncJwt } = await import("@/app/actions/auth")
-  const result = await syncJwt(data.token)
+  const { syncSessionJwt } = await import("@/app/actions/auth")
+  const result = await syncSessionJwt()
   if (!result.ok) throw new Error(result.error ?? "Falha ao sincronizar JWT")
 }
