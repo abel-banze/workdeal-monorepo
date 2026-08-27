@@ -30,7 +30,7 @@ const trackSchema = z.object({
   province: z.string().optional(),
   district: z.string().optional(),
   referrer: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 // POST /api/v1/analytics/track — public endpoint, rate-limited

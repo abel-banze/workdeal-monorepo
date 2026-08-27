@@ -267,6 +267,7 @@ export function OnboardingForm({
   const [createdProfileId, setCreatedProfileId] = useState<string | null>(null);
   const [wantVerification, setWantVerification] = useState<boolean | null>(null);
   const [docNote, setDocNote] = useState("");
+  const [verifyLevel, setVerifyLevel] = useState<"level1" | "level2">("level1");
   // Erros por campo (mostrados junto ao input); preenchidos em cada tentativa de avançar
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -717,7 +718,7 @@ export function OnboardingForm({
     try {
       if (!skip && createdProfileId) {
         const docs = docNote.trim() ? [{ type: "note", url: docNote.trim() }] : [{ type: "pending", note: "Solicitação via onboarding" }];
-        await requestVerification({ profileId: createdProfileId, documents: docs });
+        await requestVerification({ profileId: createdProfileId, documents: docs, level: verifyLevel });
       }
       router.push("/dashboard?welcome=1");
       router.refresh();
@@ -1557,9 +1558,32 @@ export function OnboardingForm({
               </button>
             </div>
             {wantVerification === true && (
-              <div className="space-y-1.5">
-                <label className={labelCls}>Nota / link do documento (opcional)</label>
-                <input value={docNote} onChange={(e) => setDocNote(e.target.value)} placeholder="Ex: NUIT, alvará ou link Drive" className={inputCls} />
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className={labelCls}>Nível de verificação</label>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setVerifyLevel("level1")}
+                      className={`rounded-xl border p-3 text-left transition ${verifyLevel === "level1" ? "border-[#0B5E56] bg-[#0B5E56]/5" : "border-[#D9D2C2] bg-white"}`}
+                    >
+                      <span className="block text-sm font-bold text-[#0F1A2E]">1º grau — Verificado</span>
+                      <span className="mt-0.5 block text-xs leading-snug text-[#0F1A2E]/55">Todos os documentos de registo legal.</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVerifyLevel("level2")}
+                      className={`rounded-xl border p-3 text-left transition ${verifyLevel === "level2" ? "border-[#1F5C99] bg-[#1F5C99]/5" : "border-[#D9D2C2] bg-white"}`}
+                    >
+                      <span className="block text-sm font-bold text-[#0F1A2E]">2º grau — Em legalização</span>
+                      <span className="mt-0.5 block text-xs leading-snug text-[#0F1A2E]/55">Ainda em processo de legalização.</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelCls}>Nota / link do documento (opcional)</label>
+                  <input value={docNote} onChange={(e) => setDocNote(e.target.value)} placeholder="Ex: NUIT, alvará ou link Drive" className={inputCls} />
+                </div>
               </div>
             )}
             {error && <p role="alert" aria-live="polite" className={errorCls}>{error}</p>}

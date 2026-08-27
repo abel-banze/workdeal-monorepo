@@ -9,6 +9,7 @@ import { requireAuth } from "@/lib/auth"
 const requestSchema = z.object({
   profileId: z.string().min(1),
   documents: z.array(z.unknown()).max(5).default([]),
+  level: z.enum(["level1", "level2"]).default("level1"),
 })
 
 async function getAuthToken(): Promise<string> {
@@ -18,7 +19,7 @@ async function getAuthToken(): Promise<string> {
   return token
 }
 
-export async function requestVerification(input: { profileId: string; documents?: unknown[] }) {
+export async function requestVerification(input: { profileId: string; documents?: unknown[]; level?: "level1" | "level2" }) {
   const session = await requireAuth()
   const data = requestSchema.parse(input)
   const token = await getAuthToken()

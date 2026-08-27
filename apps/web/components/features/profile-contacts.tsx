@@ -49,6 +49,14 @@ function VerifiedPill() {
   );
 }
 
+function UnverifiedPill() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#FF3B1F]/10 px-2 py-0.5 text-[10px] font-bold text-[#B3260F]">
+      <span className="size-1 rounded-full bg-[#FF3B1F]" aria-hidden /> Não verificado
+    </span>
+  );
+}
+
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -161,7 +169,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none">WhatsApp</span>
             <span className="font-mono text-xs font-normal text-white/80">{wa}</span>
           </span>
-          {waVerified ? <VerifiedPill /> : null}
+          {waVerified ? <VerifiedPill /> : <UnverifiedPill />}
           <FiExternalLink className="size-4 shrink-0 text-white/60" aria-hidden />
         </DialogTrigger>
         <DialogContent className="max-w-[420px] rounded-[20px] border-[#D9D2C2] bg-white p-6">
@@ -214,7 +222,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none text-[#0F1A2E]">Telefone</span>
             <span className="font-mono text-xs text-[#0F1A2E]/60">{tel}</span>
           </span>
-          {phoneVerified ? <VerifiedPill /> : null}
+          {phoneVerified ? <VerifiedPill /> : <UnverifiedPill />}
           <FiExternalLink className="size-4 shrink-0 text-[#0F1A2E]/30" aria-hidden />
         </DialogTrigger>
         <DialogContent className="max-w-[420px] rounded-[20px] border-[#D9D2C2] bg-white p-6">
@@ -247,7 +255,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none text-[#0F1A2E]">Email</span>
             <span className="truncate font-mono text-xs text-[#0F1A2E]/60">{mail}</span>
           </span>
-          {emailVerified ? <VerifiedPill /> : null}
+          {emailVerified ? <VerifiedPill /> : <UnverifiedPill />}
           <FiCopy className="size-4 shrink-0 text-[#0F1A2E]/30" aria-hidden />
         </DialogTrigger>
         <DialogContent className="max-w-[460px] rounded-[20px] border-[#D9D2C2] bg-white p-6">
@@ -286,7 +294,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none text-[#0B5E56]">Website</span>
             <span className="truncate text-xs text-[#0B5E56]/70">{website.replace(/^https?:\/\//, "")}</span>
           </span>
-          {webVerified ? <VerifiedPill /> : null}
+          {webVerified ? <VerifiedPill /> : <UnverifiedPill />}
           <FiExternalLink className="size-4 shrink-0 text-[#0B5E56]/40" aria-hidden />
         </a>
       ) : null}

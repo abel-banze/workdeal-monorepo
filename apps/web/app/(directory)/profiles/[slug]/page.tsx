@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FaWhatsapp } from "react-icons/fa";
 import { FiPhone, FiGlobe } from "react-icons/fi";
 import { HeroEmailButton, ProfileContacts } from "@/components/features/profile-contacts";
+import { ProfileMap } from "@/components/features/profile-map";
 import { ProfileServices } from "@/components/features/profile-services";
 import { ProfilePortfolio } from "@/components/features/profile-portfolio";
 import { QuoteDialog } from "@/components/features/profile-quote-dialog";
@@ -78,6 +79,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
 
   // Selo de verificação Workdeal — apenas quando a DB confirma (badge "verified" ativo)
   const verifiedBadge = p.badges.find((b) => b.slug === "verified" && b.status === "active") ?? null;
+  const legalizingBadge = p.badges.find((b) => b.slug === "in-legalization" && b.status === "active") ?? null;
   const loc = p.location;
   const qual = p.qualification;
   const founded = qual?.foundedYear ? String(qual.foundedYear) : null;
@@ -105,6 +107,24 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
 
       {/* HERO — thesis: identidade + selo em relevo, não hero centrado genérico */}
       <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-6">
+        {!verifiedBadge && !legalizingBadge && (
+          <div className="mb-4 rounded-2xl border border-[#FF3B1F]/30 bg-[#FF3B1F]/[0.05] p-4">
+            <div className="flex gap-3">
+              <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-[#FF3B1F] text-[12px] font-black text-white" aria-hidden>
+                !
+              </span>
+              <div>
+                <p className="text-sm font-black text-[#0F1A2E]">Atenção — identidade não verificada</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#0F1A2E]/70">
+                  Este perfil não apresentou qualquer documento legal para validação da sua identidade (NUIT, alvará ou documento com fotografia). A
+                  Workdeal ainda não pôde confirmar a sua autenticidade. Qualquer contacto é da sua responsabilidade — esta entidade pode não
+                  corresponder a uma empresa legalmente constituída.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-hidden rounded-[28px] border border-[#D9D2C2] bg-white">
           <div className="h-[4px] w-full bg-[#D9D2C2]/60" />
 
@@ -259,14 +279,14 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                     Selo & pertença
                   </h2>
                 </div>
-                <span className="rounded-full bg-[#0B5E56] px-3 py-1 font-mono text-[11px] font-bold tracking-[0.08em] text-white">
-                  {verifiedBadge ? "Certificado Workdeal" : "Sem certificação Workdeal"}
+                <span className={`rounded-full px-3 py-1 font-mono text-[11px] font-bold tracking-[0.08em] text-white ${verifiedBadge ? "bg-[#0B5E56]" : legalizingBadge ? "bg-[#1F5C99]" : "bg-[#0F1A2E]/40"}`}>
+                  {verifiedBadge ? "Certificado Workdeal · 1º grau" : legalizingBadge ? "Em processo de legalização · 2º grau" : "Sem certificação Workdeal"}
                 </span>
               </div>
 
               <div className="flex flex-col gap-6 p-6 sm:p-7">
-                {/* 1ª linha — selo de validação Workdeal (só se a DB confirmar badge "verified") */}
-                {verifiedBadge ? (
+                {/* 1ª linha — selo de validação Workdeal (só se a DB confirmar badge "verified" ou "in-legalization") */}
+                {(verifiedBadge || legalizingBadge) ? (
                   <div className="flex flex-col items-center text-center">
                     <div className="relative size-[148px] shrink-0 sm:size-[168px]">
                       <div className="absolute inset-0 overflow-hidden rounded-full border border-[#D9D2C2] bg-white shadow-[0_8px_24px_rgba(15,26,46,0.10)]" aria-hidden>
@@ -289,22 +309,24 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                         height={168}
                         className="relative size-full rounded-full object-cover p-1.5"
                       />
-                      <div className="pointer-events-none absolute inset-[11px] flex flex-col items-center justify-center rounded-full border-[1.5px] border-[#0B5E56]/15 text-center">
-                        <span className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-[#0B5E56]">Workdeal</span>
+                      <div className={`pointer-events-none absolute inset-[11px] flex flex-col items-center justify-center rounded-full border-[1.5px] ${verifiedBadge ? "border-[#0B5E56]/15" : "border-[#1F5C99]/20"} text-center`}>
+                        <span className={`font-mono text-[9px] font-black uppercase tracking-[0.22em] ${verifiedBadge ? "text-[#0B5E56]" : "text-[#1F5C99]"}`}>Workdeal</span>
                         <span className="mt-0.5 font-black tracking-[-0.04em] text-[#0F1A2E] text-[15px] leading-none" style={{ fontFamily: "var(--font-display)" }}>
-                          VERIFICADO
+                          {verifiedBadge ? "VERIFICADO" : "EM LEGALIZAÇÃO"}
                         </span>
                         <span className="mt-1 h-px w-10 bg-[#D9D2C2]" aria-hidden />
                         <span className="mt-1 font-mono text-[10px] font-bold tracking-[0.14em] text-[#0F1A2E]/40">
-                          {new Date(verifiedBadge.awardedAt).getFullYear()} · {displayProvince ? displayProvince.toUpperCase() : "MOÇAMBIQUE"}
+                          {new Date((verifiedBadge ?? legalizingBadge)!.awardedAt).getFullYear()} · {displayProvince ? displayProvince.toUpperCase() : "MOÇAMBIQUE"}
                         </span>
                       </div>
-                      <span className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-[#0B5E56] px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-white shadow">
-                        ✓ Verificado
+                      <span className={`pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-white shadow ${verifiedBadge ? "bg-[#0B5E56]" : "bg-[#1F5C99]"}`}>
+                        {verifiedBadge ? "✓ Verificado" : "2º grau"}
                       </span>
                     </div>
                     <p className="mt-4 font-mono text-[11px] leading-relaxed text-[#0F1A2E]/50">
-                      Selo de validação Workdeal · verificação de identidade
+                      {verifiedBadge
+                        ? "Selo de validação Workdeal · verificação de identidade"
+                        : "Empresa em processo de legalização · verificação de identidade"}
                     </p>
                     <Link href="/dashboard/profile/edit" className="mt-2 text-xs font-bold text-[#0B5E56] hover:underline">
                       Ver dossiê →
@@ -420,14 +442,15 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                 )}
                 {displayProvince ? <p className="text-sm text-[#0F1A2E]/60">{displayProvince} · Moçambique</p> : null}
                 {displayLat != null && displayLng != null ? (
-                  <div className="mt-3 h-[132px] overflow-hidden rounded-xl border border-[#D9D2C2] bg-white">
-                    <div className="flex size-full items-center justify-center bg-[linear-gradient(135deg,#F6F3EE_0%,#FFFFFF_100%)] p-4 text-center">
-                      <div>
-                        <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0B5E56]">Mapa</p>
-                        {displayBairro && displayDistrict ? <p className="mt-1 text-xs text-[#0F1A2E]/60">{displayBairro} · {displayDistrict}</p> : null}
-                        <p className="text-xs text-[#0F1A2E]/40">{displayLat.toFixed(2)}, {displayLng.toFixed(2)}</p>
-                      </div>
-                    </div>
+                  <div className="mt-3 h-[160px] overflow-hidden rounded-xl border border-[#D9D2C2] bg-white">
+                    <ProfileMap
+                      lat={displayLat}
+                      lng={displayLng}
+                      name={p.name}
+                      bairro={displayBairro}
+                      district={displayDistrict}
+                      address={displayAddress}
+                    />
                   </div>
                 ) : null}
                 {hoursStr ? <p className="mt-2 font-mono text-[11px] text-[#0F1A2E]/40">Horário: {hoursStr}</p> : null}

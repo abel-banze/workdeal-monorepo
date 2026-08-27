@@ -169,6 +169,13 @@
       "when": 1787833298787,
       "tag": "0023_eminent_xavin",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787835366233,
+      "tag": "0024_clear_spirit",
+      "breakpoints": true
     }
   ]
 }

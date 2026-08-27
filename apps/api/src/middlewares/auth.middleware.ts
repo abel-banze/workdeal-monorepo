@@ -64,7 +64,7 @@ export const requireAuth = createMiddleware<Env>(async (c, next) => {
           phone: u.phone ?? null,
           locale: u.locale ?? "pt-MZ",
         });
-        c.set("sessionId", session.sessionId ?? null);
+        c.set("sessionId", session.session?.id ?? null);
         await next();
         return;
       }

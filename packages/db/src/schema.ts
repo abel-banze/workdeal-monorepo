@@ -196,6 +196,7 @@ export const badgeOriginEnum = pgEnum("badge_origin", ["automatic", "manual", "p
 export const badgeStatusEnum = pgEnum("badge_status", ["active", "revoked"]);
 export const reviewOriginEnum = pgEnum("review_origin", ["directory", "task", "event"]);
 export const verificationRequestStatusEnum = pgEnum("verification_request_status", ["pending", "in_review", "approved", "rejected"]);
+export const verificationLevelEnum = pgEnum("verification_level", ["level1", "level2"]);
 export const reportTargetTypeEnum = pgEnum("report_target_type", ["profile", "review", "task", "event"]);
 export const reportStatusEnum = pgEnum("report_status", ["pending", "resolved", "dismissed"]);
 export const companySizeEnum = pgEnum("company_size", ["micro", "pequena", "media", "grande"]);
@@ -395,6 +396,7 @@ export const verificationRequest = pgTable(
       .notNull()
       .references(() => profile.id, { onDelete: "cascade" }),
     status: verificationRequestStatusEnum("status").notNull().default("pending"),
+    level: verificationLevelEnum("level").notNull().default("level1"),
     documents: jsonb("documents").notNull().default([]),
     reviewerUserId: text("reviewer_user_id").references(() => user.id, { onDelete: "set null" }),
     reviewedAt: timestamp("reviewed_at"),

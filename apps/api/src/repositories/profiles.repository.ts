@@ -34,7 +34,9 @@ export const profileColumns = {
   deletedAt: profile.deletedAt,
 } as const;
 
-type ProfileRow = typeof profile.$inferSelect;
+// Exclui geom (geography) e searchTsv (tsvector) — não serializáveis por Drizzle como texto;
+// são usados só em SQL raw (distância/full-text). O resto das queries usa `profileColumns`.
+type ProfileRow = Omit<typeof profile.$inferSelect, "geom" | "searchTsv">;
 type CategoryRow = typeof category.$inferSelect;
 
 export interface ProfileCategoryLink {
