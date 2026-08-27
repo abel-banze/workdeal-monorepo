@@ -20,6 +20,27 @@ export const orgRoleEnum = pgEnum("org_role", ["owner", "admin", "editor", "memb
 export const verificationStatusEnum = pgEnum("verification_status", ["pending", "in_review", "verified", "suspended"]);
 export const invitationStatusEnum = pgEnum("invitation_status", ["pending", "accepted", "rejected", "canceled"]);
 
+// PostGIS geography(Point,4326). O drizzle-kit (v0.31) não sabe emitir tipos
+// parametrizados: `dataType()` com "geography(Point, 4326)" gera SQL inválido
+// (`"geography(Point, 4326)"`), tal como `"undefined"."geography(Point,4326)"`
+// nas migrações antigas. Por isso o customType devolve o tipo base "geography"
+// (sem typmod), que o `push`/`generate` emitem como `"geography"` — SQL válido,
+// compatível com `ST_Distance`/`ST_DWithin` usando `::geography`. Todos os valores
+// são gravados via `ST_MakePoint(lng,lat)::geography`, logo o SRID/Point é mantido
+// de facto mesmo sem o typmod explícito. O índice GIST é criado por migração SQL.
+export const geographyPoint = customType<{ data: string; driverData: string }>({
+  dataType() {
+    return "geography";
+  },
+  toDriver(value) {
+    return value;
+  },
+  fromDriver(value) {
+    return value as string;
+  },
+});
+
+
 export const user = pgTable(
   "user",
   {
@@ -175,6 +196,7 @@ export const badgeOriginEnum = pgEnum("badge_origin", ["automatic", "manual", "p
 export const badgeStatusEnum = pgEnum("badge_status", ["active", "revoked"]);
 export const reviewOriginEnum = pgEnum("review_origin", ["directory", "task", "event"]);
 export const verificationRequestStatusEnum = pgEnum("verification_request_status", ["pending", "in_review", "approved", "rejected"]);
+export const verificationLevelEnum = pgEnum("verification_level", ["level1", "level2"]);
 export const reportTargetTypeEnum = pgEnum("report_target_type", ["profile", "review", "task", "event"]);
 export const reportStatusEnum = pgEnum("report_status", ["pending", "resolved", "dismissed"]);
 export const companySizeEnum = pgEnum("company_size", ["micro", "pequena", "media", "grande"]);
@@ -195,14 +217,6 @@ export const category = pgTable(
   (table) => [index("category_slug_idx").on(table.slug)],
 );
 
-const geographyPoint = customType<{ data: string; driverData: string }>({
-  dataType() {
-    // Drizzle-kit push não entende geography(Point,4326) e gera "undefined"."geography" — mantém text para push
-    // O tipo real geography é criado via SQL em 0002_enable_postgis.sql + 0014_reactivate_postgis.sql
-    return "text";
-  },
-});
-
 export const profile = pgTable(
   "profile",
   {
@@ -220,7 +234,9 @@ export const profile = pgTable(
     coverUrl: text("cover_url"),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
-    // PostGIS geography — mantido em sincronia com latitude/longitude via trigger/migração (fallback text quando sem PostGIS)
+    // PostGIS geography(Point,4326) — mantido em sincronia com latitude/longitude
+    // via trigger/migração SQL (ver 0002_enable_postgis.sql, 0014_reactivate_postgis.sql,
+    // e o índice GIST profile_geom_gist_idx criado por migração).
     geom: geographyPoint("geom"),
     // tsvector gerado para busca full-text (fallback text quando sem postgis/pg_trgm)
     searchTsv: text("search_tsv"),
@@ -230,7 +246,7 @@ export const profile = pgTable(
     website: text("website"),
     googlePlaceId: text("google_place_id"),
     formattedAddress: text("formatted_address"),
-    businessHours: jsonb("business_hours"), // formato canónico {periods:[{open,close}]} — ver shared/business-hours.ts
+    businessHours: jsonb("business_hours"),
     status: profileStatusEnum("status").notNull().default("draft"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -241,6 +257,7 @@ export const profile = pgTable(
     uniqueIndex("profile_organization_id_idx").on(table.organizationId),
     index("profile_type_status_idx").on(table.type, table.status),
     index("profile_geo_idx").on(table.latitude, table.longitude),
+    index("profile_geom_gist_idx").using("gist", table.geom),
     index("profile_slug_idx").on(table.slug),
   ],
 );
@@ -379,6 +396,7 @@ export const verificationRequest = pgTable(
       .notNull()
       .references(() => profile.id, { onDelete: "cascade" }),
     status: verificationRequestStatusEnum("status").notNull().default("pending"),
+    level: verificationLevelEnum("level").notNull().default("level1"),
     documents: jsonb("documents").notNull().default([]),
     reviewerUserId: text("reviewer_user_id").references(() => user.id, { onDelete: "set null" }),
     reviewedAt: timestamp("reviewed_at"),
@@ -438,9 +456,27 @@ export const companyQualification = pgTable(
   ],
 );
 
+export const contactChannelEnum = pgEnum("contact_channel", ["whatsapp", "phone", "email", "website"]);
+
+export const profileContactVerification = pgTable(
+  "profile_contact_verification",
+  {
+    id: text("id").primaryKey(),
+    profileId: text("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    channel: contactChannelEnum("channel").notNull(),
+    identifier: text("identifier").notNull(),
+    verifiedAt: timestamp("verified_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("profile_contact_channel_identifier_idx").on(table.profileId, table.channel, table.identifier),
+    index("profile_contact_profile_idx").on(table.profileId),
+  ],
+);
+
 export const visibilityEnum = pgEnum("visibility", ["exact", "zone"]);
 
-// Bairro/zona para privacidade: exact = mostra pin exacto, zone = só bairro/distrito até contacto aceite
 export const profileLocation = pgTable(
   "profile_location",
   {
@@ -449,13 +485,14 @@ export const profileLocation = pgTable(
       .notNull()
       .references(() => profile.id, { onDelete: "cascade" }),
     organizationId: text("organization_id").references(() => organization.id, { onDelete: "cascade" }),
-    label: text("label"), // ex: "Sede", "Filial Beira"
+    label: text("label"),
     province: text("province").notNull(),
     district: text("district"),
     bairro: text("bairro"),
     address: text("address"),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
+    // PostGIS geography(Point,4326) — índice GIST profile_location_geom_gist_idx via migração SQL
     geom: geographyPoint("geom"),
     isPrimary: boolean("is_primary").notNull().default(false),
     visibility: visibilityEnum("visibility").notNull().default("zone"),
@@ -467,6 +504,7 @@ export const profileLocation = pgTable(
     index("profile_location_org_idx").on(table.organizationId),
     index("profile_location_province_idx").on(table.province),
     index("profile_location_geo_idx").on(table.latitude, table.longitude),
+    index("profile_location_geom_gist_idx").using("gist", table.geom),
   ],
 );
 
@@ -476,7 +514,7 @@ export const tag = pgTable(
     id: text("id").primaryKey(),
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
-    category: text("category"), // opcional: grupo da tag
+    category: text("category"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [index("tag_slug_idx").on(table.slug)],
@@ -567,16 +605,13 @@ export const quoteFile = pgTable(
   ],
 );
 
-// Desafios OTP duráveis — substitui o store em memória (AGENTS §3.6: handlers
-// stateless; multi-réplica e restart-safe). identifier = forma canónica
-// (258XXXXXXXXX ou email lowercase). Consumo = delete on success.
 export const otpChallenge = pgTable(
   "otp_challenge",
   {
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    channel: text("channel").notNull(), // whatsapp | phone | email
+    channel: text("channel").notNull(),
     identifier: text("identifier").notNull(),
     codeHash: text("code_hash").notNull(),
     attempts: integer("attempts").notNull().default(0),
@@ -585,5 +620,41 @@ export const otpChallenge = pgTable(
   },
   (table) => [
     index("otp_challenge_identifier_idx").on(table.channel, table.identifier, table.createdAt),
+  ],
+);
+
+export const analyticsEventTypeEnum = pgEnum("analytics_event_type", [
+  "page_view",
+  "contact_click",
+  "whatsapp_click",
+  "phone_click",
+  "email_click",
+  "website_click",
+  "save",
+  "quote_request",
+  "search_impression",
+]);
+
+export const analyticsEvent = pgTable(
+  "analytics_event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    profileId: text("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    eventType: analyticsEventTypeEnum("event_type").notNull(),
+    visitorId: text("visitor_id"),
+    province: text("province"),
+    district: text("district"),
+    referrer: text("referrer"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("analytics_event_profile_idx").on(table.profileId, table.createdAt),
+    index("analytics_event_type_idx").on(table.eventType, table.createdAt),
+    index("analytics_event_visitor_idx").on(table.visitorId),
   ],
 );

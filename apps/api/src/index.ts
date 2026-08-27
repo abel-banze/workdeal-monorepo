@@ -31,6 +31,7 @@ import { onboardingRoute } from "./routes/onboarding.route.js";
 import { metricsRoute } from "./routes/metrics.route.js";
 import { portfolioRoute } from "./routes/portfolio.route.js";
 import { servicesRoute } from "./routes/services.route.js";
+import { analyticsRoute } from "./routes/analytics.route.js";
 
 const app = new Hono();
 
@@ -448,6 +449,7 @@ app.route("/api/v1/onboarding", onboardingRoute);
 app.route("/api/v1/metrics", metricsRoute);
 app.route("/api/v1/portfolio", portfolioRoute);
 app.route("/api/v1/services", servicesRoute);
+app.route("/api/v1/analytics", analyticsRoute);
 
 app.notFound(() => {
   throw new AppError(404, "NOT_FOUND", "Rota não encontrada");

@@ -80,6 +80,12 @@ profilesRoute.get("/:slug", rateLimit(publicLimiter), async (c) => {
   return c.json(body, status);
 });
 
+profilesRoute.get("/:slug/public", rateLimit(publicLimiter), async (c) => {
+  const { body, status } = await profilesController.getPublicBySlug(c, c.req.param("slug"));
+  c.header("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=600");
+  return c.json(body, status);
+});
+
 profilesRoute.patch(
   "/:slug",
   requireAuth,

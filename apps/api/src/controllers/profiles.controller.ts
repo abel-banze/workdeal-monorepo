@@ -15,6 +15,11 @@ export const profilesController = {
     return { body: ok(profile), status: 200 as const };
   },
 
+  async getPublicBySlug(_c: Context<Env>, slug: string) {
+    const profile = await profilesService.getPublicProfile(slug);
+    return { body: ok(profile), status: 200 as const };
+  },
+
   async update(user: AuthUser, slug: string, input: UpdateProfileInput) {
     const profile = await profilesService.updateProfile(user, slug, input);
     return { body: ok(profile), status: 200 as const };

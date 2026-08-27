@@ -77,6 +77,10 @@ class OnboardingService {
         status: "active",
       },
       categoryIds: input.profile.categoryIds,
+      verifiedContacts: verifiedContacts.filter(
+        (v): v is { channel: "whatsapp" | "phone" | "email"; identifier: string } =>
+          v.channel === "whatsapp" || v.channel === "phone" || v.channel === "email",
+      ),
       qualification,
       location: input.location
         ? {

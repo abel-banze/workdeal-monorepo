@@ -60,7 +60,8 @@ const categories = [
 ];
 
 const badges = [
-  { id: "badge-verified", slug: "verified", name: "Verificado", description: "Identidade/NUIT verificado pela equipa Workdeal", type: "trust" as const, origin: "manual" as const, criteria: "Documento NUIT/BI validado manualmente (SLA 48h)" },
+  { id: "badge-verified", slug: "verified", name: "Verificado", description: "Identidade/NUIT verificada — empresa com todos os documentos de registo legal (1º grau)", type: "trust" as const, origin: "manual" as const, criteria: "Documento NUIT/BI + alvará validados manualmente (SLA 48h)" },
+  { id: "badge-in-legalization", slug: "in-legalization", name: "Em Processo de Legalização", description: "Empresa em processo de legalização junto da conservatória / IAGE (2º grau)", type: "trust" as const, origin: "manual" as const, criteria: "Documentos de legalização em curso validados manualmente (SLA 48h)" },
   { id: "badge-profile-complete", slug: "profile-complete", name: "Perfil Completo", description: "Todos os campos essenciais + portfólio ≥1 item", type: "quality" as const, origin: "automatic" as const, criteria: "name, description, category ≥1, logo/cover, contacto, portfólio ≥1" },
   { id: "badge-quick-response", slug: "quick-response", name: "Resposta Rápida", description: "Tempo médio de resposta <2h nos últimos 30 dias", type: "activity" as const, origin: "automatic" as const, criteria: "p50 resposta <2h, mínimo 5 interacções em 30d" },
   { id: "badge-highly-rated", slug: "highly-rated", name: "Bem Avaliado", description: "Média ≥4.3 com pelo menos 5 avaliações", type: "reputation" as const, origin: "automatic" as const, criteria: "avg rating ≥4.3, count ≥5" },

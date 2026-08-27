@@ -31,5 +31,8 @@ export default defineConfig({
   dbCredentials: { url },
   verbose: true,
   strict: false,
+  extensionsFilters: ["postgis"],
+  schemaFilter: ["public"],
+  tablesFilter: ["*"]
   // PostGIS é habilitado via migração SQL (CREATE EXTENSION IF NOT EXISTS postgis)
 });

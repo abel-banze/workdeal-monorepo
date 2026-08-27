@@ -18,7 +18,9 @@ function getPool(): Pool {
     // request até ao timeout da Vercel (300s de 504) sem nenhum erro nos logs
     statement_timeout: 10_000,
     query_timeout: 10_000,
-  });
+    // Desactiva prepared statements — obrigatório com PgBouncer em pool_mode=transaction
+    prepareThreshold: 0,
+  } as ConstructorParameters<typeof Pool>[0] & { prepareThreshold?: number });
   _pool.on("error", (err) => {
     console.error("[db] Pool error:", err.message);
   });

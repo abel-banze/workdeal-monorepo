@@ -106,3 +106,69 @@ export type CreateProfileInput = z.infer<typeof createProfileSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ProfileView = z.infer<typeof profileViewSchema>;
 export type CategoryView = z.infer<typeof categorySchema>;
+
+// --- Public profile (página /profiles/:slug) ---
+
+export const publicLocationSchema = z.object({
+  province: z.string().nullable(),
+  district: z.string().nullable(),
+  bairro: z.string().nullable(),
+  address: z.string().nullable(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+  formattedAddress: z.string().nullable(),
+});
+
+export const publicQualificationSchema = z.object({
+  foundedYear: z.number().nullable(),
+  companySize: z.string().nullable(),
+  workers: z.number().nullable(),
+  legalForm: z.string().nullable(),
+  nuit: z.string().nullable(),
+  alvara: z.string().nullable(),
+});
+
+export const publicBadgeSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  type: z.string(),
+  status: z.string(),
+  awardedAt: z.date(),
+});
+
+export const publicReviewsSchema = z.object({
+  average: z.number().nullable(),
+  count: z.number(),
+});
+
+export const publicServiceSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  priceMzn: z.number().nullable(),
+  imageUrl: z.string().nullable(),
+  categoryId: z.string().nullable(),
+});
+
+export const publicContactVerificationSchema = z.object({
+  channel: z.enum(["whatsapp", "phone", "email", "website"]),
+  identifier: z.string(),
+  verifiedAt: z.date(),
+});
+
+export const publicProfileViewSchema = profileViewSchema.extend({
+  location: publicLocationSchema.nullable(),
+  qualification: publicQualificationSchema.nullable(),
+  badges: publicBadgeSchema.array(),
+  reviews: publicReviewsSchema,
+  services: publicServiceSchema.array(),
+  contactVerifications: publicContactVerificationSchema.array(),
+});
+
+export type PublicProfileView = z.infer<typeof publicProfileViewSchema>;
+export type PublicBadge = z.infer<typeof publicBadgeSchema>;
+export type PublicService = z.infer<typeof publicServiceSchema>;
+export type PublicContactVerification = z.infer<typeof publicContactVerificationSchema>;
+

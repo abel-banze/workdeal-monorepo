@@ -1,7 +1,7 @@
 import { getOrgRole } from "@workdeal/auth";
 import { hasOrgPermission, hasSelfPermission, normalizeBusinessHours } from "@workdeal/shared";
 import type { AuthUser, CreateProfileInput, DomainPermission, ListProfilesQuery, ProfileType, ProfileView, UpdateProfileInput } from "@workdeal/shared";
-import type { CategoryView } from "@workdeal/shared";
+import type { CategoryView, PublicProfileView, PublicBadge } from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 import { profilesRepository } from "../repositories/profiles.repository.js";
 import type { ProfileWithCategories } from "../repositories/profiles.repository.js";
@@ -23,6 +23,35 @@ class ProfilesService {
       throw new AppError(404, "NOT_FOUND", "Perfil não encontrado");
     }
     return this.toProfileView(row);
+  }
+
+  async getPublicProfile(slug: string): Promise<PublicProfileView> {
+    const row = await profilesRepository.findBySlug(slug);
+    if (!row || row.status !== "active") {
+      throw new AppError(404, "NOT_FOUND", "Perfil não encontrado");
+    }
+
+    const profileView = this.toProfileView(row);
+
+    // Fetch related data in parallel
+    const [locations, qualification, badges, reviewStats, services, contactVerifications] = await Promise.all([
+      this.fetchLocation(row.id),
+      this.fetchQualification(row.organizationId),
+      this.fetchBadges(row.id),
+      this.fetchReviewStats(row.id),
+      this.fetchServices(row.id),
+      this.fetchContactVerifications(row.id),
+    ]);
+
+    return {
+      ...profileView,
+      location: locations,
+      qualification,
+      badges,
+      reviews: reviewStats,
+      services,
+      contactVerifications,
+    };
   }
 
   async updateProfile(user: AuthUser, slug: string, input: UpdateProfileInput): Promise<ProfileView> {
@@ -267,6 +296,126 @@ class ProfilesService {
     }
     const byId = new Map(found.map((c) => [c.id, c]));
     return unique.map((id) => byId.get(id)!);
+  }
+
+  private async fetchLocation(profileId: string): Promise<PublicProfileView["location"]> {
+    const { profileLocation } = await import("@workdeal/db");
+    const { eq, desc } = await import("drizzle-orm");
+    const { db } = await import("@workdeal/db");
+    const [loc] = await db
+      .select({
+        province: profileLocation.province,
+        district: profileLocation.district,
+        bairro: profileLocation.bairro,
+        address: profileLocation.address,
+        latitude: profileLocation.latitude,
+        longitude: profileLocation.longitude,
+      })
+      .from(profileLocation)
+      .where(eq(profileLocation.profileId, profileId))
+      .orderBy(desc(profileLocation.isPrimary))
+      .limit(1);
+    if (!loc) return null;
+    return {
+      province: loc.province,
+      district: loc.district,
+      bairro: loc.bairro,
+      address: loc.address,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      formattedAddress: null,
+    };
+  }
+
+  private async fetchQualification(organizationId: string | null): Promise<PublicProfileView["qualification"]> {
+    if (!organizationId) return null;
+    const { companyQualificationRepository } = await import("../repositories/company-qualification.repository.js");
+    const row = await companyQualificationRepository.findByOrganizationId(organizationId);
+    if (!row) return null;
+    return {
+      foundedYear: row.foundedYear,
+      companySize: row.companySize,
+      workers: row.workers,
+      legalForm: row.legalForm,
+      nuit: row.nuit,
+      alvara: row.alvara,
+    };
+  }
+
+  private async fetchBadges(profileId: string): Promise<PublicBadge[]> {
+    const { db, profileBadge, badge } = await import("@workdeal/db");
+    const { eq, and } = await import("drizzle-orm");
+    const rows = await db
+      .select({
+        id: badge.id,
+        slug: badge.slug,
+        name: badge.name,
+        description: badge.description,
+        type: badge.type,
+        status: profileBadge.status,
+        awardedAt: profileBadge.awardedAt,
+      })
+      .from(profileBadge)
+      .innerJoin(badge, eq(profileBadge.badgeId, badge.id))
+      .where(and(eq(profileBadge.profileId, profileId), eq(profileBadge.status, "active")));
+    return rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      name: r.name,
+      description: r.description,
+      type: r.type,
+      status: r.status,
+      awardedAt: r.awardedAt,
+    }));
+  }
+
+  private async fetchReviewStats(profileId: string): Promise<PublicProfileView["reviews"]> {
+    const { db, review } = await import("@workdeal/db");
+    const { eq, sql } = await import("drizzle-orm");
+    const [stats] = await db
+      .select({
+        avg: sql<number>`COALESCE(AVG(${review.rating})::float, 0)`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(review)
+      .where(eq(review.profileId, profileId));
+    return {
+      average: stats?.avg ? Math.round(stats.avg * 10) / 10 : null,
+      count: stats?.count ?? 0,
+    };
+  }
+
+  private async fetchServices(profileId: string): Promise<PublicProfileView["services"]> {
+    const { db, service } = await import("@workdeal/db");
+    const { eq, asc } = await import("drizzle-orm");
+    const rows = await db
+      .select({
+        id: service.id,
+        title: service.title,
+        description: service.description,
+        priceMzn: service.priceMzn,
+        imageUrl: service.imageUrl,
+        categoryId: service.categoryId,
+      })
+      .from(service)
+      .where(eq(service.profileId, profileId))
+      .orderBy(asc(service.sortOrder), asc(service.createdAt));
+    return rows;
+  }
+
+  private async fetchContactVerifications(profileId: string): Promise<PublicProfileView["contactVerifications"]> {
+    const { db, profileContactVerification } = await import("@workdeal/db");
+    const { eq, desc } = await import("drizzle-orm");
+    const rows = await db
+      .select({
+        channel: profileContactVerification.channel,
+        identifier: profileContactVerification.identifier,
+        verifiedAt: profileContactVerification.verifiedAt,
+      })
+      .from(profileContactVerification)
+      .where(eq(profileContactVerification.profileId, profileId))
+      .orderBy(desc(profileContactVerification.verifiedAt));
+    return rows;
   }
 
   private toProfileView(row: ProfileWithCategories): ProfileView {

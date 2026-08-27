@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { getCategories, getProfiles } from "@/lib/profiles";
 import { ProfileCard } from "@/components/features/profile-card";
+import { SearchImpressions } from "@/components/features/search-impressions";
 import { CompaniesFilters } from "@/components/features/companies-filters";
 
 export const revalidate = 3600;
@@ -108,6 +109,7 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
             <ProfileCard key={p.id} profile={p} />
           ))}
         </div>
+        <SearchImpressions profileIds={companies.map((p) => p.id)} />
         <div className="mt-8">
           <Pagination page={page} total={total} baseQs={baseQs} />
         </div>
