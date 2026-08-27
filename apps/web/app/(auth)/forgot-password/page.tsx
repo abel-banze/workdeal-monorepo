@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
 import { getServerSession } from "@/lib/auth";
 import { ForgotPasswordForm } from "./forgot-password-form";
 
@@ -11,7 +13,11 @@ export const metadata = {
 
 export default async function ForgotPasswordPage() {
   const session = await getServerSession().catch(() => null);
-  if (session) redirect("/dashboard");
+  if (session) {
+    const store = await cookies();
+    if (store.has(JWT_COOKIE_NAME)) redirect("/dashboard");
+    // Sessão sem JWT (logout parcial) — não redireciona para evitar loop
+  }
 
   return (
     <div className="min-h-dvh bg-[#F6F3EE]">

@@ -74,7 +74,7 @@ export const session = pgTable(
     userAgent: text("user_agent"),
     activeOrganizationId: text("active_organization_id"),
   },
-  (table) => [index("session_user_id_idx").on(table.userId)],
+  (table) => [index("session_user_id_idx").on(table.userId), index("session_token_idx").on(table.token)],
 );
 
 export const account = pgTable(

@@ -65,25 +65,29 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // Guard P0-1: /profiles/me agora é estritamente pessoal. Se não tem pessoal,
   // verifica se tem pelo menos um perfil de empresa; só então força onboarding.
+  // Não bloqueia o render do dashboard se DB/API estiver lento — timeout 2s e paralelo.
   try {
     const { apiFetch } = await import("@/lib/api")
-    const res = await apiFetch<{ id: string } | null>("/api/v1/profiles/me", { cache: "no-store" })
-    if (!res.data) {
+    function withTimeout<T>(p: Promise<T>, ms = 2000): Promise<T | null> {
+      return Promise.race([p, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]) as Promise<T | null>
+    }
+    const res = await withTimeout(apiFetch<{ id: string } | null>("/api/v1/profiles/me", { cache: "no-store" }))
+    if (res && !res.data) {
       if (allOrgs.length === 0) {
         redirect("/onboarding")
-      } else {
-        let hasOrgProfile = false
-        for (const org of allOrgs) {
-          try {
-            const pRes = await apiFetch<{ id: string } | null>(`/api/v1/profiles/${org.slug}`, { cache: "no-store" })
-            if (pRes.data?.id) { hasOrgProfile = true; break }
-          } catch {}
-        }
+      } else if (allOrgs.length > 0) {
+        // Paralelo em vez de sequencial N+1 — evita 10s de waterfall quando DB remoto está lento
+        const checks = await Promise.all(
+          allOrgs.map((org) =>
+            withTimeout(apiFetch<{ id: string } | null>(`/api/v1/profiles/${org.slug}`, { cache: "no-store" })).catch(() => null),
+          ),
+        )
+        const hasOrgProfile = checks.some((r) => r?.data?.id)
         if (!hasOrgProfile) redirect("/onboarding")
       }
     }
   } catch {
-    // Se API falhar, não bloqueia — deixa dashboard mostrar estado
+    // Se API/DB falhar ou timeout, não bloqueia — deixa dashboard mostrar estado (evita 13.8s)
   }
   // Expose debug via header for easy inspection (also visible in UI if needed)
   // console.log also helps via `next dev` logs

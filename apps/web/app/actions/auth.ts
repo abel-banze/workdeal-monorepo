@@ -20,15 +20,23 @@ export async function signOut() {
     if (v) { sessionToken = v; break }
   }
 
-  // Delete all auth cookies
-  store.delete(JWT_COOKIE_NAME)
-  for (const name of BETTER_AUTH_SESSION_COOKIES) store.delete(name)
+  // Capture full cookie header BEFORE clearing — needed for sign-out API
+  const isSecure = env.BETTER_AUTH_URL.startsWith("https://")
+  const cookieHeaderForSignOut = store.getAll().map((c) => `${c.name}=${c.value}`).join("; ")
+  const jwtOpts = jwtCookieOptions(isSecure)
+  // cast to allow maxAge:0 despite CookieOptions typing
+  ;(store as unknown as { set: (n:string,v:string,o:unknown)=>void }).set(JWT_COOKIE_NAME, "", { ...jwtOpts, maxAge: 0 })
+  const sessionCookieOpts = { httpOnly: true, secure: isSecure, sameSite: "lax" as const, path: "/", maxAge: 0 } as const
+  for (const name of BETTER_AUTH_SESSION_COOKIES) {
+    ;(store as unknown as { set: (n:string,v:string,o:unknown)=>void }).set(name, "", sessionCookieOpts)
+  }
 
-  // Tell the API to invalidate the session (best-effort, via proxy)
+  // Tell the API to invalidate the session (best-effort) — use header captured BEFORE clearing
   if (sessionToken) {
+    const header = cookieHeaderForSignOut || `${isSecure ? "__Secure-better-auth.session_token" : "better-auth.session_token"}=${sessionToken}`
     await fetch(`${env.BETTER_AUTH_URL}/api/auth/sign-out`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: `better-auth.session_token=${sessionToken}` },
+      headers: { "Content-Type": "application/json", Cookie: header },
     }).catch(() => {})
   }
 
