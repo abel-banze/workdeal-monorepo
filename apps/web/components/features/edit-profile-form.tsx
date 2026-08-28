@@ -1,9 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { Briefcase, Phone, FileText, Building2, Image as ImageIcon, Check, ChevronLeft, ChevronRight } from "lucide-react"
+import { Briefcase, Phone, FileText, Building2, Image as ImageIcon, Check, ChevronLeft, ChevronRight, Clock } from "lucide-react"
 import type { UpdateProfileInput } from "@workdeal/shared"
 import { updateProfile } from "@/app/actions/profiles"
 import { cn } from "@workspace/ui/lib/utils"
@@ -11,6 +11,19 @@ import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Combobox,
+  ComboboxChips,
+  ComboboxChip,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxItem,
+  ComboboxList,
+  useComboboxAnchor,
+} from "@workspace/ui/components/combobox"
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@workspace/ui/components/input-otp"
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@workspace/ui/components/input-group"
 
 type Category = { id: string; slug: string; name: string }
 type Profile = {
@@ -78,6 +91,65 @@ export function EditProfileForm({
   const [success, setSuccess] = useState<string | null>(null)
   const [step, setStep] = useState(0)
 
+  // Verificação de contactos (igual ao onboarding)
+  const [whatsappInput, setWhatsappInput] = useState("")
+  const [whatsappOtp, setWhatsappOtp] = useState<string | null>(null)
+  const [whatsappVerifiedAt, setWhatsappVerifiedAt] = useState<Date | null>(null)
+  const [whatsappSending, setWhatsappSending] = useState(false)
+  const [phoneInput, setPhoneInput] = useState("")
+  const [phoneOtp, setPhoneOtp] = useState<string | null>(null)
+  const [phoneVerifiedAt, setPhoneVerifiedAt] = useState<Date | null>(null)
+  const [phoneSending, setPhoneSending] = useState(false)
+  const [emailInput, setEmailInput] = useState("")
+  const [emailOtp, setEmailOtp] = useState<string | null>(null)
+  const [emailVerifiedAt, setEmailVerifiedAt] = useState<Date | null>(null)
+  const [emailSending, setEmailSending] = useState(false)
+  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [timers, setTimers] = useState<Record<"whatsapp" | "phone" | "email", number | null>>({ whatsapp: null, phone: null, email: null })
+  const [timerNow, setTimerNow] = useState(Date.now())
+  const catAnchor = useComboboxAnchor()
+  const [catQuery, setCatQuery] = useState("")
+  const labelCls = "text-xs font-bold tracking-[0.07em] text-[#0F1A2E]/70 uppercase"
+  const inputCls = "w-full rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] leading-none text-[#0F1A2E] placeholder:text-[#0F1A2E]/35 outline-none transition focus:border-[#0B5E56] focus:bg-white focus:ring-2 focus:ring-[#0B5E56]/15"
+  const fieldErrCls = "text-xs font-medium text-[#7A1A0A]"
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const hasActive = timers.whatsapp != null || timers.phone != null || timers.email != null
+    if (!hasActive) return
+    const id = setInterval(() => {
+      const now = Date.now()
+      setTimerNow(now)
+      setTimers((prev) => {
+        let changed = false
+        const next = { ...prev }
+        ;(Object.keys(next) as Array<keyof typeof next>).forEach((k) => {
+          if (next[k] != null && now >= next[k]!) { next[k] = null; changed = true }
+        })
+        return changed ? next : prev
+      })
+    }, 1000)
+    return () => clearInterval(id)
+  }, [timers])
+
+  // Se o contacto mudou em relação ao inicial, invalida verificação anterior
+  useEffect(() => {
+    if (whatsapp.trim() !== (initialProfile.whatsapp ?? "")) setWhatsappVerifiedAt(null)
+  }, [whatsapp, initialProfile.whatsapp])
+  useEffect(() => {
+    if (phone.trim() !== (initialProfile.phone ?? "")) setPhoneVerifiedAt(null)
+  }, [phone, initialProfile.phone])
+  useEffect(() => {
+    if (email.trim() !== (initialProfile.email ?? "")) setEmailVerifiedAt(null)
+  }, [email, initialProfile.email])
+
+  function countdownLabel(channel: "whatsapp" | "phone" | "email"): string {
+    const endsAt = timers[channel]
+    if (!endsAt) return ""
+    const secs = Math.max(0, Math.ceil((endsAt - timerNow) / 1000))
+    return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`
+  }
+
   const steps: StepDef[] = useMemo(() => {
     const base: StepDef[] = [
       { key: "identidade", label: "Identidade", eyebrow: "Passo 1", hint: "Como a empresa se chama e é encontrada.", Icon: Briefcase },
@@ -133,6 +205,72 @@ export function EditProfileForm({
     })
   }
 
+  async function sendOtp(type: "whatsapp" | "phone" | "email") {
+    setMsg(null)
+    if (type === "whatsapp") {
+      if (!whatsapp.trim()) { setError("Preencha o WhatsApp antes de enviar o código."); return }
+      setWhatsappSending(true); setError(null)
+      try {
+        const { sendWhatsappOtp } = await import("@/app/actions/otp")
+        const res = await sendWhatsappOtp({ whatsapp: whatsapp.trim() })
+        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar código." }); return }
+        setWhatsappOtp("sent"); setWhatsappInput(""); setMsg({ type: "success", text: "Código enviado! Verifica o teu WhatsApp." }); setTimers((p) => ({ ...p, whatsapp: Date.now() + 60_000 }))
+      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar WhatsApp" }) }
+      finally { setWhatsappSending(false) }
+      return
+    }
+    if (type === "phone") {
+      if (!phone.trim()) { setError("Preencha o telefone antes de enviar o código."); return }
+      setPhoneSending(true); setError(null)
+      try {
+        const { sendPhoneOtp } = await import("@/app/actions/otp")
+        const res = await sendPhoneOtp({ phone: phone.trim() })
+        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar SMS." }); return }
+        setPhoneOtp("sent"); setPhoneInput(""); setMsg({ type: "success", text: "Código enviado! Verifica o teu SMS." }); setTimers((p) => ({ ...p, phone: Date.now() + 60_000 }))
+      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar SMS" }) }
+      finally { setPhoneSending(false) }
+      return
+    }
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("Email inválido para enviar código."); return }
+    setEmailSending(true); setError(null)
+    try {
+      const { sendEmailOtp } = await import("@/app/actions/otp")
+      const res = await sendEmailOtp({ email: email.trim() })
+      if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar email." }); return }
+      setEmailOtp("sent"); setEmailInput(""); setMsg({ type: "success", text: "Código enviado! Verifica o teu email." }); setTimers((p) => ({ ...p, email: Date.now() + 60_000 }))
+    } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar email" }) }
+    finally { setEmailSending(false) }
+  }
+
+  async function verifyOtp(type: "whatsapp" | "phone" | "email") {
+    setMsg(null)
+    if (type === "whatsapp") {
+      try {
+        const { verifyWhatsappOtp } = await import("@/app/actions/otp")
+        const res = await verifyWhatsappOtp({ whatsapp: whatsapp.trim(), code: whatsappInput.trim() })
+        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Código incorreto." }); return }
+        setWhatsappVerifiedAt(new Date()); setWhatsappOtp(null); setTimers((p) => ({ ...p, whatsapp: null })); setMsg({ type: "success", text: "WhatsApp verificado!" })
+      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar" }) }
+      return
+    }
+    if (type === "phone") {
+      if (!phoneInput || phoneInput.length < 6) { setMsg({ type: "error", text: "Introduz os 6 dígitos." }); return }
+      try {
+        const { verifyPhoneOtp } = await import("@/app/actions/otp")
+        const res = await verifyPhoneOtp({ phone: phone.trim(), code: phoneInput.trim() })
+        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Código incorreto." }); return }
+        setPhoneVerifiedAt(new Date()); setPhoneOtp(null); setTimers((p) => ({ ...p, phone: null })); setMsg({ type: "success", text: "Telefone verificado!" })
+      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar" }) }
+      return
+    }
+    try {
+      const { verifyEmailOtp } = await import("@/app/actions/otp")
+      const res = await verifyEmailOtp({ email: email.trim(), code: emailInput.trim() })
+      if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Código incorreto." }); return }
+      setEmailVerifiedAt(new Date()); setEmailOtp(null); setTimers((p) => ({ ...p, email: null })); setMsg({ type: "success", text: "Email verificado!" })
+    } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar" }) }
+  }
+
   // Valida o passo actual; devolve mensagem de erro ou null se válido.
   function validateStep(stepIndex: number): string | null {
     const current = steps[stepIndex]
@@ -140,6 +278,20 @@ export function EditProfileForm({
     if (current.key === "identidade") {
       if (!name.trim() || name.trim().length < 2) return "Nome deve ter pelo menos 2 caracteres"
       if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug.trim())) return "Slug inválido: apenas minúsculas, números e hífens"
+    }
+    if (current.key === "contactos") {
+      const changedWhatsapp = whatsapp.trim() !== (initialProfile.whatsapp ?? "")
+      const changedPhone = phone.trim() !== (initialProfile.phone ?? "")
+      const changedEmail = email.trim() !== (initialProfile.email ?? "")
+      if (changedWhatsapp && !whatsappVerifiedAt) return "Verifica o WhatsApp com código OTP ou repõe o valor original"
+      if (changedPhone && !phoneVerifiedAt) return "Verifica o telefone com código OTP ou repõe o valor original"
+      if (changedEmail && !emailVerifiedAt) return "Verifica o email com código OTP ou repõe o valor original"
+      if ((whatsapp.trim() || phone.trim() || email.trim()) && !whatsappVerifiedAt && !phoneVerifiedAt && !emailVerifiedAt && (changedWhatsapp || changedPhone || changedEmail)) {
+        return "Altera contactos requer verificação OTP de pelo menos um canal"
+      }
+    }
+    if (current.key === "sobre") {
+      if (selectedCats.length === 0) return "Escolhe pelo menos 1 categoria"
     }
     if (current.key === "porte") {
       if (!workers.trim()) return "Nº trabalhadores é obrigatório"
@@ -382,25 +534,101 @@ export function EditProfileForm({
             </div>
           )}
 
-          {/* PASSO 2 — Contactos */}
+          {/* PASSO 2 — Contactos (com verificação OTP igual ao onboarding) */}
           {step === 1 && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="whatsapp">WhatsApp</Label>
-                <Input id="whatsapp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+258 82 123 4567" maxLength={32} />
+            <div className="space-y-5">
+              {msg && (
+                <div className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium ${msg.type === "success" ? "border border-[#0B5E56]/20 bg-[#0B5E56]/10 text-[#0B5E56]" : "border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 text-[#7A1A0A]"}`}>
+                  {msg.text}
+                </div>
+              )}
+              {/* WhatsApp */}
+              <div className="rounded-2xl border border-[#D9D2C2] bg-white p-4">
+                <label htmlFor="edit-whatsapp" className={labelCls}>WhatsApp</label>
+                <div className="mt-1.5 flex gap-2">
+                  <InputGroup className="h-11 flex-1 rounded-lg border-[#D9D2C2] bg-[#F6F3EE] has-[[data-slot=input-group-control]:focus-visible]:border-[#0B5E56] has-[[data-slot=input-group-control]:focus-visible]:ring-2 has-[[data-slot=input-group-control]:focus-visible]:ring-[#0B5E56]/15 has-[[data-slot=input-group-control]:focus-visible]:bg-white">
+                    <InputGroupAddon align="inline-start" className="border-r border-[#D9D2C2] pl-3">
+                      <InputGroupText className="gap-1.5 text-[13px] font-semibold text-[#0F1A2E]/50"><Phone className="size-3.5" /> +258</InputGroupText>
+                    </InputGroupAddon>
+                    <InputGroupInput id="edit-whatsapp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="82 000 0001" className="h-full px-3 text-[13px] text-[#0F1A2E] placeholder:text-[#0F1A2E]/35" />
+                  </InputGroup>
+                  <button type="button" onClick={() => sendOtp("whatsapp")} disabled={whatsappSending || !!whatsappVerifiedAt} className="shrink-0 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-4 text-xs font-bold text-[#0F1A2E] transition hover:bg-white hover:border-[#0B5E56] disabled:opacity-40">
+                    {whatsappVerifiedAt ? "✓" : whatsappSending ? "A enviar..." : timers.whatsapp ? "Reenviar" : "Enviar código"}
+                  </button>
+                </div>
+                {whatsappVerifiedAt ? (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#0B5E56]/10 px-3 py-1 text-xs font-medium text-[#0B5E56]"><span className="size-1.5 rounded-full bg-[#0B5E56]" /> Verificado</p>
+                ) : whatsappOtp ? (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <InputOTP maxLength={6} value={whatsappInput} onChange={setWhatsappInput} containerClassName="gap-1.5">
+                        <InputOTPGroup className="gap-1.5">{[0,1,2].map((i) => (<InputOTPSlot key={i} index={i} className="size-10 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] text-base font-semibold text-[#0F1A2E] data-[active=true]:border-[#0B5E56] data-[active=true]:ring-2 data-[active=true]:ring-[#0B5E56]/15 data-[active=true]:bg-white" />))}</InputOTPGroup>
+                        <div className="flex items-center px-1 text-[#0F1A2E]/20">–</div>
+                        <InputOTPGroup className="gap-1.5">{[3,4,5].map((i) => (<InputOTPSlot key={i} index={i} className="size-10 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] text-base font-semibold text-[#0F1A2E] data-[active=true]:border-[#0B5E56] data-[active=true]:ring-2 data-[active=true]:ring-[#0B5E56]/15 data-[active=true]:bg-white" />))}</InputOTPGroup>
+                      </InputOTP>
+                      <button type="button" onClick={() => verifyOtp("whatsapp")} disabled={whatsappInput.length < 6} className="shrink-0 rounded-lg bg-[#0B5E56] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#0A4A44] disabled:opacity-40">Verificar</button>
+                    </div>
+                    {timers.whatsapp && (<p className="flex items-center gap-1.5 text-xs text-[#0F1A2E]/50"><Clock className="size-3" /> Reenviar em {countdownLabel("whatsapp")}</p>)}
+                  </div>
+                ) : null}
+                {fieldErrors.whatsapp && (<p role="alert" className={fieldErrCls}>{fieldErrors.whatsapp}</p>)}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Telefone</Label>
-                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Opcional" maxLength={32} />
+              {/* Telefone */}
+              <div className="rounded-2xl border border-[#D9D2C2] bg-white p-4">
+                <label htmlFor="edit-phone" className={labelCls}>Telefone</label>
+                <div className="mt-1.5 flex gap-2">
+                  <Input id="edit-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Opcional" maxLength={32} className="flex-1 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E] placeholder:text-[#0F1A2E]/35 outline-none focus:border-[#0B5E56] focus:bg-white focus:ring-2 focus:ring-[#0B5E56]/15" />
+                  <button type="button" onClick={() => sendOtp("phone")} disabled={phoneSending || !!phoneVerifiedAt} className="shrink-0 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-4 text-xs font-bold text-[#0F1A2E] transition hover:bg-white hover:border-[#0B5E56] disabled:opacity-40">
+                    {phoneVerifiedAt ? "✓" : phoneSending ? "A enviar..." : timers.phone ? "Reenviar" : "Enviar código"}
+                  </button>
+                </div>
+                {phoneVerifiedAt ? (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#0B5E56]/10 px-3 py-1 text-xs font-medium text-[#0B5E56]"><span className="size-1.5 rounded-full bg-[#0B5E56]" /> Verificado</p>
+                ) : phoneOtp ? (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <InputOTP maxLength={6} value={phoneInput} onChange={setPhoneInput} containerClassName="gap-1.5">
+                        <InputOTPGroup className="gap-1.5">{[0,1,2].map((i) => (<InputOTPSlot key={i} index={i} className="size-10 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] text-base font-semibold text-[#0F1A2E] data-[active=true]:border-[#0B5E56] data-[active=true]:ring-2 data-[active=true]:ring-[#0B5E56]/15 data-[active=true]:bg-white" />))}</InputOTPGroup>
+                        <div className="flex items-center px-1 text-[#0F1A2E]/20">–</div>
+                        <InputOTPGroup className="gap-1.5">{[3,4,5].map((i) => (<InputOTPSlot key={i} index={i} className="size-10 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] text-base font-semibold text-[#0F1A2E] data-[active=true]:border-[#0B5E56] data-[active=true]:ring-2 data-[active=true]:ring-[#0B5E56]/15 data-[active=true]:bg-white" />))}</InputOTPGroup>
+                      </InputOTP>
+                      <button type="button" onClick={() => verifyOtp("phone")} disabled={phoneInput.length < 6} className="shrink-0 rounded-lg bg-[#0B5E56] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#0A4A44] disabled:opacity-40">Verificar</button>
+                    </div>
+                    {timers.phone && (<p className="flex items-center gap-1.5 text-xs text-[#0F1A2E]/50"><Clock className="size-3" /> Reenviar em {countdownLabel("phone")}</p>)}
+                  </div>
+                ) : null}
+                {fieldErrors.phone && (<p role="alert" className={fieldErrCls}>{fieldErrors.phone}</p>)}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="geral@empresa.co.mz" maxLength={255} />
+              {/* Email */}
+              <div className="rounded-2xl border border-[#D9D2C2] bg-white p-4">
+                <label htmlFor="edit-email" className={labelCls}>Email</label>
+                <div className="mt-1.5 flex gap-2">
+                  <Input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="geral@empresa.co.mz" maxLength={255} className="flex-1 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E] placeholder:text-[#0F1A2E]/35 outline-none focus:border-[#0B5E56] focus:bg-white focus:ring-2 focus:ring-[#0B5E56]/15" />
+                  <button type="button" onClick={() => sendOtp("email")} disabled={emailSending || !!emailVerifiedAt} className="shrink-0 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-4 text-xs font-bold text-[#0F1A2E] transition hover:bg-white hover:border-[#0B5E56] disabled:opacity-40">
+                    {emailVerifiedAt ? "✓" : emailSending ? "A enviar..." : timers.email ? "Reenviar" : "Enviar código"}
+                  </button>
+                </div>
+                {emailVerifiedAt ? (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#0B5E56]/10 px-3 py-1 text-xs font-medium text-[#0B5E56]"><span className="size-1.5 rounded-full bg-[#0B5E56]" /> Verificado</p>
+                ) : emailOtp ? (
+                  <div className="mt-3 flex items-center gap-3">
+                    <InputOTP maxLength={6} value={emailInput} onChange={setEmailInput} containerClassName="gap-1.5">
+                      <InputOTPGroup className="gap-1.5">{[0,1,2].map((i) => (<InputOTPSlot key={i} index={i} className="size-10 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] text-base font-semibold text-[#0F1A2E] data-[active=true]:border-[#0B5E56] data-[active=true]:ring-2 data-[active=true]:ring-[#0B5E56]/15 data-[active=true]:bg-white" />))}</InputOTPGroup>
+                      <div className="flex items-center px-1 text-[#0F1A2E]/20">–</div>
+                      <InputOTPGroup className="gap-1.5">{[3,4,5].map((i) => (<InputOTPSlot key={i} index={i} className="size-10 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] text-base font-semibold text-[#0F1A2E] data-[active=true]:border-[#0B5E56] data-[active=true]:ring-2 data-[active=true]:ring-[#0B5E56]/15 data-[active=true]:bg-white" />))}</InputOTPGroup>
+                    </InputOTP>
+                    <button type="button" onClick={() => verifyOtp("email")} disabled={emailInput.length < 6} className="shrink-0 rounded-lg bg-[#0B5E56] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#0A4A44] disabled:opacity-40">Verificar</button>
+                  </div>
+                ) : null}
+                {fieldErrors.email && (<p role="alert" className={fieldErrCls}>{fieldErrors.email}</p>)}
+                {timers.email && !emailVerifiedAt && !emailOtp && (<p className="flex items-center gap-1.5 text-xs text-[#0F1A2E]/50"><Clock className="size-3" /> Reenviar em {countdownLabel("email")}</p>)}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="website">Website</Label>
                 <Input id="website" type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." maxLength={255} />
               </div>
+              {fieldErrors.contacts && (<p role="alert" className="rounded-xl border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 px-3.5 py-2.5 text-sm font-medium text-[#7A1A0A]">{fieldErrors.contacts}</p>)}
+              {msg && (<div className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium ${msg.type === "success" ? "border border-[#0B5E56]/20 bg-[#0B5E56]/10 text-[#0B5E56]" : "border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 text-[#7A1A0A]"}`}>{msg.text}</div>)}
             </div>
           )}
 
@@ -426,22 +654,46 @@ export function EditProfileForm({
               <div className="space-y-3">
                 <Label>Áreas de actuação ({selectedCats.length}/5)</Label>
                 <p className="text-xs text-muted-foreground">Escolhe até 5 categorias. Define onde apareces no directório.</p>
-                <div className="flex flex-wrap gap-2">
-                  {categories.map((c) => {
-                    const active = selectedCats.includes(c.id)
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => toggleCat(c.id)}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${active ? "border-[#0B5E56] bg-[#0B5E56] text-white" : "border-[#D9D2C2] bg-background text-[#0F1A2E]/80 hover:bg-muted"}`}
-                        aria-pressed={active}
-                      >
-                        {c.name}
-                      </button>
-                    )
-                  })}
-                </div>
+                <Combobox multiple value={selectedCats} onValueChange={(val) => { const next = (val as string[]) ?? []; if (next.length <= 5) setSelectedCats(next) }} onInputValueChange={setCatQuery}>
+                  <ComboboxChips ref={catAnchor} className="min-h-[38px] rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-2 py-1 text-[13px] transition focus-within:border-[#0B5E56] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#0B5E56]/15">
+                    {selectedCats.map((id) => {
+                      const cat = categories.find((c) => c.id === id)
+                      return (<ComboboxChip key={id} className="bg-[#0B5E56] text-white hover:bg-[#0A4A44]">{cat?.name ?? id}</ComboboxChip>)
+                    })}
+                    <ComboboxChipsInput placeholder={selectedCats.length === 0 ? "Procurar categoria da empresa…" : selectedCats.length < 5 ? "Adicionar…" : "Limite 5 atingido"} disabled={selectedCats.length >= 5 && !catQuery} className="placeholder:text-[#0F1A2E]/40" />
+                  </ComboboxChips>
+                  <ComboboxContent anchor={catAnchor} className="z-50">
+                    <ComboboxList>
+                      {categories
+                        .filter((c) => {
+                          if (!catQuery) return true
+                          return c.name.toLowerCase().includes(catQuery.toLowerCase())
+                        })
+                        .slice(0, 30)
+                        .map((c) => (
+                          <ComboboxItem key={c.id} value={c.id} className="data-[selected]:bg-[#0B5E56] data-[selected]:text-white">
+                            {c.name}
+                          </ComboboxItem>
+                        ))}
+                    </ComboboxList>
+                    <ComboboxEmpty className="px-3 py-6 text-center text-sm text-[#0F1A2E]/50">Nenhuma categoria encontrada.</ComboboxEmpty>
+                  </ComboboxContent>
+                </Combobox>
+                <p className="text-xs text-[#0F1A2E]/50">{selectedCats.length}/5 seleccionadas{selectedCats.length === 5 ? " • limite atingido" : " • escolhe até 5"} — define onde a empresa aparece no directório</p>
+                {fieldErrors.selectedCats && <p role="alert" className={fieldErrCls}>{fieldErrors.selectedCats}</p>}
+                {selectedCats.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedCats.map((id) => {
+                      const cat = categories.find((c) => c.id === id)
+                      return (
+                        <span key={id} className="inline-flex items-center gap-1 rounded-full border border-[#0B5E56]/15 bg-[#0B5E56]/10 px-2.5 py-1 text-xs font-medium text-[#0B5E56]">
+                          {cat?.name ?? id}
+                          <button type="button" onClick={() => setSelectedCats((prev) => prev.filter((x) => x !== id))} className="ml-1 rounded-full p-0.5 hover:bg-[#0B5E56]/20" aria-label={`Remover ${cat?.name}`}>×</button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}

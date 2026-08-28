@@ -3,19 +3,25 @@ import Image from "next/image";
 import type { ProfileView } from "@workdeal/shared";
 
 type Props = {
-  profile: ProfileView;
+  profile: ProfileView & { distanceKm?: number | null };
   // opcionais quando o card é usado fora do directory (dashboard preview)
   verified?: boolean;
   sizeLabel?: string;
   district?: string | null;
   province?: string | null;
+  distanceKm?: number | null;
 };
 
-export function ProfileCard({ profile, verified, sizeLabel, district, province }: Props) {
+export function ProfileCard({ profile, verified, sizeLabel, district, province, distanceKm: distanceKmProp }: Props) {
   const initials = profile.name.slice(0, 2).toUpperCase();
   const isVerified = verified ?? false;
   const topBar = isVerified ? "bg-[#0B5E56]" : "bg-[#D9D2C2]/60";
-  const hasLocation = Boolean(district || province);
+  const distanceKm = distanceKmProp ?? (profile as { distanceKm?: number | null }).distanceKm ?? null;
+  const hasDistance = typeof distanceKm === "number" && Number.isFinite(distanceKm);
+  const pProvince = province ?? (profile as { province?: string | null }).province ?? null;
+  const pDistrict = district ?? (profile as { district?: string | null }).district ?? null;
+  const provinceLine = [pDistrict, pProvince].filter(Boolean).join(" · ");
+  const hasLocation = Boolean(pProvince || pDistrict);
 
   return (
     <Link
@@ -43,11 +49,16 @@ export function ProfileCard({ profile, verified, sizeLabel, district, province }
         </div>
 
         <div className="min-w-0 flex-1">
-          {/* eyebrow mono — província/distrito ou NUIT quando existir */}
+          {/* eyebrow mono — província/distrito + distância */}
           {hasLocation ? (
             <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0B5E56]">
               <span className="size-1 rounded-full bg-[#0B5E56]" aria-hidden />
-              {[district, province].filter(Boolean).join(" · ")}
+              <span className="truncate">{provinceLine}{hasDistance ? ` · ${distanceKm!.toFixed(1)} km` : ""}</span>
+            </p>
+          ) : hasDistance ? (
+            <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0B5E56]">
+              <span className="size-1 rounded-full bg-[#0B5E56]" aria-hidden />
+              {distanceKm!.toFixed(1)} km de si
             </p>
           ) : (
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/40">
@@ -62,8 +73,10 @@ export function ProfileCard({ profile, verified, sizeLabel, district, province }
             {profile.name}
           </h3>
           {profile.tagline ? (
-            <p className="mt-1 line-clamp-1 text-[13px] leading-snug text-[#0F1A2E]/60">{profile.tagline}</p>
-          ) : null}
+            <p className="mt-1 line-clamp-2 min-h-[2.2rem] text-[13px] leading-snug text-[#0F1A2E]/60">{profile.tagline}</p>
+          ) : (
+            <p className="mt-1 hidden min-h-[2.2rem] text-[13px] leading-snug text-transparent sm:block" aria-hidden>—</p>
+          )}
         </div>
 
         {/* selo tamanho — signature discreta */}
@@ -74,20 +87,20 @@ export function ProfileCard({ profile, verified, sizeLabel, district, province }
         ) : null}
       </div>
 
-      {/* categorias — pills Paper */}
+      {/* categorias — reduzido para 2 badges pequenos */}
       {profile.categories.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5 px-5">
-          {profile.categories.slice(0, 3).map((c) => (
+        <div className="flex flex-wrap gap-1 px-5">
+          {profile.categories.slice(0, 2).map((c) => (
             <span
               key={c.id}
-              className="inline-flex rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 text-xs font-medium leading-none text-[#0F1A2E]/80"
+              className="inline-flex rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2 py-0.5 text-[11px] font-medium leading-none text-[#0F1A2E]/75"
             >
               {c.name}
             </span>
           ))}
-          {profile.categories.length > 3 ? (
-            <span className="inline-flex rounded-full bg-[#0F1A2E] px-2.5 py-1 text-xs font-bold leading-none text-white">
-              +{profile.categories.length - 3}
+          {profile.categories.length > 2 ? (
+            <span className="inline-flex rounded-full bg-[#0F1A2E] px-2 py-0.5 text-[11px] font-bold leading-none text-white">
+              +{profile.categories.length - 2}
             </span>
           ) : null}
         </div>
@@ -102,12 +115,13 @@ export function ProfileCard({ profile, verified, sizeLabel, district, province }
         <div className="mx-5 mt-3 border-t border-[#D9D2C2]/30 pt-3" aria-hidden />
       )}
 
-      {/* footer — acção */}
-      <div className="mt-4 flex items-center justify-between bg-[#F6F3EE]/60 px-5 py-3">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/40">
-          {isVerified ? "Verificado · Workdeal" : "Workdeal · Perfis"}
+      {/* footer — província + distância / acção */}
+      <div className="mt-4 flex items-center justify-between gap-2 bg-[#F6F3EE]/60 px-5 py-3">
+        <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/40">
+          {hasLocation ? provinceLine : hasDistance ? `${distanceKm!.toFixed(1)} km` : isVerified ? "Verificado · Workdeal" : "Workdeal · Perfis"}
+          {hasLocation && hasDistance ? ` · ${distanceKm!.toFixed(1)} km` : ""}
         </span>
-        <span className="inline-flex items-center gap-1 text-xs font-bold text-[#0B5E56] opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[#0B5E56] opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
           Ver perfil <span aria-hidden>→</span>
         </span>
       </div>

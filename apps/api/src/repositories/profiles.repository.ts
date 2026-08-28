@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from "drizzle-orm";
-import { db, profile, profileCategory, category } from "@workdeal/db";
+import { db, profile, profileCategory, category, profileLocation } from "@workdeal/db";
 import type { ListProfilesQuery } from "@workdeal/shared";
 import { boundingBox, isValidCoordinates } from "@workdeal/shared/lib/geo";
 
@@ -213,8 +213,15 @@ class ProfilesRepository {
           ? sql`ST_Distance(${sql.raw('"profile"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC`
           : desc(profile.updatedAt);
 
+    const selectColumns = nearCoords
+      ? {
+          ...profileColumns,
+          distanceKm: sql<number>`ST_Distance(${sql.raw('"profile"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) / 1000.0`.as("distanceKm"),
+        }
+      : profileColumns;
+
     const [rows, countRows] = await Promise.all([
-      db.select(profileColumns).from(profile).where(where).orderBy(orderBy).limit(limit).offset(offset),
+      db.select(selectColumns).from(profile).where(where).orderBy(orderBy).limit(limit).offset(offset),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(profile)
@@ -248,10 +255,28 @@ class ProfilesRepository {
       byProfile.set(l.profileId, arr);
     }
 
-    const items: ProfileWithCategories[] = rows.map((r) => ({
-      ...r,
-      categories: byProfile.get(r.id) ?? [],
-    }));
+    // Província para o company-card: sede primária por perfil (evita N+1, 1 query extra)
+    const primaryLocs: { profileId: string; province: string | null; district: string | null }[] =
+      ids.length === 0
+        ? []
+        : await db
+            .select({ profileId: profileLocation.profileId, province: profileLocation.province, district: profileLocation.district })
+            .from(profileLocation)
+            .where(and(inArray(profileLocation.profileId, ids), eq(profileLocation.isPrimary, true)));
+    const locByProfile = new Map(primaryLocs.map((r) => [r.profileId, r]));
+
+    const items: (ProfileWithCategories & { distanceKm?: number | null; province?: string | null; district?: string | null })[] = (
+      rows as unknown as (ProfileRow & { distanceKm?: number | null })[]
+    ).map((r) => {
+      const loc = locByProfile.get(r.id);
+      return {
+        ...r,
+        distanceKm: (r as unknown as { distanceKm?: number | null }).distanceKm ?? null,
+        province: loc?.province ?? null,
+        district: loc?.district ?? null,
+        categories: byProfile.get(r.id) ?? [],
+      };
+    });
 
     return { items, total: countRows };
   }
