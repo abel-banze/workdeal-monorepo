@@ -91,6 +91,7 @@ class OnboardingService {
             latitude: input.location.latitude ?? null,
             longitude: input.location.longitude ?? null,
             visibility: input.location.visibility,
+            googlePlaceId: (input.location as any).googlePlaceId ?? input.profile.googlePlaceId ?? null,
           }
         : null,
       tagSlugs: input.tagSlugs ?? [],
@@ -110,6 +111,11 @@ class OnboardingService {
       );
     }
 
+    // Refresh MV em background (não bloqueia resposta)
+    void import("@workdeal/db").then(async ({ db }) => {
+      const { sql } = await import("drizzle-orm");
+      try { await db.execute(sql`SELECT refresh_known_locations()`); } catch {}
+    });
     return result;
   }
 

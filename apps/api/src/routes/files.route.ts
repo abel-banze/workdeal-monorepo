@@ -28,7 +28,7 @@ filesRoute.post("/upload", optionalAuth, async (c) => {
   }
   const parsed = uploadFileSchema.safeParse({ purpose: body["purpose"] ?? undefined });
   if (!parsed.success) {
-    throw new AppError(400, "INVALID_PURPOSE", "Campo 'purpose' inválido (quote | avatar | logo | generic)");
+    throw new AppError(400, "INVALID_PURPOSE", "Campo 'purpose' inválido (quote | avatar | logo | verification | generic)");
   }
   if (!user && parsed.data.purpose !== "quote") {
     throw new AppError(401, "UNAUTHORIZED", "Inicie sessão para carregar ficheiros fora de cotações");

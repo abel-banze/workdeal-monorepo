@@ -13,8 +13,10 @@ export async function getProfiles(params: Record<string, string | undefined>) {
   const search = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v) search.set(k, v);
   const qs = search.toString();
+  // Pesquisa e "nearby" são dados voláteis — nunca cachear. Listagem geral cache 1h.
+  const volatile = params.near !== undefined || params.q !== undefined;
   return apiFetch<ProfileView[]>(`/api/v1/profiles${qs ? `?${qs}` : ""}`, {
-    next: params.near ? { revalidate: 0 } : { revalidate: 3600, tags: ["profiles"] },
+    next: volatile ? { revalidate: 0 } : { revalidate: 3600, tags: ["profiles"] },
   });
 }
 

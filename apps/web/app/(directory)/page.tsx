@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import type { ProfileView } from "@workdeal/shared";
 import { getProfiles, getCategories } from "@/lib/profiles";
 import { ProfileCard } from "@/components/features/profile-card";
 import { HomeSearch } from "@/components/features/home-search";
@@ -22,41 +23,18 @@ export async function generateMetadata() {
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
 async function FeaturedCompanies({ searchParams }: { searchParams: Record<string, string | undefined> }) {
+  let companies: ProfileView[] = [];
+  let total = 0;
+  let failed = false;
   try {
     const { data: profiles, meta } = await getProfiles({ ...searchParams, limit: "6" });
-    const companies = profiles.filter((p) => p.type === "company");
-    if (companies.length === 0) {
-      return (
-        <div className="rounded-[20px] border border-dashed border-[#D9D2C2] bg-white px-6 py-12 text-center">
-          <p className="text-sm font-semibold text-[#0F1A2E]">Nenhuma empresa encontrada com estes filtros.</p>
-          <p className="mt-1 text-sm text-[#0F1A2E]/60">Tente outra categoria ou limpe a pesquisa para explorar a comunidade.</p>
-          <Link
-            href="/"
-            className="mt-4 inline-flex h-9 items-center rounded-full border border-[#0F1A2E]/10 bg-white px-5 text-sm font-semibold hover:bg-[#0F1A2E] hover:text-white transition-colors"
-          >
-            Limpar filtros
-          </Link>
-        </div>
-      );
-    }
-    return (
-      <>
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs font-bold tracking-[0.14em] text-[#0B5E56]">
-            {String(meta?.total ?? companies.length)} EMPRESAS EM DESTAQUE
-          </p>
-          <Link href="/companies" className="text-xs font-semibold text-[#0F1A2E]/60 hover:text-[#0F1A2E]">
-            Explorar directório completo →
-          </Link>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          {companies.map((p) => (
-            <ProfileCard key={p.id} profile={p} />
-          ))}
-        </div>
-      </>
-    );
+    companies = profiles.filter((p) => p.type === "company");
+    total = typeof meta?.total === "number" ? (meta.total as number) : companies.length;
   } catch {
+    failed = true;
+  }
+
+  if (failed) {
     return (
       <div className="grid gap-4 md:grid-cols-2">
         {[1, 2, 3, 4].map((i) => (
@@ -78,6 +56,39 @@ async function FeaturedCompanies({ searchParams }: { searchParams: Record<string
       </div>
     );
   }
+
+  if (companies.length === 0) {
+    return (
+      <div className="rounded-[20px] border border-dashed border-[#D9D2C2] bg-white px-6 py-12 text-center">
+        <p className="text-sm font-semibold text-[#0F1A2E]">Nenhuma empresa encontrada com estes filtros.</p>
+        <p className="mt-1 text-sm text-[#0F1A2E]/60">Tente outra categoria ou limpe a pesquisa para explorar a comunidade.</p>
+        <Link
+          href="/"
+          className="mt-4 inline-flex h-9 items-center rounded-full border border-[#0F1A2E]/10 bg-white px-5 text-sm font-semibold hover:bg-[#0F1A2E] hover:text-white transition-colors"
+        >
+          Limpar filtros
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs font-bold tracking-[0.14em] text-[#0B5E56]">
+          {total} EMPRESAS EM DESTAQUE
+        </p>
+        <Link href="/companies" className="text-xs font-semibold text-[#0F1A2E]/60 hover:text-[#0F1A2E]">
+          Explorar directório completo →
+        </Link>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {companies.map((p) => (
+          <ProfileCard key={p.id} profile={p} />
+        ))}
+      </div>
+    </>
+  );
 }
 
 const CATEGORY_FALLBACK = [
@@ -441,6 +452,89 @@ export default async function DirectoryPage({ searchParams }: Props) {
               <p className="mt-2 text-sm leading-relaxed text-[#0F1A2E]/60">{s.d}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* REQUISIÇÕES & EVENTOS — oportunidades */}
+      <section className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-10 lg:py-12">
+        <div>
+          <p className="text-[11px] font-bold tracking-[0.16em] text-[#0B5E56]">OPORTUNIDADES • JÁ VIVE NO WORKDEAL</p>
+          <h2 className="mt-2 text-[26px] font-black tracking-[-0.04em] leading-none text-[#0F1A2E] sm:text-[30px]" style={{ fontFamily: "var(--font-display)" }}>
+            Pode resolver. Ou pode pedir.
+          </h2>
+          <p className="mt-2 max-w-[560px] text-sm leading-relaxed text-[#0F1A2E]/60">
+            Duas formas de fazer negócio: responda a pedidos de serviço ou junte-se aos próximos eventos do ecossistema.
+          </p>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <div className="relative overflow-hidden rounded-[24px] bg-[#0F1A2E] p-6 sm:p-8">
+            <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 size-[280px] rounded-full bg-[#FF3B1F]/20 blur-[50px]" />
+            <div className="relative">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-[#FF3B1F] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">Requisições</span>
+                <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-white/70">Novo</span>
+              </div>
+              <h3 className="mt-4 text-[26px] font-black leading-[0.95] tracking-[-0.04em] text-white sm:text-[30px]" style={{ fontFamily: "var(--font-display)" }}>
+                Pedidos de serviço à espera de propostas.
+              </h3>
+              <p className="mt-3 max-w-[440px] text-sm leading-relaxed text-white/65">
+                Empresas públicas e privadas publicam o que precisam — obras, manutenção, tecnologia. Veja os detalhes e envie a sua proposta directamente ao solicitante.
+              </p>
+              <ul className="mt-5 space-y-2 text-sm text-white/85">
+                <li className="flex gap-2.5">
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[#0B5E56] text-[11px] text-white">✓</span>
+                  O que o mercado precisa, em tempo real
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[#0B5E56] text-[11px] text-white">✓</span>
+                  Propostas directas, sem intermediários
+                </li>
+              </ul>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href="/tasks" className="inline-flex h-11 items-center rounded-full bg-[#FF3B1F] px-6 text-sm font-bold text-white hover:bg-[#E8350F] transition-colors">
+                  Explorar requisições →
+                </Link>
+                <Link href="/signup" className="inline-flex h-11 items-center rounded-full border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white hover:bg-white hover:text-[#0F1A2E] transition-colors">
+                  Publicar um pedido
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden rounded-[24px] border border-[#D9D2C2] bg-white p-6 sm:p-8">
+            <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 size-[280px] rounded-full bg-[#0B5E56]/10 blur-[50px]" />
+            <div className="relative">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-[#0B5E56] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">Eventos</span>
+                <span className="rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-[#0F1A2E]/60">Agenda Moçambique</span>
+              </div>
+              <h3 className="mt-4 text-[26px] font-black leading-[0.95] tracking-[-0.04em] text-[#0F1A2E] sm:text-[30px]" style={{ fontFamily: "var(--font-display)" }}>
+                Feiras, lançamentos e networking.
+              </h3>
+              <p className="mt-3 max-w-[440px] text-sm leading-relaxed text-[#0F1A2E]/60">
+                Siga os próximos eventos do ecossistema Workdeal e inscreva-se em segundos. Presença confirmada, networking real.
+              </p>
+              <ul className="mt-5 space-y-2 text-sm text-[#0F1A2E]/85">
+                <li className="flex gap-2.5">
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[#0B5E56] text-[11px] text-white">✓</span>
+                  Inscrições gratuitas com a sua conta
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[#0B5E56] text-[11px] text-white">✓</span>
+                  Crie e gerencie os seus próprios eventos
+                </li>
+              </ul>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href="/events" className="inline-flex h-11 items-center rounded-full bg-[#0F1A2E] px-6 text-sm font-bold text-white hover:bg-black transition-colors">
+                  Ver eventos →
+                </Link>
+                <Link href="/signup" className="inline-flex h-11 items-center rounded-full border border-[#0F1A2E]/15 bg-[#F6F3EE] px-6 text-sm font-semibold text-[#0F1A2E] hover:bg-[#0F1A2E] hover:text-white transition-colors">
+                  Organizar um evento
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

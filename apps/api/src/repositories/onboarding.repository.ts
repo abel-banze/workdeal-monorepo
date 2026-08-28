@@ -28,6 +28,7 @@ export interface CompleteOnboardingParams {
         Partial<Omit<LocationInsert, "id" | "profileId" | "organizationId" | "province">>)
     | null;
   tagSlugs: string[];
+  // googlePlaceId propagated to profile_location via onboarding.service
 }
 
 export interface CompleteOnboardingResult {
@@ -116,6 +117,7 @@ class OnboardingRepository {
         }
       }
 
+      // Refresh dicionário dinâmico (best-effort, não falha onboarding) — executa fora da tx para não bloquear
       // Contactos verificados — persistência do estado "verificado" por canal
       await tx.delete(profileContactVerification).where(eq(profileContactVerification.profileId, profileId));
       if (params.verifiedContacts && params.verifiedContacts.length > 0) {

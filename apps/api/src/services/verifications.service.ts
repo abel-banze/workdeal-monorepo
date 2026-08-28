@@ -1,6 +1,11 @@
 import { db, badge, organization, profile, profileBadge } from "@workdeal/db";
 import { eq } from "drizzle-orm";
-import type { VerificationListQuery } from "@workdeal/shared";
+import {
+  type VerificationListQuery,
+  VERIFICATION_DOCUMENT_TYPES,
+  missingVerificationDocuments,
+  verificationDocumentLabel,
+} from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 import { verificationsRepository } from "../repositories/verifications.repository.js";
 import { logger } from "@workdeal/shared/lib/logger";
@@ -42,7 +47,20 @@ class VerificationsService {
       .then((rows) => rows.find((r) => r.status === "pending" || r.status === "in_review"));
     if (pending) throw new AppError(409, "ALREADY_PENDING", "Já existe um pedido pendente");
     const docs = Array.isArray(documents) ? documents : [];
-    if (docs.length > 5) throw new AppError(400, "TOO_MANY_DOCUMENTS", "Máximo 5 documentos");
+    if (docs.length > VERIFICATION_DOCUMENT_TYPES.length) {
+      throw new AppError(400, "TOO_MANY_DOCUMENTS", `Máximo ${VERIFICATION_DOCUMENT_TYPES.length} documentos`);
+    }
+    const knownTypes = VERIFICATION_DOCUMENT_TYPES.map((d) => d.id) as string[];
+    const invalidType = docs.find((d) => typeof d === "object" && d && "type" in d && !knownTypes.includes((d as { type: string }).type));
+    if (invalidType) {
+      throw new AppError(400, "INVALID_DOCUMENT_TYPE", "Tipo de documento inválido no pedido");
+    }
+    // 1º grau exige os documentos obrigatórios — validação de novo no servidor
+    const missing = missingVerificationDocuments(docs as Array<{ type: string }>, level);
+    if (missing.length > 0) {
+      const labels = missing.map((t) => verificationDocumentLabel(t)).join(", ");
+      throw new AppError(400, "DOCUMENTS_REQUIRED", `Faltam documentos obrigatórios: ${labels}`);
+    }
     return verificationsRepository.create({ id: newId(), profileId, documents: docs as never, status: "pending" as never, level: level as never });
   }
 

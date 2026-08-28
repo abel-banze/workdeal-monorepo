@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import { getPublicProfile, getPortfolioItems } from "@/lib/profiles";
 import Link from "next/link";
 import { FaWhatsapp } from "react-icons/fa";
-import { FiPhone, FiGlobe } from "react-icons/fi";
+import { FiPhone, FiGlobe, FiShare2 } from "react-icons/fi";
 import { HeroEmailButton, ProfileContacts } from "@/components/features/profile-contacts";
 import { ProfileMap } from "@/components/features/profile-map";
 import { ProfileServices } from "@/components/features/profile-services";
 import { ProfilePortfolio } from "@/components/features/profile-portfolio";
 import { QuoteDialog } from "@/components/features/profile-quote-dialog";
+import { ShareProfileDialog } from "@/components/features/profile-share-dialog";
+import { BookmarkButton } from "@/components/features/profile-bookmark-button";
 import { Analytics } from "@/components/features/analytics";
 import type { PublicProfileView } from "@workdeal/shared";
 
@@ -214,6 +216,22 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                     <FiGlobe className="size-[18px]" aria-hidden />
                   </a>
                 ) : null}
+                <BookmarkButton profileId={p.id} profileName={p.name} />
+                <ShareProfileDialog
+                  profileName={p.name}
+                  profileSlug={slug}
+                  profileTagline={p.tagline}
+                  trigger={
+                    <button
+                      type="button"
+                      aria-label="Partilhar perfil"
+                      title="Partilhar"
+                      className="inline-flex size-11 items-center justify-center rounded-full border border-[#D9D2C2] bg-white text-[#0F1A2E] hover:bg-[#F6F3EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5E56]/20"
+                    >
+                      <FiShare2 className="size-[18px]" aria-hidden />
+                    </button>
+                  }
+                />
               </div>
               <p className="text-center font-mono text-[11px] text-[#0F1A2E]/40 sm:text-right">
                 {reviewAvg ? `${reviewAvg} ★ · ${p.reviews.count} avaliação${p.reviews.count !== 1 ? "ões" : ""}` : null}

@@ -24,6 +24,7 @@
     "./lib/env": "./dist/lib/env.js",
     "./lib/logger": "./dist/lib/logger.js",
     "./lib/geo": "./dist/lib/geo.js",
+    "./lib/smart-search": "./dist/lib/smart-search.js",
     "./lib/rate-limit": "./dist/lib/rate-limit.js",
     "./lib/company-size": "./dist/lib/company-size.js",
     "./lib/phone": "./dist/lib/phone.js",

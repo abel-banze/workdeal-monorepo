@@ -408,6 +408,30 @@ export default async function OrgDashboardPage({
             </span>
             <span className="ml-auto text-[#0F1A2E]/30 group-hover:text-[#0B5E56]">→</span>
           </Link>
+          <Link href={`/dashboard/${organizationId}/tasks`} className="group flex items-center gap-3 rounded-[16px] border border-[#D9D2C2] bg-[#F6F3EE] px-4 py-3 hover:border-[#0B5E56]/30 hover:bg-white">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-[#0F1A2E] text-white">▤</span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold leading-tight text-[#0F1A2E]">Tarefas</span>
+              <span className="block text-xs text-[#0F1A2E]/55">Publicar e gerir propostas</span>
+            </span>
+            <span className="ml-auto text-[#0F1A2E]/30 group-hover:text-[#0B5E56]">→</span>
+          </Link>
+          <Link href={`/dashboard/${organizationId}/opportunities`} className="group flex items-center gap-3 rounded-[16px] border border-[#D9D2C2] bg-white px-4 py-3 hover:border-[#0F1A2E]/20">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-[#0B5E56] text-white">⬡</span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold leading-tight text-[#0F1A2E]">Oportunidades</span>
+              <span className="block text-xs text-[#0F1A2E]/55">Propostas e adjudicações</span>
+            </span>
+            <span className="ml-auto text-[#0F1A2E]/30 group-hover:text-[#0B5E56]">→</span>
+          </Link>
+          <Link href={`/dashboard/${organizationId}/events`} className="group flex items-center gap-3 rounded-[16px] border border-[#D9D2C2] bg-white px-4 py-3 hover:border-[#0F1A2E]/20">
+            <span className="flex size-9 items-center justify-center rounded-xl border border-[#D9D2C2] bg-[#F6F3EE] text-[#0F1A2E]">◷</span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold leading-tight text-[#0F1A2E]">Eventos</span>
+              <span className="block text-xs text-[#0F1A2E]/55">Criar e fazer check-in</span>
+            </span>
+            <span className="ml-auto text-[#0F1A2E]/30 group-hover:text-[#0B5E56]">→</span>
+          </Link>
         </div>
       </div>
 

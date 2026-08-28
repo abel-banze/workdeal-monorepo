@@ -20,6 +20,7 @@ export const onboardingCompleteSchema = z.object({
       latitude: z.number().min(-90).max(90).nullable().optional(),
       longitude: z.number().min(-180).max(180).nullable().optional(),
       visibility: z.enum(["exact", "zone"]).default("zone"),
+      googlePlaceId: z.string().trim().max(512).nullable().optional(),
     })
     .nullable()
     .optional(),

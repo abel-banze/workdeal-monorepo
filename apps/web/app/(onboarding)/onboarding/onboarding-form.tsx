@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { requestVerification } from "@/app/actions/verifications";
 import { completeOnboardingAction } from "@/app/actions/onboarding";
 import { authClient } from "@/lib/auth-client";
-import { classifyCompanySize, sizeLabel, sizeDescription, normalizeBusinessHours } from "@workdeal/shared";
-import type { BusinessHours, PlaceSuggestion } from "@workdeal/shared";
+import { classifyCompanySize, sizeLabel, sizeDescription, normalizeBusinessHours, missingVerificationDocuments, verificationDocumentLabel } from "@workdeal/shared";
+import type { BusinessHours, PlaceSuggestion, VerificationDocumentInput } from "@workdeal/shared";
 import type { LegalForm } from "@workdeal/shared/lib/company-size";
 import type { ContactChannel } from "@workdeal/shared/lib/phone";
 import { getVerifiedContacts } from "@/app/actions/otp";
 import { placesAutocompleteAction, placesDetailsAction } from "@/app/actions/places";
 import { LocationPicker } from "@/components/features/location-picker";
+import { VerificationDocuments } from "@/components/features/verification-documents";
 import {
   Select,
   SelectContent,
@@ -266,8 +267,8 @@ export function OnboardingForm({
   const [progressLabel, setProgressLabel] = useState("");
   const [createdProfileId, setCreatedProfileId] = useState<string | null>(null);
   const [wantVerification, setWantVerification] = useState<boolean | null>(null);
-  const [docNote, setDocNote] = useState("");
   const [verifyLevel, setVerifyLevel] = useState<"level1" | "level2">("level1");
+  const [verifDocs, setVerifDocs] = useState<VerificationDocumentInput[]>([]);
   // Erros por campo (mostrados junto ao input); preenchidos em cada tentativa de avançar
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -717,8 +718,14 @@ export function OnboardingForm({
     setLoading(true);
     try {
       if (!skip && createdProfileId) {
-        const docs = docNote.trim() ? [{ type: "note", url: docNote.trim() }] : [{ type: "pending", note: "Solicitação via onboarding" }];
-        await requestVerification({ profileId: createdProfileId, documents: docs, level: verifyLevel });
+        const missing = missingVerificationDocuments(verifDocs, verifyLevel);
+        if (missing.length > 0) {
+          throw new Error(`Anexa os documentos obrigatórios: ${missing.map((t) => verificationDocumentLabel(t)).join(", ")}`);
+        }
+        await requestVerification({ profileId: createdProfileId, documents: verifDocs, level: verifyLevel });
+        if (verifyLevel === "level1") {
+          setVerifDocs([]);
+        }
       }
       router.push("/dashboard?welcome=1");
       router.refresh();
@@ -1581,8 +1588,10 @@ export function OnboardingForm({
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className={labelCls}>Nota / link do documento (opcional)</label>
-                  <input value={docNote} onChange={(e) => setDocNote(e.target.value)} placeholder="Ex: NUIT, alvará ou link Drive" className={inputCls} />
+                  <label className={labelCls}>Documentos da empresa</label>
+                  <div className="mt-1">
+                    <VerificationDocuments value={verifDocs} onChange={setVerifDocs} disabled={loading} />
+                  </div>
                 </div>
               </div>
             )}

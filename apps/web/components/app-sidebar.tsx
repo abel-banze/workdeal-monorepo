@@ -14,7 +14,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@workspace/ui/components/sidebar"
-import { GalleryVerticalEndIcon, Settings2Icon, FrameIcon, LayoutDashboardIcon, Building2Icon } from "lucide-react"
+import { GalleryVerticalEndIcon, Settings2Icon, FrameIcon, LayoutDashboardIcon, Building2Icon, ListChecksIcon, BriefcaseIcon, CalendarDaysIcon } from "lucide-react"
 
 function buildNavMain(activeId: string | null) {
   const base = activeId ? `/dashboard/${activeId}` : "/dashboard"
@@ -34,6 +34,16 @@ function buildNavMain(activeId: string | null) {
         { title: "Editar perfil", url: `${base}/profile/edit` },
         { title: "Portfólio", url: `${base}/portfolio` },
         { title: "Serviços", url: `${base}/services` },
+      ],
+    },
+    {
+      title: "Operação",
+      url: `${base}/tasks`,
+      icon: <ListChecksIcon />,
+      items: [
+        { title: "Tarefas", url: `${base}/tasks` },
+        { title: "Oportunidades", url: `${base}/opportunities` },
+        { title: "Eventos", url: `${base}/events` },
       ],
     },
     {
