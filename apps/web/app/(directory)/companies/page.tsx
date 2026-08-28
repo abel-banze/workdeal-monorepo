@@ -106,7 +106,7 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {companies.map((p) => (
-            <ProfileCard key={p.id} profile={p} />
+            <ProfileCard key={p.id} profile={p as unknown as Parameters<typeof ProfileCard>[0]["profile"]} distanceKm={(p as unknown as { distanceKm?: number | null }).distanceKm ?? null} />
           ))}
         </div>
         <SearchImpressions profileIds={companies.map((p) => p.id)} />
