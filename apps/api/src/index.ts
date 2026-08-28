@@ -35,6 +35,7 @@ import { servicesRoute } from "./routes/services.route.js";
 import { analyticsRoute } from "./routes/analytics.route.js";
 import { tasksRoute } from "./routes/tasks.route.js";
 import { eventsRoute } from "./routes/events.route.js";
+import { searchRoute } from "./routes/search.route.js";
 
 const app = new Hono();
 
@@ -460,6 +461,7 @@ app.route("/api/v1/services", servicesRoute);
 app.route("/api/v1/analytics", analyticsRoute);
 app.route("/api/v1/tasks", tasksRoute);
 app.route("/api/v1/events", eventsRoute);
+app.route("/api/v1/search", searchRoute);
 
 app.notFound(() => {
   throw new AppError(404, "NOT_FOUND", "Rota não encontrada");

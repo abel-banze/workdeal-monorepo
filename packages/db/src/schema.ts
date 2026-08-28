@@ -238,8 +238,11 @@ export const profile = pgTable(
     // via trigger/migração SQL (ver 0002_enable_postgis.sql, 0014_reactivate_postgis.sql,
     // e o índice GIST profile_geom_gist_idx criado por migração).
     geom: geographyPoint("geom"),
-    // tsvector gerado para busca full-text (fallback text quando sem postgis/pg_trgm)
+    // tsvector GENERATED STORED (pesos A/B/C) + unaccent portuguese — ver 0029_search_tsv_generated.sql
+    // Colunas denormalizadas mantêm categoria/location na mesma linha para GENERATED (sem subquery)
     searchTsv: text("search_tsv"),
+    searchCategoryText: text("search_category_text"),
+    searchLocationText: text("search_location_text"),
     whatsapp: text("whatsapp"),
     phone: text("phone"),
     email: text("email"),
@@ -511,6 +514,7 @@ export const profileLocation = pgTable(
     longitude: doublePrecision("longitude"),
     // PostGIS geography(Point,4326) — índice GIST profile_location_geom_gist_idx via migração SQL
     geom: geographyPoint("geom"),
+    googlePlaceId: text("google_place_id"),
     isPrimary: boolean("is_primary").notNull().default(false),
     visibility: visibilityEnum("visibility").notNull().default("zone"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

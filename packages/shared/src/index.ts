@@ -16,6 +16,7 @@ export * from "./schemas/task.js";
 export * from "./schemas/event.js";
 export * from "./lib/geo.js";
 export * from "./lib/smart-search.js";
+export * from "./lib/parse-search-query.js";
 export * from "./lib/logger.js";
 export * from "./lib/rate-limit.js";
 export * from "./lib/company-size.js";
