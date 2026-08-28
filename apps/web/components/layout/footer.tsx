@@ -48,8 +48,9 @@ export function Footer() {
             <p className="text-[11px] font-bold tracking-[0.16em] text-white/40">EXPLORAR</p>
             <ul className="mt-3 space-y-2 text-sm text-white/70">
               <li><Link href="/companies" className="hover:text-white">Empresas</Link></li>
+              <li><Link href="/tasks" className="hover:text-white">Requisições</Link></li>
+              <li><Link href="/events" className="hover:text-white">Eventos</Link></li>
               <li><Link href="/#categorias" className="hover:text-white">Sectores</Link></li>
-              <li><Link href="/#como-funciona" className="hover:text-white">Como funciona</Link></li>
               <li><Link href="/dashboard" className="hover:text-white">Painel</Link></li>
             </ul>
           </div>

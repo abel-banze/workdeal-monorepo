@@ -19,8 +19,8 @@ interface CloudinaryConfig {
 }
 
 function getCloudinary(): CloudinaryConfig | null {
-  const { CLOUDINARY_NAME, CLOUDINARY_KEY, CLOUDINARY_SECRET, CLOUDINARY_FOLDER } = env;
-  if (!CLOUDINARY_NAME || !CLOUDINARY_KEY || !CLOUDINARY_SECRET) {
+  const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_FOLDER } = env;
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
     // Fail fast em produção — nunca servir URLs mock a utilizadores reais
     if (env.NODE_ENV === "production") {
       throw new AppError(503, "STORAGE_NOT_CONFIGURED", "Armazenamento de ficheiros não configurado");
@@ -28,9 +28,9 @@ function getCloudinary(): CloudinaryConfig | null {
     return null; // dev/test: modo mock
   }
   return {
-    cloudName: CLOUDINARY_NAME,
-    apiKey: CLOUDINARY_KEY,
-    apiSecret: CLOUDINARY_SECRET,
+    cloudName: CLOUDINARY_CLOUD_NAME,
+    apiKey: CLOUDINARY_API_KEY,
+    apiSecret: CLOUDINARY_API_SECRET,
     folder: CLOUDINARY_FOLDER ?? "workdeal",
   };
 }

@@ -76,6 +76,11 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
     const companies = data.filter((p) => p.type === "company");
     const total = typeof meta?.total === "number" ? (meta.total as number) : companies.length;
 
+    const search = meta?.search as
+      | { matchedProvince?: string | null; matchedCategory?: string | null }
+      | undefined;
+    const smartFilters = [search?.matchedCategory, search?.matchedProvince].filter(Boolean).join(" • ");
+
     const baseQs = new URLSearchParams();
     for (const [k, v] of Object.entries(searchParams)) if (v && k !== "page") baseQs.set(k, v as string);
 
@@ -104,6 +109,11 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
             Ordenação: <span className="font-semibold text-[#0F1A2E]">{searchParams.sort ?? "recent"}</span> {searchParams.near ? "• índice PostGIS" : "• revalidate 1h"}
           </p>
         </div>
+        {smartFilters && (
+          <p className="mb-4 rounded-[10px] border border-[#0B5E56]/20 bg-[#EAF4F2] px-3 py-2 text-xs text-[#0B5E56]">
+            Pesquisa interpretada: <span className="font-semibold">{smartFilters}</span> — resultados filtrados automaticamente.
+          </p>
+        )}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {companies.map((p) => (
             <ProfileCard key={p.id} profile={p as unknown as Parameters<typeof ProfileCard>[0]["profile"]} distanceKm={(p as unknown as { distanceKm?: number | null }).distanceKm ?? null} />

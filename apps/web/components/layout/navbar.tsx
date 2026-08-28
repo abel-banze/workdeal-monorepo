@@ -8,9 +8,8 @@ type NavLink = { href: string; label: string };
 
 const NAV_LINKS: NavLink[] = [
   { href: "/companies", label: "Empresas" },
-  { href: "/#concursos", label: "Concursos" },
-  { href: "/#requisicoes", label: "Requisições" },
-  { href: "/#eventos", label: "Eventos" },
+  { href: "/tasks", label: "Requisições" },
+  { href: "/events", label: "Eventos" },
 ];
 
 export async function Navbar() {

@@ -1,6 +1,6 @@
 import { getOrgRole } from "@workdeal/auth";
-import { hasOrgPermission, hasSelfPermission, normalizeBusinessHours } from "@workdeal/shared";
-import type { AuthUser, CreateProfileInput, DomainPermission, ListProfilesQuery, ProfileType, ProfileView, UpdateProfileInput } from "@workdeal/shared";
+import { hasOrgPermission, hasSelfPermission, normalizeBusinessHours, parseSmartSearch } from "@workdeal/shared";
+import type { AuthUser, CreateProfileInput, DomainPermission, ListProfilesQuery, ProfileType, ProfileView, SmartSearchResult, UpdateProfileInput } from "@workdeal/shared";
 import type { CategoryView, PublicProfileView, PublicBadge } from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 import { profilesRepository } from "../repositories/profiles.repository.js";
@@ -121,15 +121,37 @@ class ProfilesService {
     }));
   }
 
-  async listProfiles(query: ListProfilesQuery): Promise<{ items: ProfileView[]; total: number; page: number; limit: number }> {
+  async listProfiles(query: ListProfilesQuery): Promise<{ items: ProfileView[]; total: number; page: number; limit: number; search?: SmartSearchResult }> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const { items, total } = await profilesRepository.listProfiles({ ...query, page, limit });
+
+    // Smart search: converte "empresas de construção civil em maputo" em
+    // filtros estruturados (província + categoria). O texto residual só
+    // ordena por relevância (rankOnly) quando a intenção foi resolvida.
+    let search: SmartSearchResult | null = null;
+    let opts: { province?: string; categorySlug?: string; rankOnly?: boolean } | undefined;
+    let q = query.q;
+
+    const raw = query.q?.trim();
+    if (raw) {
+      const categories = (await profilesRepository.listActiveCategories()).map((c) => ({ slug: c.slug, name: c.name }));
+      search = parseSmartSearch(raw, categories);
+      const text = search.text.trim();
+      q = text.length >= 2 ? text : undefined;
+      if (search.structured) {
+        opts = { ...opts, rankOnly: true };
+        if (search.province) opts.province = search.province;
+        if (search.categorySlug) opts.categorySlug = search.categorySlug;
+      }
+    }
+
+    const { items, total } = await profilesRepository.listProfiles({ ...query, q, page, limit }, opts);
     return {
       items: items.map((r) => this.toProfileView(r)),
       total,
       page,
       limit,
+      ...(search?.structured ? { search } : {}),
     };
   }
 

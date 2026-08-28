@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { db, profile, profileCategory, category, profileLocation } from "@workdeal/db";
 import type { ListProfilesQuery } from "@workdeal/shared";
 import { boundingBox, isValidCoordinates } from "@workdeal/shared/lib/geo";
@@ -145,7 +146,10 @@ class ProfilesRepository {
       .orderBy(asc(category.name));
   }
 
-  async listProfiles(query: ListProfilesQuery): Promise<{ items: ProfileWithCategories[]; total: number }> {
+  async listProfiles(
+    query: ListProfilesQuery,
+    opts?: { province?: string; categorySlug?: string; rankOnly?: boolean },
+  ): Promise<{ items: ProfileWithCategories[]; total: number }> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const offset = (page - 1) * limit;
@@ -154,11 +158,30 @@ class ProfilesRepository {
     conditions.push(eq(profile.status, query.status ?? "active"));
     conditions.push(isNull(profile.deletedAt));
 
+    // Filtro estruturado por província (perfis com uma localização nessa província)
+    if (opts?.province) {
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(profileLocation)
+            .where(and(eq(profileLocation.profileId, profile.id), eq(profileLocation.province, opts.province))),
+        ),
+      );
+    }
+
+    // Full-text com ranking por relevância. Quando `rankOnly` está activo
+    // (query já resolvida em província/categoria pelo smart search), o texto
+    // residual apenas ordena — não filtra — para maximizar o recall.
+    let rankQuery: SQL | null = null;
     if (query.q) {
       const raw = query.q.trim();
-      // P2-1: tsvector quando tem ≥2 termos ou >3 chars, senão ilike trigram (fallback)
-      if (raw.includes(" ") || raw.length > 3) {
-        conditions.push(sql`${profile.searchTsv} @@ plainto_tsquery('portuguese', ${raw})`);
+      if (opts?.rankOnly) {
+        rankQuery = sql`websearch_to_tsquery('portuguese', ${raw})`;
+      } else if (raw.includes(" ") || raw.length > 3) {
+        const tsq: SQL = sql`websearch_to_tsquery('portuguese', ${raw})`;
+        conditions.push(sql`${profile.searchTsv} @@ ${tsq}`);
+        rankQuery = tsq;
       } else {
         const term = `%${raw}%`;
         conditions.push(or(ilike(profile.name, term), ilike(profile.description, term), ilike(profile.slug, term)) as unknown as ReturnType<typeof eq>);
@@ -174,8 +197,9 @@ class ProfilesRepository {
             .where(and(eq(profileCategory.profileId, profile.id), eq(profileCategory.categoryId, query.categoryId))),
         ),
       );
-    } else if (query.categorySlug) {
-      const cat = await db.select({ id: category.id }).from(category).where(eq(category.slug, query.categorySlug)).limit(1);
+    } else if (query.categorySlug || opts?.categorySlug) {
+      const slug = (opts?.categorySlug ?? query.categorySlug) as string;
+      const cat = await db.select({ id: category.id }).from(category).where(eq(category.slug, slug)).limit(1);
       if (!cat[0]) return { items: [], total: 0 };
       conditions.push(
         exists(
@@ -211,7 +235,9 @@ class ProfilesRepository {
         ? asc(profile.name)
         : query.sort === "distance" && nearCoords
           ? sql`ST_Distance(${sql.raw('"profile"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC`
-          : desc(profile.updatedAt);
+          : rankQuery
+            ? sql`ts_rank_cd(${profile.searchTsv}, ${rankQuery}) DESC, ${profile.updatedAt} DESC`
+            : desc(profile.updatedAt);
 
     const selectColumns = nearCoords
       ? {

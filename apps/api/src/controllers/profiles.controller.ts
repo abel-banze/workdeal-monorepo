@@ -38,7 +38,12 @@ export const profilesController = {
   async list(query: ListProfilesQuery) {
     const result = await profilesService.listProfiles(query);
     return {
-      body: ok(result.items, { total: result.total, page: result.page, limit: result.limit }),
+      body: ok(result.items, {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        ...(result.search ? { search: result.search } : {}),
+      }),
       status: 200 as const,
     };
   },

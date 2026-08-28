@@ -354,6 +354,23 @@ export const follow = pgTable(
   ],
 );
 
+export const profileBookmark = pgTable(
+  "profile_bookmark",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    profileId: text("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.profileId] }),
+    index("profile_bookmark_profile_idx").on(table.profileId),
+  ],
+);
+
 export const portfolioItem = pgTable(
   "portfolio_item",
   {
@@ -656,5 +673,177 @@ export const analyticsEvent = pgTable(
     index("analytics_event_profile_idx").on(table.profileId, table.createdAt),
     index("analytics_event_type_idx").on(table.eventType, table.createdAt),
     index("analytics_event_visitor_idx").on(table.visitorId),
+  ],
+);
+
+// ── Tasks / Pedidos de serviço ─────────────────────────────────────
+
+export const taskStatusEnum = pgEnum("task_status", ["open", "in_review", "in_progress", "completed", "cancelled", "withdrawn"]);
+export const proposalStatusEnum = pgEnum("proposal_status", ["submitted", "shortlisted", "rejected", "withdrawn", "accepted"]);
+export const bidStatusEnum = pgEnum("bid_status", ["awarded", "in_progress", "completed", "cancelled", "disputed"]);
+
+export const task = pgTable(
+  "task",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    requesterUserId: text("requester_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    requesterOrganizationId: text("requester_organization_id").references(() => organization.id, { onDelete: "set null" }),
+    categoryId: text("category_id").references(() => category.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    priceMinMzn: integer("price_min_mzn"),
+    priceMaxMzn: integer("price_max_mzn"),
+    province: text("province"),
+    district: text("district"),
+    address: text("address"),
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    // PostGIS geography(Point,4326) — índice GIST task_geom_gist_idx via migração SQL
+    geom: geographyPoint("geom"),
+    dueAt: timestamp("due_at"),
+    attachments: jsonb("attachments").$type<Array<{ fileId: string; url: string; name?: string }> | null>().default([]),
+    status: taskStatusEnum("status").notNull().default("open"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("task_status_created_idx").on(table.status, table.createdAt),
+    index("task_category_idx").on(table.categoryId),
+    index("task_requester_user_idx").on(table.requesterUserId),
+    index("task_geo_idx").on(table.latitude, table.longitude),
+    index("task_geom_gist_idx").using("gist", table.geom),
+  ],
+);
+
+export const taskProposal = pgTable(
+  "task_proposal",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+    providerProfileId: text("provider_profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    message: text("message").notNull(),
+    priceMzn: integer("price_mzn"),
+    estimatedDays: integer("estimated_days"),
+    status: proposalStatusEnum("status").notNull().default("submitted"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("task_proposal_task_provider_idx").on(table.taskId, table.providerProfileId),
+    index("task_proposal_provider_idx").on(table.providerProfileId),
+    index("task_proposal_status_idx").on(table.status),
+  ],
+);
+
+export const taskBid = pgTable(
+  "task_bid",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+    proposalId: text("proposal_id")
+      .notNull()
+      .references(() => taskProposal.id, { onDelete: "cascade" }),
+    providerProfileId: text("provider_profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    requesterUserId: text("requester_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    agreedPriceMzn: integer("agreed_price_mzn").notNull(),
+    agreedDeadlineAt: timestamp("agreed_deadline_at"),
+    status: bidStatusEnum("status").notNull().default("awarded"),
+    reviewNote: text("review_note"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("task_bid_proposal_idx").on(table.proposalId),
+    uniqueIndex("task_bid_task_idx").on(table.taskId),
+    index("task_bid_provider_idx").on(table.providerProfileId),
+    index("task_bid_requester_idx").on(table.requesterUserId),
+    index("task_bid_status_idx").on(table.status),
+  ],
+);
+
+// ── Eventos ────────────────────────────────────────────────────────
+
+export const eventStatusEnum = pgEnum("event_status", ["draft", "published", "cancelled", "ended"]);
+export const eventRegistrationStatusEnum = pgEnum("event_registration_status", ["registered", "cancelled", "checked_in"]);
+
+export const event = pgTable(
+  "event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    organizerProfileId: text("organizer_profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    categoryId: text("category_id").references(() => category.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    slug: text("slug").notNull().unique(),
+    description: text("description").notNull(),
+    startAt: timestamp("start_at").notNull(),
+    endAt: timestamp("end_at").notNull(),
+    isOnline: boolean("is_online").notNull().default(false),
+    onlineUrl: text("online_url"),
+    venueName: text("venue_name"),
+    province: text("province"),
+    district: text("district"),
+    address: text("address"),
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    // PostGIS geography(Point,4326) — índice GIST event_geom_gist_idx via migração SQL
+    geom: geographyPoint("geom"),
+    coverImage: text("cover_image"),
+    capacity: integer("capacity"),
+    status: eventStatusEnum("status").notNull().default("draft"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("event_status_start_idx").on(table.status, table.startAt),
+    index("event_slug_idx").on(table.slug),
+    index("event_organizer_idx").on(table.organizerProfileId),
+    index("event_category_idx").on(table.categoryId),
+    index("event_geo_idx").on(table.latitude, table.longitude),
+    index("event_geom_gist_idx").using("gist", table.geom),
+  ],
+);
+
+export const eventRegistration = pgTable(
+  "event_registration",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    eventId: text("event_id")
+      .notNull()
+      .references(() => event.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    status: eventRegistrationStatusEnum("status").notNull().default("registered"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("event_registration_event_user_idx").on(table.eventId, table.userId),
+    index("event_registration_user_idx").on(table.userId),
+    index("event_registration_status_idx").on(table.status),
   ],
 );

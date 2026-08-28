@@ -17,6 +17,7 @@ import { categoriesRoute } from "./routes/categories.route.js";
 import { healthRoute } from "./routes/health.route.js";
 import { reviewsRoute } from "./routes/reviews.route.js";
 import { followsRoute } from "./routes/follows.route.js";
+import { bookmarksRoute } from "./routes/bookmarks.route.js";
 import { adminRoute } from "./routes/admin.route.js";
 import { reportsRoute } from "./routes/reports.route.js";
 import { verificationsRoute } from "./routes/verifications.route.js";
@@ -32,6 +33,8 @@ import { metricsRoute } from "./routes/metrics.route.js";
 import { portfolioRoute } from "./routes/portfolio.route.js";
 import { servicesRoute } from "./routes/services.route.js";
 import { analyticsRoute } from "./routes/analytics.route.js";
+import { tasksRoute } from "./routes/tasks.route.js";
+import { eventsRoute } from "./routes/events.route.js";
 
 const app = new Hono();
 
@@ -236,6 +239,10 @@ app.get("/", (c) => {
     <div class="card"><h3><span class="badge post">POST</span> /api/v1/quotes</h3><p>Criação de pedido de orçamento. <span class="badge">auth</span></p><p style="margin-top:8px"><code>zValidator · rateLimit</code></p></div>
     <div class="card"><h3><span class="badge get">ALL</span> /api/auth/*</h3><p>Better Auth — sessões, organizações, RBAC.</p><p style="margin-top:8px"><code>owner / admin / editor / member</code></p></div>
     <div class="card"><h3><span class="badge get">GET</span> /api/v1/services</h3><p>Serviços publicados por perfil.</p><p style="margin-top:8px"><code>portfolio · reviews · follows</code></p></div>
+    <div class="card"><h3><span class="badge post">POST</span> /api/v1/bookmarks</h3><p>Guardar/remover perfis. <span class="badge">auth</span></p><p style="margin-top:8px"><code>toggle · /me · status</code></p></div>
+    <div class="card"><h3><span class="badge post">POST</span> /api/v1/tasks</h3><p>Pedidos de serviço, propostas e adjudicações. <span class="badge">auth</span></p><p style="margin-top:8px"><code>bids · proposals · status</code></p></div>
+    <div class="card"><h3><span class="badge post">POST</span> /api/v1/events</h3><p>Eventos e inscrições. <span class="badge">auth</span></p><p style="margin-top:8px"><code>by-slug · registrations · check-in</code></p></div>
+    <div class="card"><h3><span class="badge get">GET</span> /api/v1/tasks/proposals</h3><p>As tuas propostas enviadas. <span class="badge">auth</span></p><p style="margin-top:8px"><code>role · status · paginado</code></p></div>
   </div>
 
   <div class="foot">
@@ -435,6 +442,7 @@ app.route("/api/v1/profiles", profilesRoute);
 app.route("/api/v1/categories", categoriesRoute);
 app.route("/api/v1/reviews", reviewsRoute);
 app.route("/api/v1/follows", followsRoute);
+app.route("/api/v1/bookmarks", bookmarksRoute);
 app.route("/api/v1/admin", adminRoute);
 app.route("/api/v1/reports", reportsRoute);
 app.route("/api/v1/verifications", verificationsRoute);
@@ -450,6 +458,8 @@ app.route("/api/v1/metrics", metricsRoute);
 app.route("/api/v1/portfolio", portfolioRoute);
 app.route("/api/v1/services", servicesRoute);
 app.route("/api/v1/analytics", analyticsRoute);
+app.route("/api/v1/tasks", tasksRoute);
+app.route("/api/v1/events", eventsRoute);
 
 app.notFound(() => {
   throw new AppError(404, "NOT_FOUND", "Rota não encontrada");

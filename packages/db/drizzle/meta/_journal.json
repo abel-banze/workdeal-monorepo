@@ -176,6 +176,20 @@
       "when": 1787835366233,
       "tag": "0024_clear_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787901892142,
+      "tag": "0025_natural_scorpion",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787916802445,
+      "tag": "0026_odd_gunslinger",
+      "breakpoints": true
     }
   ]
 }

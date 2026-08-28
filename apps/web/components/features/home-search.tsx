@@ -50,7 +50,7 @@ export function HomeSearch({
     if (q.trim()) params.set("q", q.trim());
     if (categoryId) params.set("categoryId", categoryId);
     const qs = params.toString();
-    router.push(qs ? `/?${qs}#empresas` : "/#empresas");
+    router.push(qs ? `/companies?${qs}` : "/companies");
   }
 
   const [nearbyLoading, setNearbyLoading] = useState(false);
