@@ -13,6 +13,7 @@ export type Env = {
 const BETTER_AUTH_SESSION_COOKIES = ["__Secure-better-auth.session_token", "better-auth.session_token"] as const;
 
 export const requireAuth = createMiddleware<Env>(async (c, next) => {
+  const rid = (c.get("requestId" as never) as string | undefined) ?? "?";
   // 1. Tentar JWT (Authorization header ou cookie workdeal_jwt)
   const header = c.req.header("Authorization");
   let token: string | undefined;
@@ -22,8 +23,10 @@ export const requireAuth = createMiddleware<Env>(async (c, next) => {
   if (!token) {
     token = parseCookies(c.req.header("Cookie"))[JWT_COOKIE_NAME];
   }
+  console.warn(`[auth] ${rid} jwt=${token ? "present" : "none"} header=${header ? "yes" : "no"} cookies=${JSON.stringify(Object.keys(parseCookies(c.req.header("Cookie"))))}`);
   if (token) {
     const session = await verifyJwt(token);
+    console.warn(`[auth] ${rid} jwtVerified=${session ? "ok" : "FAIL"}`);
     if (session) {
       if ((session.user as unknown as { deletedAt?: string | null })?.deletedAt) {
         throw new AppError(401, "UNAUTHORIZED", "Conta desactivada");
@@ -49,6 +52,7 @@ export const requireAuth = createMiddleware<Env>(async (c, next) => {
       const session = await auth.api.getSession({
         headers: new Headers({ Cookie: `better-auth.session_token=${sessionCookie}` }),
       });
+      console.warn(`[auth] ${rid} sessionCookie=${sessionCookie ? "present" : "none"} getSession=${session?.user ? "ok" : "FAIL"}`);
       if (session?.user) {
         const u = session.user as unknown as { deletedAt?: Date | null; id: string; email: string; name: string; image?: string | null; systemRole?: string; emailVerified?: boolean; phone?: string | null; locale?: string };
         if (u.deletedAt) {
