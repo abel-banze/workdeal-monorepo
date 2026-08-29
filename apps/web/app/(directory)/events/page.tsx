@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { getCategories } from "@/lib/profiles";
 import { getPublicEvents, PROVINCES, type PublicEventView } from "@/lib/directory";
 import { EventCard } from "@/components/features/event-card";
+import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
 
 export const revalidate = 300;
 
@@ -135,6 +137,7 @@ async function EventsList({ searchParams }: { searchParams: Record<string, strin
 
 export default async function EventsPage({ searchParams }: Props) {
   const params = await searchParams;
+  const locationParams = applyDefaultLocation(params, parseLocationCookies(await cookies()));
   const scope = params.scope === "all" ? "all" : "upcoming";
   const categoriesRes = await getCategories().catch(() => ({ data: [] as { id: string; name: string }[] }));
   const categories = (categoriesRes as { data: { id: string; name: string }[] }).data;
@@ -254,7 +257,7 @@ export default async function EventsPage({ searchParams }: Props) {
             </div>
           }
         >
-          <EventsList searchParams={params} />
+          <EventsList searchParams={locationParams} />
         </Suspense>
       </section>
     </div>

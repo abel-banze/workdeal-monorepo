@@ -16,6 +16,8 @@ const STATUS_STYLE: Record<string, string> = {
 export function TaskCard({ task, categoryName }: { task: TaskView; categoryName?: string | null }) {
   const priceRange = formatBudget(task.priceMinMzn, task.priceMaxMzn);
   const locationLine = [task.province, task.district].filter(Boolean).join(" · ");
+  const hasDistance = typeof task.distanceKm === "number" && Number.isFinite(task.distanceKm);
+  const locationText = locationLine || (hasDistance ? "Perto de si" : "Pedido de serviço");
   const hasRequesterProfile = Boolean(task.requesterProfileSlug);
 
   return (
@@ -26,7 +28,7 @@ export function TaskCard({ task, categoryName }: { task: TaskView; categoryName?
       <div className="flex items-center justify-between gap-2 border-b border-[#D9D2C2]/60 px-5 py-2.5">
         <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0B5E56]">
           <span className="size-1 rounded-full bg-[#FF3B1F]" aria-hidden />
-          {locationLine || "Pedido de serviço"}
+          {locationText}{hasDistance ? ` · ${(task.distanceKm as number).toFixed(1)} km` : ""}
         </span>
         <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${STATUS_STYLE[task.status] ?? "bg-[#F6F3EE] text-[#0F1A2E]/60"}`}>
           {TASK_STATUS_LABELS_PT[task.status]}

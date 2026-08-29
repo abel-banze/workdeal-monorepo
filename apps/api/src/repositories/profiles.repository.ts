@@ -1,7 +1,6 @@
-import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
-import { db, profile, profileCategory, category, profileLocation } from "@workdeal/db";
-import type { ListProfilesQuery } from "@workdeal/shared";
+import { and, asc, desc, eq, exists, inArray, isNull, sql } from "drizzle-orm";
+import { db, profile, profileCategory, category, profileLocation, profileBadge, badge } from "@workdeal/db";
+import type { ListProfilesQuery, ProfileBadgeLite } from "@workdeal/shared";
 import { boundingBox, isValidCoordinates } from "@workdeal/shared/lib/geo";
 
 /**
@@ -18,6 +17,8 @@ export const profileColumns = {
   name: profile.name,
   tagline: profile.tagline,
   description: profile.description,
+  searchCategoryText: profile.searchCategoryText,
+  searchLocationText: profile.searchLocationText,
   logoUrl: profile.logoUrl,
   coverUrl: profile.coverUrl,
   latitude: profile.latitude,
@@ -146,10 +147,7 @@ class ProfilesRepository {
       .orderBy(asc(category.name));
   }
 
-  async listProfiles(
-    query: ListProfilesQuery,
-    opts?: { province?: string; categorySlug?: string; rankOnly?: boolean },
-  ): Promise<{ items: ProfileWithCategories[]; total: number }> {
+  async listProfiles(query: ListProfilesQuery): Promise<{ items: ProfileWithCategories[]; total: number }> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const offset = (page - 1) * limit;
@@ -157,36 +155,6 @@ class ProfilesRepository {
 
     conditions.push(eq(profile.status, query.status ?? "active"));
     conditions.push(isNull(profile.deletedAt));
-
-    // Filtro estruturado por província (perfis com uma localização nessa província)
-    if (opts?.province) {
-      conditions.push(
-        exists(
-          db
-            .select({ one: sql`1` })
-            .from(profileLocation)
-            .where(and(eq(profileLocation.profileId, profile.id), eq(profileLocation.province, opts.province))),
-        ),
-      );
-    }
-
-    // Full-text com ranking por relevância. Quando `rankOnly` está activo
-    // (query já resolvida em província/categoria pelo smart search), o texto
-    // residual apenas ordena — não filtra — para maximizar o recall.
-    let rankQuery: SQL | null = null;
-    if (query.q) {
-      const raw = query.q.trim();
-      if (opts?.rankOnly) {
-        rankQuery = sql`websearch_to_tsquery('portuguese', ${raw})`;
-      } else if (raw.includes(" ") || raw.length > 3) {
-        const tsq: SQL = sql`websearch_to_tsquery('portuguese', ${raw})`;
-        conditions.push(sql`${profile.searchTsv} @@ ${tsq}`);
-        rankQuery = tsq;
-      } else {
-        const term = `%${raw}%`;
-        conditions.push(or(ilike(profile.name, term), ilike(profile.description, term), ilike(profile.slug, term)) as unknown as ReturnType<typeof eq>);
-      }
-    }
 
     if (query.categoryId) {
       conditions.push(
@@ -197,8 +165,8 @@ class ProfilesRepository {
             .where(and(eq(profileCategory.profileId, profile.id), eq(profileCategory.categoryId, query.categoryId))),
         ),
       );
-    } else if (query.categorySlug || opts?.categorySlug) {
-      const slug = (opts?.categorySlug ?? query.categorySlug) as string;
+    } else if (query.categorySlug) {
+      const slug = query.categorySlug;
       const cat = await db.select({ id: category.id }).from(category).where(eq(category.slug, slug)).limit(1);
       if (!cat[0]) return { items: [], total: 0 };
       conditions.push(
@@ -235,9 +203,7 @@ class ProfilesRepository {
         ? asc(profile.name)
         : query.sort === "distance" && nearCoords
           ? sql`ST_Distance(${sql.raw('"profile"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC`
-          : rankQuery
-            ? sql`ts_rank_cd(${profile.searchTsv}, ${rankQuery}) DESC, ${profile.updatedAt} DESC`
-            : desc(profile.updatedAt);
+          : desc(profile.updatedAt);
 
     const selectColumns = nearCoords
       ? {
@@ -291,7 +257,23 @@ class ProfilesRepository {
             .where(and(inArray(profileLocation.profileId, ids), eq(profileLocation.isPrimary, true)));
     const locByProfile = new Map(primaryLocs.map((r) => [r.profileId, r]));
 
-    const items: (ProfileWithCategories & { distanceKm?: number | null; province?: string | null; district?: string | null })[] = (
+    // Badges ativos por perfil — badges xs do company-card (evita N+1, 1 query extra)
+    const activeBadges: { profileId: string; slug: string; name: string; type: string }[] =
+      ids.length === 0
+        ? []
+        : await db
+            .select({ profileId: profileBadge.profileId, slug: badge.slug, name: badge.name, type: badge.type })
+            .from(profileBadge)
+            .innerJoin(badge, eq(profileBadge.badgeId, badge.id))
+            .where(and(inArray(profileBadge.profileId, ids), eq(profileBadge.status, "active")));
+    const badgeByProfile = new Map<string, ProfileBadgeLite[]>();
+    for (const b of activeBadges) {
+      const arr = badgeByProfile.get(b.profileId) ?? [];
+      arr.push({ slug: b.slug, name: b.name, type: b.type });
+      badgeByProfile.set(b.profileId, arr);
+    }
+
+    const items: (ProfileWithCategories & { distanceKm?: number | null; province?: string | null; district?: string | null; badges?: ProfileBadgeLite[] })[] = (
       rows as unknown as (ProfileRow & { distanceKm?: number | null })[]
     ).map((r) => {
       const loc = locByProfile.get(r.id);
@@ -300,6 +282,7 @@ class ProfilesRepository {
         distanceKm: (r as unknown as { distanceKm?: number | null }).distanceKm ?? null,
         province: loc?.province ?? null,
         district: loc?.district ?? null,
+        badges: badgeByProfile.get(r.id) ?? [],
         categories: byProfile.get(r.id) ?? [],
       };
     });

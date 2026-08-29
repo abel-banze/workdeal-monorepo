@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import { getCategories, getProfiles } from "@/lib/profiles";
 import { ProfileCard } from "@/components/features/profile-card";
 import { SearchImpressions } from "@/components/features/search-impressions";
 import { CompaniesFilters } from "@/components/features/companies-filters";
+import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
 
 export const revalidate = 3600;
 
@@ -140,6 +142,7 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
 
 export default async function CompaniesPage({ searchParams }: Props) {
   const params = await searchParams;
+  const locationParams = applyDefaultLocation(params, parseLocationCookies(await cookies()));
   const categoriesRes = await getCategories().catch(() => ({ data: [] as { id: string; name: string; slug: string }[] }));
   const categories = (categoriesRes as { data: { id: string; name: string; slug: string }[] }).data;
 
@@ -222,7 +225,7 @@ export default async function CompaniesPage({ searchParams }: Props) {
               </div>
             }
           >
-            <CompaniesList searchParams={params} />
+            <CompaniesList searchParams={locationParams} />
           </Suspense>
         </div>
       </section>

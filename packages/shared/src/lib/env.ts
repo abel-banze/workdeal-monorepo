@@ -48,6 +48,16 @@ export const envSchema = z.object({
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
   CLOUDINARY_FOLDER: z.string().optional(),
+  // CLOUDINARY_URL (formato standard cloudinary://api_key:api_secret@cloud_name) e
+  // aliases curtos — aceites como fallback para quem já tem estas vars definidas
+  // na plataforma (ex: Coolify). Nomes canónicos acima têm prioridade.
+  CLOUDINARY_URL: z
+    .string()
+    .refine((v) => /^cloudinary:\/\/[^:]+:[^@]+@[^/]+$/.test(v), "CLOUDINARY_URL deve ser cloudinary://api_key:api_secret@cloud_name")
+    .optional(),
+  CLOUDINARY_NAME: z.string().optional(),
+  CLOUDINARY_API: z.string().optional(),
+  CLOUDINARY_SECRET: z.string().optional(),
   // Google Maps Platform — UMA SÓ CHAVE serve o Maps JS (browser, pin/pesquisa)
   // e a Places API (New) no servidor. GOOGLE_PLACES_API_KEY é opcional para quem
   // quiser chaves separadas; sem ela, o proxy usa esta.

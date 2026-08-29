@@ -118,6 +118,9 @@ function otpEmailHtml(code: string, brandName: string): string {
 
 export async function sendOtpEmail({ to, code, brandName = "Workdeal" }: SendOtpEmailParams) {
   if (!resend) {
+    if (process.env.NODE_ENV === "production") {
+      return { ok: false as const, error: "RESEND_API_KEY em falta no servidor — email não configurado" };
+    }
     console.warn("[Email] RESEND_API_KEY não configurado — mock (sem envio real)");
     console.log(`[Email OTP mock] ${code} para ${to}`);
     return { ok: true as const };
@@ -168,6 +171,9 @@ function contactEmailHtml(fromName: string, fromEmail: string, message: string, 
 
 export async function sendContactEmail({ to, fromName, fromEmail, message, profileName = "Workdeal" }: SendContactEmailParams) {
   if (!resend) {
+    if (process.env.NODE_ENV === "production") {
+      return { ok: false as const, error: "RESEND_API_KEY em falta no servidor — email não configurado" };
+    }
     console.warn("[Email] RESEND_API_KEY não configurado — mock contacto");
     console.log(`[Email contacto mock] de ${fromName} <${fromEmail}> para ${to}: ${message.slice(0, 120)}`);
     return { ok: true as const };

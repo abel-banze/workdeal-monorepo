@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LocationSearchBox } from "@/components/features/location-search";
 
 type Props = {
   categories: { id: string; name: string; slug: string }[];
@@ -22,6 +23,7 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
 
   const near = initialParams.near ?? "";
   const hasNear = Boolean(near);
+  const nearLabel = initialParams.nearLabel ?? "";
 
   const selectedCatName = useMemo(() => categories.find((c) => c.id === categoryId)?.name ?? "", [categories, categoryId]);
   const filteredCats = useMemo(() => {
@@ -57,6 +59,7 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
       sort: sort || undefined,
       near: near || undefined,
       radiusKm: hasNear ? radiusKm : undefined,
+      nearLabel: hasNear ? nearLabel || undefined : undefined,
       ...overrides,
     };
     // overrides can explicitly clear by setting undefined
@@ -65,7 +68,10 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
     }
     // if category cleared via overrides, remove it
     if (overrides.categoryId === undefined && next.categoryId === undefined) params.delete("categoryId");
-    if (overrides.near === "") params.delete("near");
+    if (overrides.near === "") {
+      params.delete("near");
+      params.delete("nearLabel");
+    }
     // keep page reset to 1 on filter change
     params.delete("page");
     return params.toString();
@@ -97,9 +103,23 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
     const params = new URLSearchParams(window.location.search);
     params.delete("near");
     params.delete("radiusKm");
+    params.delete("nearLabel");
     if (params.get("sort") === "distance") params.set("sort", "recent");
     router.push(params.toString() ? `/companies?${params.toString()}` : "/companies");
   }
+
+  const onSelectLocation = useCallback(
+    (near: string, label: string) => {
+      const params = new URLSearchParams(window.location.search);
+      params.set("near", near);
+      params.set("radiusKm", radiusKm || "25");
+      params.set("sort", "distance");
+      params.set("nearLabel", label);
+      params.delete("page");
+      router.push(`/companies?${params.toString()}`);
+    },
+    [radiusKm, router],
+  );
 
   function clearAll() {
     setQ("");
@@ -144,6 +164,18 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
           </button>
         )}
       </label>
+
+      {/* endereço global via Places — perto de um endereço, não só GPS */}
+      <div className="mt-2">
+        <LocationSearchBox
+          key={`${near}-${nearLabel}`}
+          near={near}
+          label={nearLabel || null}
+          onSelect={onSelectLocation}
+          onClear={clearNear}
+          placeholder="Pesquisar perto de um endereço — ex: Av. Julius Nyerere, Maputo"
+        />
+      </div>
 
       {/* row 2 — categoria combobox + ordenação + acções */}
       <div className="mt-2 flex w-full flex-col gap-2 lg:flex-row lg:items-center">
@@ -293,7 +325,7 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
           <div className="flex flex-wrap items-center gap-1.5">
             {q.trim() && <span className="inline-flex items-center gap-1 rounded-full bg-[#F6F3EE] border border-[#D9D2C2] px-2.5 py-1 text-xs">“{q.trim()}”</span>}
             {selectedCatName && <span className="inline-flex rounded-full bg-[#0B5E56] px-2.5 py-1 text-xs font-semibold text-white">{selectedCatName}</span>}
-            {hasNear && <span className="inline-flex rounded-full bg-[#0F1A2E] px-2.5 py-1 text-xs font-semibold text-white">{near.slice(0, 16)}… • {radiusKm}km</span>}
+            {hasNear && <span className="inline-flex rounded-full bg-[#0F1A2E] px-2.5 py-1 text-xs font-semibold text-white">{(nearLabel || near).slice(0, 28)}{!nearLabel && "…"} • {radiusKm}km</span>}
             {sort !== "recent" && <span className="inline-flex rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-xs">{sortLabel}</span>}
           </div>
 

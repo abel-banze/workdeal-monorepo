@@ -17,6 +17,11 @@ function rateLimit(c: any, next: any) {
 
 const querySchema = z.object({
   q: z.string().trim().min(1).max(200),
+  categoryId: z.string().min(1).optional(),
+  categorySlug: z.string().min(1).optional(),
+  near: z.string().regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/, "near deve ser 'lat,lng'").optional(),
+  radiusKm: z.coerce.number().min(0.5).max(500).default(25).optional(),
+  sort: z.enum(["recent", "name", "distance"]).default("recent").optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20).optional(),
 });
@@ -24,10 +29,11 @@ const querySchema = z.object({
 export const searchRoute = new Hono<Env>();
 
 // GET /api/v1/search?q=canalizador em matola&page=&limit=
-// human-way: websearch_to_tsquery + filtro location via known_locations (trigram) + fallback trigram
+// Motor único (human-way): known_locations (trigram) + websearch_to_tsquery + fallback trigram.
+// Mesmo motor que /api/v1/profiles?q= — partilha searchService.
 searchRoute.get("/", rateLimit as any, zValidator("query", querySchema), async (c) => {
-  const { q, page, limit } = c.req.valid("query");
-  const { body, status } = await searchController.search(q, page, limit);
+  const query = c.req.valid("query");
+  const { body, status } = await searchController.search(query);
   // Cache curto (resultados mudam com novas empresas)
   c.header("Cache-Control", "public, s-maxage=30, stale-while-revalidate=120");
   return c.json(body, status);

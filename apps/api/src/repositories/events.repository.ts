@@ -1,5 +1,6 @@
 import { db, event, eventRegistration, profile, user } from "@workdeal/db";
 import { and, asc, count, desc, eq, gt, inArray, isNull, ne, sql, type SQL } from "drizzle-orm";
+import { boundingBox } from "@workdeal/shared/lib/geo";
 
 type EventStatus = (typeof event.status.enumValues)[number];
 type EventRegistrationStatus = (typeof eventRegistration.status.enumValues)[number];
@@ -121,12 +122,26 @@ export const eventsRepository = {
     return rows.length > 0;
   },
 
-  async list(params: { status?: string; categoryId?: string; province?: string; upcoming?: boolean; organizerSlug?: string; page: number; limit: number }) {
+  async list(params: { status?: string; categoryId?: string; province?: string; upcoming?: boolean; organizerSlug?: string; near?: string; radiusKm?: number; page: number; limit: number }) {
     const conds: SQL[] = [];
     if (params.status) conds.push(eq(event.status, asEventStatus(params.status)));
     if (params.categoryId) conds.push(eq(event.categoryId, params.categoryId));
     if (params.province) conds.push(eq(event.province, params.province));
     if (params.upcoming) conds.push(gt(event.startAt, new Date()));
+    let nearCoords: { latitude: number; longitude: number } | null = null;
+    if (params.near) {
+      const parts = params.near.split(",");
+      const lat = Number(parts[0]);
+      const lng = Number(parts[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        const coords = { latitude: lat, longitude: lng };
+        nearCoords = coords;
+        const box = boundingBox(coords, params.radiusKm ?? 25);
+        conds.push(sql`${event.latitude} BETWEEN ${box.minLat} AND ${box.maxLat}`);
+        conds.push(sql`${event.longitude} BETWEEN ${box.minLng} AND ${box.maxLng}`);
+        conds.push(sql`${event.latitude} IS NOT NULL AND ${event.longitude} IS NOT NULL`);
+      }
+    }
     let where: SQL | undefined = and(...conds);
 
     // Filtro por slug do organizador obriga a join com profile
@@ -138,7 +153,17 @@ export const eventsRepository = {
     }
 
     const [cntRow] = await db.select({ cnt: count() }).from(event).where(where);
-    const items = await db.select(eventColumns).from(event).where(where).orderBy(asc(event.startAt)).limit(params.limit).offset((params.page - 1) * params.limit);
+    let orderBy: SQL = asc(event.startAt);
+    if (nearCoords) {
+      orderBy = sql`ST_Distance(${sql.raw('"event"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC`;
+    }
+    const listColumns = nearCoords
+      ? {
+          ...eventColumns,
+          distanceKm: sql<number>`ST_Distance(${sql.raw('"event"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) / 1000.0`.as("distanceKm"),
+        }
+      : eventColumns;
+    const items = await db.select(listColumns).from(event).where(where).orderBy(orderBy).limit(params.limit).offset((params.page - 1) * params.limit);
     const enriched = await enrichOrganizer(items);
     return { items: enriched, total: cntRow?.cnt ?? 0 };
   },

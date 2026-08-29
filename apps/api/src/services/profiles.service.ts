@@ -1,10 +1,13 @@
 import { getOrgRole } from "@workdeal/auth";
-import { hasOrgPermission, hasSelfPermission, normalizeBusinessHours, parseSmartSearch } from "@workdeal/shared";
+import { hasOrgPermission, hasSelfPermission, normalizeBusinessHours } from "@workdeal/shared";
 import type { AuthUser, CreateProfileInput, DomainPermission, ListProfilesQuery, ProfileType, ProfileView, SmartSearchResult, UpdateProfileInput } from "@workdeal/shared";
-import type { CategoryView, PublicProfileView, PublicBadge } from "@workdeal/shared";
+import type { CategoryView, PublicProfileView, PublicBadge, ProfileBadgeLite } from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 import { profilesRepository } from "../repositories/profiles.repository.js";
 import type { ProfileWithCategories } from "../repositories/profiles.repository.js";
+import { searchService } from "./search.service.js";
+
+type ProfileExtras = { distanceKm?: number | null; province?: string | null; district?: string | null; badges?: ProfileBadgeLite[] };
 
 class ProfilesService {
   async createProfile(user: AuthUser, input: CreateProfileInput): Promise<ProfileView> {
@@ -121,37 +124,43 @@ class ProfilesService {
     }));
   }
 
-  async listProfiles(query: ListProfilesQuery): Promise<{ items: ProfileView[]; total: number; page: number; limit: number; search?: SmartSearchResult }> {
+  async listProfiles(
+    query: ListProfilesQuery,
+  ): Promise<{ items: (ProfileView & ProfileExtras)[]; total: number; page: number; limit: number; search?: SmartSearchResult }> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
-    // Smart search: converte "empresas de construção civil em maputo" em
-    // filtros estruturados (província + categoria). O texto residual só
-    // ordena por relevância (rankOnly) quando a intenção foi resolvida.
-    let search: SmartSearchResult | null = null;
-    let opts: { province?: string; categorySlug?: string; rankOnly?: boolean } | undefined;
-    let q = query.q;
-
-    const raw = query.q?.trim();
-    if (raw) {
-      const categories = (await profilesRepository.listActiveCategories()).map((c) => ({ slug: c.slug, name: c.name }));
-      search = parseSmartSearch(raw, categories);
-      const text = search.text.trim();
-      q = text.length >= 2 ? text : undefined;
-      if (search.structured) {
-        opts = { ...opts, rankOnly: true };
-        if (search.province) opts.province = search.province;
-        if (search.categorySlug) opts.categorySlug = search.categorySlug;
-      }
+    // Motor único — pesquisa textual delega para o searchService (human-way:
+    // known_locations + websearch_to_tsquery + fallback trigram). O frontend
+    // mantém `/api/v1/profiles?q=` (chamado via getProfiles) e partilha a
+    // mesma lógica de `/api/v1/search`; não há FTS duplicado aqui.
+    if (query.q?.trim()) {
+      const result = await searchService.search({
+        q: query.q,
+        categoryId: query.categoryId,
+        categorySlug: query.categorySlug,
+        near: query.near,
+        radiusKm: query.radiusKm,
+        sort: query.sort,
+        page,
+        limit,
+        status: query.status,
+      });
+      return {
+        items: result.items.map((r) => this.toProfileView({ ...r, categories: r.categories ?? [] } as unknown as ProfileWithCategories)),
+        total: result.total,
+        page,
+        limit,
+        ...(result.parsed.structured ? { search: result.parsed } : {}),
+      };
     }
 
-    const { items, total } = await profilesRepository.listProfiles({ ...query, q, page, limit }, opts);
+    const { items, total } = await profilesRepository.listProfiles(query);
     return {
       items: items.map((r) => this.toProfileView(r)),
       total,
       page,
       limit,
-      ...(search?.structured ? { search } : {}),
     };
   }
 
@@ -440,8 +449,8 @@ class ProfilesService {
     return rows;
   }
 
-  private toProfileView(row: ProfileWithCategories): ProfileView {
-    return {
+  private toProfileView(row: ProfileWithCategories): ProfileView & ProfileExtras {
+    const view: ProfileView & ProfileExtras = {
       id: row.id,
       type: row.type,
       slug: row.slug,
@@ -464,6 +473,14 @@ class ProfilesService {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
+    // Extras da listagem/pesquisa (distância ao utilizador + sede) — usados
+    // pelo ProfileCard. Não fazem parte do ProfileView canónico.
+    const ext = row as ProfileWithCategories & ProfileExtras;
+    if (ext.distanceKm != null) view.distanceKm = ext.distanceKm;
+    if (ext.province != null) view.province = ext.province;
+    if (ext.district != null) view.district = ext.district;
+    if (ext.badges != null) view.badges = ext.badges;
+    return view;
   }
 }
 

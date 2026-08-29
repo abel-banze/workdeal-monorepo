@@ -52,6 +52,16 @@ function rateLimit(limiter: ReturnType<typeof createRateLimiter>) {
   };
 }
 
+// Recalcula a MV known_locations (dicionário dinâmico do motor de pesquisa)
+// depois de qualquer mutação de localização. Fire-and-forget: não bloqueia a
+// resposta nem falha a mutação se o refresh falhar.
+function refreshKnownLocations(): void {
+  void import("@workdeal/db").then(async ({ db }) => {
+    const { sql } = await import("drizzle-orm");
+    try { await db.execute(sql`SELECT refresh_known_locations()`); } catch {}
+  });
+}
+
 export const profileLocationsRoute = new Hono<Env>();
 
 profileLocationsRoute.post("/", requireAuth, zValidator("json", createLocationSchema), async (c) => {
@@ -91,6 +101,7 @@ profileLocationsRoute.post("/", requireAuth, zValidator("json", createLocationSc
     isPrimary: input.isPrimary ?? false,
     visibility: input.visibility ?? "zone",
   });
+  refreshKnownLocations();
   return c.json(ok(created), 201);
 });
 
@@ -132,6 +143,7 @@ profileLocationsRoute.patch("/:id", requireAuth, rateLimit(locLimiter), zValidat
     ...(input.isPrimary !== undefined ? { isPrimary: input.isPrimary } : {}),
     ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
   });
+  refreshKnownLocations();
   return c.json(ok(updated), 200);
 });
 
@@ -154,5 +166,6 @@ profileLocationsRoute.delete("/:id", requireAuth, rateLimit(locLimiter), async (
     throw new AppError(403, "FORBIDDEN", "Sem permissão");
   }
   await profileLocationRepository.delete(id);
+  refreshKnownLocations();
   return c.json(ok({ id }), 200);
 });

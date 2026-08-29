@@ -65,6 +65,8 @@ export const eventsService = {
       province: query.province,
       upcoming: query.upcoming,
       organizerSlug: query.organizerSlug,
+      near: query.near,
+      radiusKm: query.radiusKm,
       page,
       limit,
     });

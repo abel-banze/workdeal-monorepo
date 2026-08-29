@@ -1,5 +1,6 @@
 import { db, task, taskProposal, taskBid, profile, member, user } from "@workdeal/db";
 import { and, count, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { boundingBox } from "@workdeal/shared/lib/geo";
 
 type TaskStatus = (typeof task.status.enumValues)[number];
 type ProposalStatus = (typeof taskProposal.status.enumValues)[number];
@@ -138,20 +139,44 @@ export const tasksRepository = {
     return { ...row, ...enriched.get(row.id) } as TaskRow & RequesterEnrichment;
   },
 
-  async list(params: { status?: string; categoryId?: string; province?: string; page: number; limit: number }) {
+  async list(params: { status?: string; categoryId?: string; province?: string; near?: string; radiusKm?: number; page: number; limit: number }) {
     const conds: SQL[] = [];
     if (params.status) conds.push(eq(task.status, asTaskStatus(params.status)));
     if (params.categoryId) conds.push(eq(task.categoryId, params.categoryId));
     if (params.province) conds.push(eq(task.province, params.province));
+    let nearCoords: { latitude: number; longitude: number } | null = null;
+    if (params.near) {
+      const parts = params.near.split(",");
+      const lat = Number(parts[0]);
+      const lng = Number(parts[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        const coords = { latitude: lat, longitude: lng };
+        nearCoords = coords;
+        const box = boundingBox(coords, params.radiusKm ?? 25);
+        conds.push(sql`${task.latitude} BETWEEN ${box.minLat} AND ${box.maxLat}`);
+        conds.push(sql`${task.longitude} BETWEEN ${box.minLng} AND ${box.maxLng}`);
+        conds.push(sql`${task.latitude} IS NOT NULL AND ${task.longitude} IS NOT NULL`);
+      }
+    }
     const where = and(...conds);
+    let orderBy: SQL = desc(task.createdAt);
+    if (nearCoords) {
+      orderBy = sql`ST_Distance(${sql.raw('"task"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC`;
+    }
+    const listColumns = nearCoords
+      ? {
+          ...taskColumns,
+          distanceKm: sql<number>`ST_Distance(${sql.raw('"task"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) / 1000.0`.as("distanceKm"),
+        }
+      : taskColumns;
     const [cntRow] = await db.select({ cnt: count() }).from(task).where(where);
-    const items = await db.select(taskColumns).from(task).where(where).orderBy(desc(task.createdAt)).limit(params.limit).offset((params.page - 1) * params.limit);
+    const items = await db.select(listColumns).from(task).where(where).orderBy(orderBy).limit(params.limit).offset((params.page - 1) * params.limit);
     const enriched = await enrichRequesterProfiles(items);
     return {
       items: items.map((i) => ({
         ...i,
         ...(enriched.get(i.id) ?? { requesterProfileName: null, requesterProfileSlug: null, requesterProfileLogo: null }),
-      })) as (TaskRow & RequesterEnrichment)[],
+      })) as (TaskRow & { distanceKm?: number | null } & RequesterEnrichment)[],
       total: cntRow?.cnt ?? 0,
     };
   },
