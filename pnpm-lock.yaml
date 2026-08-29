@@ -57,6 +57,18 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.2.3(@types/react@19.2.15)
+      '@workdeal/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@workdeal/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@workdeal/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@workspace/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       eslint:
         specifier: ^9
         version: 9.39.4(jiti@2.7.0)

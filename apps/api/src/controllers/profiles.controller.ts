@@ -1,6 +1,8 @@
 import type { Context } from "hono";
 import type { AuthUser, CreateProfileInput, ListProfilesQuery, UpdateProfileInput } from "@workdeal/shared";
 import type { Env } from "../middlewares/auth.middleware.js";
+import { parseVerifiedContacts } from "@workdeal/shared/lib/contact-verification";
+import { env } from "../env.js";
 import { ok } from "../lib/api-response.js";
 import { profilesService } from "../services/profiles.service.js";
 
@@ -20,8 +22,9 @@ export const profilesController = {
     return { body: ok(profile), status: 200 as const };
   },
 
-  async update(user: AuthUser, slug: string, input: UpdateProfileInput) {
-    const profile = await profilesService.updateProfile(user, slug, input);
+  async update(user: AuthUser, slug: string, input: UpdateProfileInput, verifiedHeader: string | null) {
+    const verified = parseVerifiedContacts(env.BETTER_AUTH_SECRET, verifiedHeader);
+    const profile = await profilesService.updateProfile(user, slug, input, verified);
     return { body: ok(profile), status: 200 as const };
   },
 

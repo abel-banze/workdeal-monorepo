@@ -92,7 +92,11 @@ profilesRoute.patch(
   requireProfilePermission("profile:edit"),
   zValidator("json", updateProfileSchema),
   async (c) => {
-    const { body, status } = await profilesController.update(c.get("user"), c.req.param("slug"), c.req.valid("json"));
+    // Contactos verificados via OTP (tokens HMAC do cookie httpOnly da web).
+    // Sem header → não altera o estado de verificação; com header → persiste
+    // as verificações provadas. Mesma bind que o onboarding.
+    const verifiedHeader = c.req.header("x-verified-contacts") ?? null;
+    const { body, status } = await profilesController.update(c.get("user"), c.req.param("slug"), c.req.valid("json"), verifiedHeader);
     return c.json(body, status);
   },
 );
