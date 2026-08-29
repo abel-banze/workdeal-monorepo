@@ -1,0 +1,2 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+export default function Page(){ return <div className="space-y-4"><h1 className="text-xl font-semibold">Moderação</h1><Card><CardHeader><CardTitle className="text-sm">Fila geral</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">Central de moderação — perfis, tarefas, eventos, denúncias.</CardContent></Card></div>; }

@@ -114,18 +114,19 @@ export default async function DirectoryPage({ searchParams }: Props) {
   return (
     <div className="bg-[#F6F3EE]">
       {/* HERO */}
-      <section className="relative overflow-hidden border-b border-[#D9D2C2] bg-[#F6F3EE]">
-        {/* subtle paper texture */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: `linear-gradient(to right, #0F1A2E 1px, transparent 1px), linear-gradient(to bottom, #0F1A2E 1px, transparent 1px)`,
-            backgroundSize: "56px 56px",
-          }}
-        />
-        <div aria-hidden className="pointer-events-none absolute -right-32 -top-32 size-[620px] rounded-full bg-[#FF3B1F]/[0.07] blur-[70px]" />
-        <div aria-hidden className="pointer-events-none absolute -left-40 top-48 size-[520px] rounded-full bg-[#0B5E56]/[0.08] blur-[70px]" />
+      <section className="relative border-b border-[#D9D2C2] bg-[#F6F3EE]">
+        {/* subtle paper texture + blur accents — apenas decorativo, clipado ao hero */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div
+            className="absolute inset-0 opacity-[0.04]"
+            style={{
+              backgroundImage: `linear-gradient(to right, #0F1A2E 1px, transparent 1px), linear-gradient(to bottom, #0F1A2E 1px, transparent 1px)`,
+              backgroundSize: "56px 56px",
+            }}
+          />
+          <div className="absolute -right-32 -top-32 size-[620px] rounded-full bg-[#FF3B1F]/[0.07] blur-[70px]" />
+          <div className="absolute -left-40 top-48 size-[520px] rounded-full bg-[#0B5E56]/[0.08] blur-[70px]" />
+        </div>
 
         <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
           <div className="grid gap-10 py-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:py-16">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FiShare2, FiLink, FiMail, FiCheck } from "react-icons/fi";
 import { FaWhatsapp } from "react-icons/fa";
+import { FaFacebookF, FaLinkedinIn, FaXTwitter, FaInstagram } from "react-icons/fa6";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@workspace/ui/components/dialog";
 
 type Props = {
@@ -28,6 +29,12 @@ export function ShareProfileDialog({ trigger, profileName, profileSlug, profileT
   const shareText = `${profileName}${profileTagline ? ` — ${profileTagline}` : ""} · Perfil no Workdeal`;
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${shareText}\n${currentUrl}`)}`;
   const mailtoUrl = `mailto:?subject=${encodeURIComponent(`${profileName} no Workdeal`)}&body=${encodeURIComponent(`${shareText}\n${currentUrl}`)}`;
+  const encodedUrl = encodeURIComponent(currentUrl);
+  const encodedText = encodeURIComponent(shareText);
+  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+  const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
+  const twitterUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
+  const instagramUrl = `https://www.instagram.com/?url=${encodedUrl}`;
 
   async function copyLink() {
     try {
@@ -94,7 +101,35 @@ export function ShareProfileDialog({ trigger, profileName, profileSlug, profileT
           </button>
         </div>
 
-        <p className="mt-3 text-center font-mono text-[11px] text-[#0F1A2E]/40">Qualquer pessoa com o link pode ver este perfil público</p>
+        <p className="mt-4 mb-3 text-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#0F1A2E]/35">Partilhar nas redes sociais</p>
+        <div className="grid grid-cols-4 gap-2">
+          <a href={facebookUrl} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1.5">
+            <span className="flex size-11 items-center justify-center rounded-full bg-[#1877F2] text-white transition hover:scale-105">
+              <FaFacebookF className="size-[18px]" />
+            </span>
+            <span className="text-[10px] font-bold text-[#0F1A2E]/55">Facebook</span>
+          </a>
+          <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1.5">
+            <span className="flex size-11 items-center justify-center rounded-full bg-[#0A66C2] text-white transition hover:scale-105">
+              <FaLinkedinIn className="size-[18px]" />
+            </span>
+            <span className="text-[10px] font-bold text-[#0F1A2E]/55">LinkedIn</span>
+          </a>
+          <a href={twitterUrl} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1.5">
+            <span className="flex size-11 items-center justify-center rounded-full bg-[#0F1A2E] text-white transition hover:scale-105">
+              <FaXTwitter className="size-[18px]" />
+            </span>
+            <span className="text-[10px] font-bold text-[#0F1A2E]/55">X</span>
+          </a>
+          <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1.5">
+            <span className="flex size-11 items-center justify-center rounded-full bg-[#E1306C] text-white transition hover:scale-105">
+              <FaInstagram className="size-[18px]" />
+            </span>
+            <span className="text-[10px] font-bold text-[#0F1A2E]/55">Instagram</span>
+          </a>
+        </div>
+
+        <p className="mt-5 text-center font-mono text-[11px] text-[#0F1A2E]/40">Qualquer pessoa com o link pode ver este perfil público</p>
       </DialogContent>
     </Dialog>
   );

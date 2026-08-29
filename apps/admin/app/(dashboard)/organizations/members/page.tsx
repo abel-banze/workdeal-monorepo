@@ -1,0 +1,2 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+export default function Page(){ return <div className="space-y-4"><h1 className="text-xl font-semibold">Membros de organizações</h1><Card><CardHeader><CardTitle className="text-sm">Membros</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">Lista por organização via better-auth organization plugin.</CardContent></Card></div>; }

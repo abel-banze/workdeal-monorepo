@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { FaWhatsapp } from "react-icons/fa";
 import { FiPhone, FiMail, FiGlobe, FiCopy, FiExternalLink, FiCheck } from "react-icons/fi";
-import { BsShieldCheck } from "react-icons/bs";
+import { ShieldCheck } from "lucide-react";
 import type { PublicContactVerification } from "@workdeal/shared";
 import {
   Dialog,
@@ -24,6 +24,7 @@ type ContactProps = {
   name: string;
   profileId?: string;
   contactVerifications?: PublicContactVerification[];
+  verificationDegree?: "first" | "second";
 };
 
 type ContactVerification = PublicContactVerification;
@@ -41,10 +42,14 @@ function isChannelVerified(channel: string, value: string | null, verifications:
   });
 }
 
-function VerifiedPill() {
+function VerifiedPill({ secondDegree = false }: { secondDegree?: boolean }) {
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#0B5E56]/10 px-2 py-0.5 text-[10px] font-bold text-[#0B5E56]">
-      <FiCheck className="size-3" /> Verificado
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+        secondDegree ? "bg-[#D9D2C2]/40 text-[#6B6A63]" : "bg-[#0B5E56]/10 text-[#0B5E56]"
+      }`}
+    >
+      <ShieldCheck className={`size-3 ${secondDegree ? "text-[#9C978B]" : "text-[#0B5E56]"}`} /> Verificado
     </span>
   );
 }
@@ -141,12 +146,13 @@ function EmailForm({ to, profileName, profileId }: { to: string; profileName: st
   );
 }
 
-export function ProfileContacts({ whatsapp, phone, email, website, name, profileId, contactVerifications = [] }: ContactProps) {
+export function ProfileContacts({ whatsapp, phone, email, website, name, profileId, contactVerifications = [], verificationDegree = "first" }: ContactProps) {
   const wa = whatsapp ?? phone ?? "+258820000000";
   const waDigits = wa.replace(/\D/g, "");
   const tel = phone ?? "+258840000000";
   const mail = email ?? "geral@empresa.co.mz";
 
+  const secondDegree = verificationDegree === "second";
   const waVerified = isChannelVerified("whatsapp", whatsapp, contactVerifications);
   const phoneVerified = isChannelVerified("phone", phone, contactVerifications);
   const emailVerified = isChannelVerified("email", email, contactVerifications);
@@ -169,7 +175,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none">WhatsApp</span>
             <span className="font-mono text-xs font-normal text-white/80">{wa}</span>
           </span>
-          {waVerified ? <VerifiedPill /> : <UnverifiedPill />}
+          {waVerified ? <VerifiedPill secondDegree={secondDegree} /> : <UnverifiedPill />}
           <FiExternalLink className="size-4 shrink-0 text-white/60" aria-hidden />
         </DialogTrigger>
         <DialogContent className="max-w-[420px] rounded-[20px] border-[#D9D2C2] bg-white p-6">
@@ -207,7 +213,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             </a>
           </div>
           <p className="mt-3 flex items-center justify-center gap-1.5 font-mono text-[11px] text-[#0F1A2E]/40">
-            <BsShieldCheck className="size-3" /> Conversa fora da plataforma — confirme identidade
+            <ShieldCheck className="size-3" /> Conversa fora da plataforma — confirme identidade
           </p>
         </DialogContent>
       </Dialog>
@@ -222,7 +228,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none text-[#0F1A2E]">Telefone</span>
             <span className="font-mono text-xs text-[#0F1A2E]/60">{tel}</span>
           </span>
-          {phoneVerified ? <VerifiedPill /> : <UnverifiedPill />}
+          {phoneVerified ? <VerifiedPill secondDegree={secondDegree} /> : <UnverifiedPill />}
           <FiExternalLink className="size-4 shrink-0 text-[#0F1A2E]/30" aria-hidden />
         </DialogTrigger>
         <DialogContent className="max-w-[420px] rounded-[20px] border-[#D9D2C2] bg-white p-6">
@@ -255,7 +261,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none text-[#0F1A2E]">Email</span>
             <span className="truncate font-mono text-xs text-[#0F1A2E]/60">{mail}</span>
           </span>
-          {emailVerified ? <VerifiedPill /> : <UnverifiedPill />}
+          {emailVerified ? <VerifiedPill secondDegree={secondDegree} /> : <UnverifiedPill />}
           <FiCopy className="size-4 shrink-0 text-[#0F1A2E]/30" aria-hidden />
         </DialogTrigger>
         <DialogContent className="max-w-[460px] rounded-[20px] border-[#D9D2C2] bg-white p-6">
@@ -294,7 +300,7 @@ export function ProfileContacts({ whatsapp, phone, email, website, name, profile
             <span className="block text-sm font-bold leading-none text-[#0B5E56]">Website</span>
             <span className="truncate text-xs text-[#0B5E56]/70">{website.replace(/^https?:\/\//, "")}</span>
           </span>
-          {webVerified ? <VerifiedPill /> : <UnverifiedPill />}
+          {webVerified ? <VerifiedPill secondDegree={secondDegree} /> : <UnverifiedPill />}
           <FiExternalLink className="size-4 shrink-0 text-[#0B5E56]/40" aria-hidden />
         </a>
       ) : null}

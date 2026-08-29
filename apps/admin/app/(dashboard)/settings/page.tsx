@@ -1,0 +1,2 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+export default function Page(){ return <div className="space-y-4"><h1 className="text-xl font-semibold">Configurações</h1><Card><CardHeader><CardTitle className="text-sm">Sistema</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">Variáveis validadas via lib/env.ts (DATABASE_URL, BETTER_AUTH_SECRET, WHATSAPP_API_TOKEN) — sem segredos hardcoded.</CardContent></Card></div>; }

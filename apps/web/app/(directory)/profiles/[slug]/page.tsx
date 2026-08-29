@@ -446,6 +446,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                   name={p.name}
                   profileId={p.id}
                   contactVerifications={p.contactVerifications}
+                  verificationDegree={legalizingBadge && !verifiedBadge ? "second" : "first"}
                 />
               </div>
 
