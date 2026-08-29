@@ -29,18 +29,13 @@ export const optionalAuth = createMiddleware<Env>(async (c, next) => {
   }
 
   // 2. Fallback: sessão better-auth
-  const allCookies = parseCookies(c.req.header("Cookie"));
-  let sessionCookie: string | undefined;
-  for (const name of BETTER_AUTH_SESSION_COOKIES) {
-    if (allCookies[name]) {
-      sessionCookie = allCookies[name];
-      break;
-    }
-  }
-  if (sessionCookie) {
+  const rawCookieHeader = c.req.header("Cookie");
+  const allCookies = parseCookies(rawCookieHeader);
+  const hasSessionCookie = BETTER_AUTH_SESSION_COOKIES.some((name) => Boolean(allCookies[name]));
+  if (hasSessionCookie) {
     try {
       const session = await auth.api.getSession({
-        headers: new Headers({ Cookie: `better-auth.session_token=${sessionCookie}` }),
+        headers: new Headers({ Cookie: rawCookieHeader ?? "" }),
       });
       if (session?.user) {
         const u = session.user as unknown as { deletedAt?: Date | null; id: string; email: string; name: string; image?: string | null; systemRole?: string; emailVerified?: boolean; phone?: string | null; locale?: string };
