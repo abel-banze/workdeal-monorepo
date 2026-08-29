@@ -1,0 +1,2 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+export default function Page(){ return <div className="space-y-4"><h1 className="text-xl font-semibold">Selos</h1><Card><CardHeader><CardTitle className="text-sm">Gestão de selos</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">CRUD de selos + regras automáticas (workers).</CardContent></Card></div>; }

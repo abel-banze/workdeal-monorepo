@@ -1,0 +1,2 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+export default function Page(){ return <div className="space-y-4"><h1 className="text-xl font-semibold">Alertas de concursos</h1><Card><CardHeader><CardTitle className="text-sm">Alertas</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">Configurar alertas por categoria/região — workers dedicados.</CardContent></Card></div>; }

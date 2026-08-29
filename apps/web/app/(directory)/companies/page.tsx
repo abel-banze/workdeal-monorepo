@@ -149,10 +149,10 @@ export default async function CompaniesPage({ searchParams }: Props) {
   return (
     <div className="bg-[#F6F3EE]">
       {/* header */}
-      <section className="relative overflow-hidden border-b border-[#D9D2C2] bg-white">
+      <section className="relative border-b border-[#D9D2C2] bg-white">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.04]"
+          className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.04]"
           style={{
             backgroundImage: `linear-gradient(to right, #0F1A2E 1px, transparent 1px), linear-gradient(to bottom, #0F1A2E 1px, transparent 1px)`,
             backgroundSize: "40px 40px",
