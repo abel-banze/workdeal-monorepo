@@ -76,7 +76,10 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<Api
 
 /** Variante para Server Actions que já têm o JWT em mãos */
 export async function apiFetchWithAuth<T>(path: string, token: string | null, init?: RequestInit): Promise<ApiEnvelope<T>> {
-  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}`, Cookie: `${JWT_COOKIE_NAME}=${token}` } : {};
+  const cookieStore = await cookies();
+  const allCookies = cookieStore.getAll();
+  const cookieHeader = allCookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
   const base = getApiBase();
   const url = `${base}${path}`;
@@ -88,7 +91,7 @@ export async function apiFetchWithAuth<T>(path: string, token: string | null, in
   try {
     res = await fetch(url, {
       ...init,
-      headers: { "Content-Type": "application/json", ...authHeaders, ...(init?.headers ?? {}) },
+      headers: { "Content-Type": "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}), ...authHeaders, ...(init?.headers ?? {}) },
       signal: controller.signal,
     });
   } catch (e) {

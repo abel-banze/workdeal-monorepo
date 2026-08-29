@@ -1,5 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
-import { db, profileBookmark } from "@workdeal/db";
+import { db, profile, profileBookmark } from "@workdeal/db";
 
 export const bookmarksRepository = {
   async bookmark(userId: string, profileId: string) {
@@ -29,8 +29,21 @@ export const bookmarksRepository = {
   },
   async listByUser(userId: string) {
     return db
-      .select()
+      .select({
+        profileId: profileBookmark.profileId,
+        createdAt: profileBookmark.createdAt,
+        profile: {
+          id: profile.id,
+          slug: profile.slug,
+          name: profile.name,
+          tagline: profile.tagline,
+          logoUrl: profile.logoUrl,
+          type: profile.type,
+          status: profile.status,
+        },
+      })
       .from(profileBookmark)
+      .innerJoin(profile, eq(profile.id, profileBookmark.profileId))
       .where(eq(profileBookmark.userId, userId))
       .orderBy(desc(profileBookmark.createdAt));
   },
