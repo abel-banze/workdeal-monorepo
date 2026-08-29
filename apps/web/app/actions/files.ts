@@ -30,7 +30,12 @@ export async function uploadFilesAction(formData: FormData): Promise<UploadFileR
 
   try {
     const t0 = Date.now();
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}`, Cookie: `${JWT_COOKIE_NAME}=${token}` } : {};
+    const store = await cookies();
+    const cookieHeader = store.getAll().map((c) => `${c.name}=${c.value}`).join("; ");
+    const headers: Record<string, string> = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+    };
     const res = await fetch(uploadUrl, {
       method: "POST",
       headers,

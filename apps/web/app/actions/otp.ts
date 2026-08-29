@@ -8,11 +8,12 @@ import {
   contactIdentifier,
   normalizeMzPhone,
 } from "@workdeal/shared/lib/phone";
-import { env } from "@/lib/env";
 import {
   signContactVerification,
   parseVerifiedContacts,
 } from "@workdeal/shared/lib/contact-verification";
+import { Resend } from "resend";
+import { otpEmailHtml } from "@workdeal/shared/lib/email-templates";
 
 // OTP durável: desafios na tabela otp_challenge (multi-réplica/restart-safe),
 // cooldown por identificador, falha explícita em prod sem provider e bind do
@@ -269,47 +270,60 @@ export async function verifyPhoneOtp(input: { phone: string; code: string }): Pr
   return { ok: true };
 }
 
-// --- Email (API interna /api/v1/email/otp) ---
+// --- Email (Resend, directo do web — tal como WhatsApp/SMS envia via provider) ---
+
+const EMAIL_FROM = "Workdeal <noreply@codebaz.cloud>";
+
+async function sendViaResend(to: string, code: string): Promise<SendResult> {
+  const rawKey = process.env.RESEND_API_KEY?.trim().replace(/^["']|["']$/g, "");
+  const apiKey = rawKey && rawKey.startsWith("re_") ? rawKey : undefined;
+  if (!apiKey) {
+    if (isProd()) {
+      return { ok: false, error: "Serviço de email não configurado — contacta o suporte Workdeal." };
+    }
+    console.warn("[Email] RESEND_API_KEY em falta — mock dev");
+    console.log(`[Email OTP mock] ${code} para ${to}`);
+    return { ok: true };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to,
+      subject: `${code} — Código de verificação Workdeal`,
+      html: otpEmailHtml(code, "Workdeal"),
+    });
+    if (error) {
+      console.error("[Email] Resend error:", JSON.stringify(error).slice(0, 800));
+      const msg = (error as { message?: string })?.message || JSON.stringify(error).slice(0, 500);
+      if (!isProd()) {
+        console.log(`[Email OTP mock fallback] ${code} para ${to}`);
+        return { ok: true };
+      }
+      return { ok: false, error: `Falha ao enviar email: ${msg.slice(0, 150)}` };
+    }
+    if (!data?.id) {
+      console.error("[Email] Resend resposta sem id:", JSON.stringify(data).slice(0, 800));
+      if (!isProd()) return { ok: true };
+      return { ok: false, error: "Resposta do Resend sem id — verifique domínio verificado e API key" };
+    }
+    console.log(`[Email] OTP enviado para ${to} (id: ${data.id})`);
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[Email] erro send → ${msg}`);
+    if (!isProd()) return { ok: true };
+    return { ok: false, error: "Falha ao enviar email — tenta novamente ou usa WhatsApp/SMS." };
+  }
+}
 
 export async function sendEmailOtp(input: { email: string }): Promise<SendResult> {
   const id = contactIdentifier("email", input.email);
   if (!id) return { ok: false, error: "Email inválido." };
   const r = await issueCode("email", id, newCode());
   if (!r.ok || !r.code) return r;
-  const code = r.code;
-
-  try {
-    const base = env.API_URL.replace(/\/+$/, "");
-    const res = await fetch(`${base}/api/v1/email/otp`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(process.env.INTERNAL_API_SECRET ? { "x-internal-secret": process.env.INTERNAL_API_SECRET } : {}),
-      },
-      body: JSON.stringify({ to: id, code }),
-      cache: "no-store",
-    });
-    const text = await res.text().catch(() => "");
-    interface EmailOtpResponse { success?: boolean; error?: { message?: string } }
-    const data: EmailOtpResponse | null = text
-      ? (JSON.parse(text) as EmailOtpResponse)
-      : null;
-    if (res.ok && data?.success !== false) {
-      console.log(`[Email] OTP enviado para ${id}`);
-      return { ok: true };
-    }
-    const apiMessage = data?.error?.message ?? text.slice(0, 200) ?? `${res.status}`;
-    if (!isProd() && !res.ok) {
-      // dev: não bloquear onboarding local se API offline
-      return { ok: true };
-    }
-    return { ok: false, error: `Falha ao enviar email: ${String(apiMessage).slice(0, 150)}` };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.warn(`[Email] erro fetch → ${msg}`);
-    if (!isProd()) return { ok: true };
-    return { ok: false, error: "Falha ao enviar email — tenta novamente ou usa WhatsApp/SMS." };
-  }
+  return sendViaResend(id, r.code);
 }
 
 export async function verifyEmailOtp(input: { email: string; code: string }): Promise<SendResult> {

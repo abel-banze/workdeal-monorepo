@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useParams, usePathname } from "next/navigation"
 
-import { NavMain } from "@/components/nav-main"
+import { NavMain, type NavMainItem } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
 import { TeamSwitcher } from "@/components/team-switcher"
@@ -14,16 +14,15 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@workspace/ui/components/sidebar"
-import { GalleryVerticalEndIcon, Settings2Icon, FrameIcon, LayoutDashboardIcon, Building2Icon, ListChecksIcon, BriefcaseIcon, CalendarDaysIcon } from "lucide-react"
+import { GalleryVerticalEndIcon, Settings2Icon, LayoutDashboardIcon, Building2Icon, ListChecksIcon, BriefcaseIcon, CalendarDaysIcon, BookmarkIcon, FrameIcon } from "lucide-react"
 
-function buildNavMain(activeId: string | null) {
+function buildNavGroups(activeId: string | null) {
   const base = activeId ? `/dashboard/${activeId}` : "/dashboard"
-  return [
+  const menu: NavMainItem[] = [
     {
       title: "Painel",
       url: base,
       icon: <LayoutDashboardIcon />,
-      isActive: true,
     },
     {
       title: "Perfil",
@@ -37,13 +36,14 @@ function buildNavMain(activeId: string | null) {
       ],
     },
     {
-      title: "Operação",
-      url: `${base}/tasks`,
-      icon: <ListChecksIcon />,
+      title: "Guardados",
+      url: `${base}/guards`,
+      icon: <BookmarkIcon />,
       items: [
-        { title: "Tarefas", url: `${base}/tasks` },
-        { title: "Oportunidades", url: `${base}/opportunities` },
-        { title: "Eventos", url: `${base}/events` },
+        { title: "Perfis", url: `${base}/guards?tab=profiles` },
+        { title: "Concursos", url: `${base}/guards?tab=tenders` },
+        { title: "Tarefas", url: `${base}/guards?tab=tasks` },
+        { title: "Eventos", url: `${base}/guards?tab=events` },
       ],
     },
     {
@@ -57,11 +57,49 @@ function buildNavMain(activeId: string | null) {
       ],
     },
   ]
+
+  const operacao: NavMainItem[] = [
+    {
+      title: "Tarefas",
+      url: `${base}/tasks`,
+      icon: <ListChecksIcon />,
+      items: [
+        { title: "Todas", url: `${base}/tasks` },
+        { title: "Aceitando propostas", url: `${base}/tasks?status=open` },
+        { title: "Em execução", url: `${base}/tasks?status=in_progress` },
+        { title: "Concluídas", url: `${base}/tasks?status=completed` },
+      ],
+    },
+    {
+      title: "Oportunidades",
+      url: `${base}/opportunities`,
+      icon: <BriefcaseIcon />,
+      items: [
+        { title: "Propostas enviadas", url: `${base}/opportunities` },
+        { title: "Adjudicações ganhas", url: `${base}/opportunities?tab=bids` },
+      ],
+    },
+    {
+      title: "Eventos",
+      url: `${base}/events`,
+      icon: <CalendarDaysIcon />,
+      items: [
+        { title: "Todos", url: `${base}/events` },
+        { title: "Publicados", url: `${base}/events?status=published` },
+        { title: "Rascunhos", url: `${base}/events?status=draft` },
+      ],
+    },
+  ]
+
+  return [
+    { label: "Menu", items: menu },
+    { label: "Operação", items: operacao },
+  ]
 }
 
 function buildProjects() {
   return [
-    { name: "Directório", url: "/", icon: <FrameIcon /> },
+    { name: "Página inicial", url: "/", icon: <FrameIcon /> },
   ]
 }
 
@@ -94,7 +132,7 @@ export function AppSidebar({
   // Fallback: tenta extrair /dashboard/<id> do pathname quando params ainda não hidratou
   const activeId = urlOrgId ?? (pathname?.startsWith("/dashboard/") ? pathname.split("/")[2] ?? null : null)
   const isValidActive = activeId && activeId !== "personal" && teams?.some((t) => t.id === activeId) ? activeId : null
-  const navMain = buildNavMain(isValidActive)
+  const navGroups = buildNavGroups(isValidActive)
   const projects = buildProjects()
 
   const safeUser = user ?? { name: "Utilizador", email: "dev@workdeal.co.mz", avatar: "" }
@@ -121,7 +159,7 @@ export function AppSidebar({
         <TeamSwitcher teams={effectiveTeams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain groups={navGroups} />
         <NavProjects projects={projects} />
       </SidebarContent>
       <SidebarFooter>
