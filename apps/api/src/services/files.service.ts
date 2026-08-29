@@ -18,9 +18,30 @@ interface CloudinaryConfig {
   folder: string;
 }
 
+// Resolve a configuração do Cloudinary aceitando três convenções:
+//  - nomes canónicos: CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET
+//  - aliases curtos:  CLOUDINARY_NAME / CLOUDINARY_API / CLOUDINARY_SECRET
+//  - CLOUDINARY_URL standard: cloudinary://api_key:api_secret@cloud_name
+// (canónicos têm prioridade; opcionais curtas depois; URL por último)
 function getCloudinary(): CloudinaryConfig | null {
-  const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_FOLDER } = env;
-  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+  const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_FOLDER, CLOUDINARY_URL, CLOUDINARY_NAME, CLOUDINARY_API, CLOUDINARY_SECRET } = env;
+  let cloudName = CLOUDINARY_CLOUD_NAME;
+  let apiKey = CLOUDINARY_API_KEY;
+  let apiSecret = CLOUDINARY_API_SECRET;
+
+  if (CLOUDINARY_URL && (!cloudName || !apiKey || !apiSecret)) {
+    const m = /^cloudinary:\/\/([^:]+):([^@]+)@([^/]+)$/.exec(CLOUDINARY_URL);
+    if (m) {
+      cloudName = cloudName ?? m[3];
+      apiKey = apiKey ?? m[1];
+      apiSecret = apiSecret ?? m[2];
+    }
+  }
+  cloudName = cloudName ?? CLOUDINARY_NAME;
+  apiKey = apiKey ?? CLOUDINARY_API;
+  apiSecret = apiSecret ?? CLOUDINARY_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) {
     // Fail fast em produção — nunca servir URLs mock a utilizadores reais
     if (env.NODE_ENV === "production") {
       throw new AppError(503, "STORAGE_NOT_CONFIGURED", "Armazenamento de ficheiros não configurado");
@@ -28,9 +49,9 @@ function getCloudinary(): CloudinaryConfig | null {
     return null; // dev/test: modo mock
   }
   return {
-    cloudName: CLOUDINARY_CLOUD_NAME,
-    apiKey: CLOUDINARY_API_KEY,
-    apiSecret: CLOUDINARY_API_SECRET,
+    cloudName,
+    apiKey,
+    apiSecret,
     folder: CLOUDINARY_FOLDER ?? "workdeal",
   };
 }

@@ -69,6 +69,11 @@ export const taskListQuerySchema = z.object({
   status: taskStatusSchema.optional(),
   categoryId: z.string().min(1).optional(),
   province: z.string().min(1).optional(),
+  near: z
+    .string()
+    .regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/, "near deve ser 'lat,lng'")
+    .optional(),
+  radiusKm: z.coerce.number().min(0.5).max(500).default(25).optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20).optional(),
 });
@@ -141,6 +146,8 @@ export const taskViewSchema = z.object({
   requesterProfileName: z.string().nullable().optional(),
   requesterProfileSlug: z.string().nullable().optional(),
   requesterProfileLogo: z.string().nullable().optional(),
+  // Distância ao utilizador quando listado por proximidade (near)
+  distanceKm: z.number().nullable().optional(),
 });
 
 export const proposalViewSchema = z.object({

@@ -55,6 +55,11 @@ export const eventListQuerySchema = z.object({
   categoryId: z.string().min(1).optional(),
   province: z.string().min(1).optional(),
   organizerSlug: z.string().min(1).optional(),
+  near: z
+    .string()
+    .regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/, "near deve ser 'lat,lng'")
+    .optional(),
+  radiusKm: z.coerce.number().min(0.5).max(500).default(25).optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20).optional(),
 });
@@ -104,6 +109,8 @@ export const eventViewSchema = z.object({
   organizerLogo: z.string().nullable().optional(),
   // Estado da inscrição do utilizador autenticado (optionalAuth)
   myRegistration: eventRegistrationStatusSchema.nullable().optional(),
+  // Distância ao utilizador quando listado por proximidade (near)
+  distanceKm: z.number().nullable().optional(),
 });
 
 export const eventRegistrationViewSchema = z.object({

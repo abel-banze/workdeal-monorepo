@@ -2,6 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 import type { ProfileView } from "@workdeal/shared";
 
+type CardBadge = { slug: string; name: string; type: string };
+
 type Props = {
   profile: ProfileView & { distanceKm?: number | null };
   // opcionais quando o card é usado fora do directory (dashboard preview)
@@ -10,11 +12,24 @@ type Props = {
   district?: string | null;
   province?: string | null;
   distanceKm?: number | null;
+  badges?: CardBadge[];
 };
 
-export function ProfileCard({ profile, verified, sizeLabel, district, province, distanceKm: distanceKmProp }: Props) {
+const BADGE_STYLE: Record<string, string> = {
+  verified: "bg-[#0B5E56] text-white",
+  "in-legalization": "bg-[#1F5C99] text-white",
+  "profile-complete": "bg-[#0F1A2E] text-white",
+};
+const BADGE_PRIORITY = ["verified", "in-legalization", "profile-complete"];
+
+function badgeStyle(slug: string) {
+  return BADGE_STYLE[slug] ?? "border border-[#D9D2C2] bg-[#F6F3EE] text-[#0F1A2E]/70";
+}
+
+export function ProfileCard({ profile, verified, sizeLabel, district, province, distanceKm: distanceKmProp, badges: badgesProp }: Props) {
   const initials = profile.name.slice(0, 2).toUpperCase();
-  const isVerified = verified ?? false;
+  const badges = badgesProp ?? (profile as { badges?: CardBadge[] }).badges ?? [];
+  const isVerified = verified ?? badges.some((b) => b.slug === "verified");
   const topBar = isVerified ? "bg-[#0B5E56]" : "bg-[#D9D2C2]/60";
   const distanceKm = distanceKmProp ?? (profile as { distanceKm?: number | null }).distanceKm ?? null;
   const hasDistance = typeof distanceKm === "number" && Number.isFinite(distanceKm);
@@ -22,6 +37,9 @@ export function ProfileCard({ profile, verified, sizeLabel, district, province, 
   const pDistrict = district ?? (profile as { district?: string | null }).district ?? null;
   const provinceLine = [pDistrict, pProvince].filter(Boolean).join(" · ");
   const hasLocation = Boolean(pProvince || pDistrict);
+  const cardBadges = [...badges]
+    .sort((a, b) => (BADGE_PRIORITY.indexOf(a.slug) - BADGE_PRIORITY.indexOf(b.slug)) || 0)
+    .slice(0, 3);
 
   return (
     <Link
@@ -101,6 +119,23 @@ export function ProfileCard({ profile, verified, sizeLabel, district, province, 
           {profile.categories.length > 2 ? (
             <span className="inline-flex rounded-full bg-[#0F1A2E] px-2 py-0.5 text-[11px] font-bold leading-none text-white">
               +{profile.categories.length - 2}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* badges xs — selos de confiança/reputação ativos, com prioridade */}
+      {cardBadges.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1 px-5">
+          {cardBadges.map((b) => (
+            <span key={b.slug} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold leading-none tracking-wide ${badgeStyle(b.slug)}`}>
+              {b.slug === "verified" ? "✓ " : ""}
+              {b.name}
+            </span>
+          ))}
+          {badges.length > cardBadges.length ? (
+            <span className="inline-flex items-center rounded-full bg-[#0F1A2E]/10 px-2 py-0.5 text-[10px] font-bold leading-none text-[#0F1A2E]/60">
+              +{badges.length - cardBadges.length}
             </span>
           ) : null}
         </div>

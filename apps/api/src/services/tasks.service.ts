@@ -74,6 +74,8 @@ export const tasksService = {
       status: query.status ?? "open",
       categoryId: query.categoryId,
       province: query.province,
+      near: query.near,
+      radiusKm: query.radiusKm,
       page,
       limit,
     });

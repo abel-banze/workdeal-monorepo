@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { loadGoogleMaps, hasGoogleMapsKey } from "@/lib/google-maps";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { hasGoogleMapsKey } from "@/lib/google-maps";
+import { LocationSearchBox } from "@/components/features/location-search";
 
 export function HomeSearch({
   categories,
@@ -54,55 +55,38 @@ export function HomeSearch({
   }
 
   const [nearbyLoading, setNearbyLoading] = useState(false);
-  const [nearbyAddr, setNearbyAddr] = useState<string | null>(null);
-  const locationInputRef = useRef<HTMLInputElement>(null);
 
-  // Places Autocomplete para pesquisa por endereço — propósito Workdeal: encontrar empresas perto de um endereço global, não só GPS
-  useEffect(() => {
-    if (!hasGoogleMapsKey() || !locationInputRef.current) return;
-    let autocomplete: google.maps.places.Autocomplete | null = null;
-    loadGoogleMaps()
-      .then((g) => {
-        if (!locationInputRef.current) return;
-        autocomplete = new g.maps.places.Autocomplete(locationInputRef.current, {
-          fields: ["geometry", "formatted_address"],
-          types: ["geocode"],
-        });
-        autocomplete.addListener("place_changed", () => {
-          const place = autocomplete!.getPlace();
-          const loc = place.geometry?.location;
-          if (!loc) return;
-          const near = `${loc.lat().toFixed(5)},${loc.lng().toFixed(5)}`;
-          const params = new URLSearchParams(window.location.search);
-          params.set("near", near);
-          params.set("radiusKm", "25");
-          params.set("sort", "distance");
-          if (place.formatted_address) params.set("nearLabel", place.formatted_address);
-          router.push(`/?${params.toString()}#empresas`);
-        });
-      })
-      .catch(() => {});
-    return () => {
-      if (autocomplete) (window as unknown as { google?: typeof google }).google?.maps?.event?.clearInstanceListeners(autocomplete);
-    };
+  const near = initialParams.near ?? "";
+  const nearLabel = initialParams.nearLabel ?? null;
+
+  const onSelectLocation = useCallback(
+    (near: string, label: string) => {
+      const params = new URLSearchParams(window.location.search);
+      params.set("near", near);
+      params.set("radiusKm", "25");
+      params.set("sort", "distance");
+      params.set("nearLabel", label);
+      router.push(`/?${params.toString()}#empresas`);
+    },
+    [router],
+  );
+
+  const onClearLocation = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("near");
+    params.delete("radiusKm");
+    params.delete("nearLabel");
+    if (params.get("sort") === "distance") params.delete("sort");
+    const qs = params.toString();
+    router.push(qs ? `/?${qs}#empresas` : "/#empresas");
   }, [router]);
 
   function onNearby() {
     if (!navigator.geolocation) return;
     setNearbyLoading(true);
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+      (pos) => {
         const near = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
-        // reverse geocode para mostrar endereço humano quando possível
-        if (hasGoogleMapsKey()) {
-          try {
-            const g = await loadGoogleMaps();
-            const geocoder = new g.maps.Geocoder();
-            const res = await geocoder.geocode({ location: { lat: pos.coords.latitude, lng: pos.coords.longitude } });
-            const addr = res.results?.[0]?.formatted_address ?? null;
-            if (addr) setNearbyAddr(addr);
-          } catch {}
-        }
         const params = new URLSearchParams(window.location.search);
         params.set("near", near);
         params.set("radiusKm", "25");
@@ -257,21 +241,14 @@ export function HomeSearch({
         </div>
       </div>
       {/* endereço global via Places — Workdeal é plataforma sem fronteiras */}
-      <div className="flex w-full items-center gap-2 rounded-[10px] border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2">
-        <span className="shrink-0 text-[#0F1A2E]/40" aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-            <path d="M12 21s7-6.5 7-11a7 7 0 10-14 0c0 4.5 7 11 7 11z" />
-            <circle cx="12" cy="10" r="2.5" />
-          </svg>
-        </span>
-        <input
-          ref={locationInputRef}
-          placeholder="Pesquisar perto de um endereço — ex: Av. Julius Nyerere, Maputo ou Rua Augusta, Lisboa"
-          aria-label="Pesquisar por endereço com Google Places"
-          className="w-full bg-transparent text-[13px] placeholder:text-[#0F1A2E]/40 focus:outline-none"
-        />
-        {nearbyAddr && <span className="hidden sm:inline text-xs font-medium text-[#0B5E56] truncate max-w-[220px]">{nearbyAddr}</span>}
-      </div>
+      <LocationSearchBox
+        key={`${near}-${nearLabel ?? ""}`}
+        near={near}
+        label={nearLabel}
+        onSelect={onSelectLocation}
+        onClear={onClearLocation}
+        placeholder="Pesquisar perto de um endereço — ex: Av. Julius Nyerere, Maputo ou Rua Augusta, Lisboa"
+      />
       {hasGoogleMapsKey() ? null : (
         <p className="text-xs text-[#0F1A2E]/40">
           Activa <code className="rounded border border-[#D9D2C2] bg-white px-1">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> para autocomplete de endereços global.

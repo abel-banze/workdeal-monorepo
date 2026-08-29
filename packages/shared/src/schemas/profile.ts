@@ -52,6 +52,13 @@ export const profileCategorySchema = z.object({
   isPrimary: z.boolean(),
 });
 
+/** Badge compacto para listagens (company-card) — sem descrição/datas. */
+export const profileBadgeLiteSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+  type: z.string(),
+});
+
 export const profileViewSchema = z.object({
   id: z.string(),
   type: profileTypeSchema,
@@ -74,6 +81,12 @@ export const profileViewSchema = z.object({
   categories: z.array(profileCategorySchema),
   createdAt: z.date(),
   updatedAt: z.date(),
+  // Extras de listagem/pesquisa (não canónicos): distância ao utilizador,
+  // sede (província/distrito) e badges ativos — usados pelo ProfileCard.
+  distanceKm: z.number().nullable().optional(),
+  province: z.string().nullable().optional(),
+  district: z.string().nullable().optional(),
+  badges: z.array(profileBadgeLiteSchema).optional(),
 });
 
 export const categorySchema = z.object({
@@ -106,6 +119,7 @@ export type CreateProfileInput = z.infer<typeof createProfileSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ProfileView = z.infer<typeof profileViewSchema>;
 export type CategoryView = z.infer<typeof categorySchema>;
+export type ProfileBadgeLite = z.infer<typeof profileBadgeLiteSchema>;
 
 // --- Public profile (página /profiles/:slug) ---
 

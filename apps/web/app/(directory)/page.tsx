@@ -1,9 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import type { ProfileView } from "@workdeal/shared";
 import { getProfiles, getCategories } from "@/lib/profiles";
 import { ProfileCard } from "@/components/features/profile-card";
 import { HomeSearch } from "@/components/features/home-search";
+import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
 
 export const revalidate = 3600;
 
@@ -104,6 +106,7 @@ const CATEGORY_FALLBACK = [
 
 export default async function DirectoryPage({ searchParams }: Props) {
   const params = await searchParams;
+  const locationParams = applyDefaultLocation(params, parseLocationCookies(await cookies()));
   const categoriesRes = await getCategories().catch(() => ({ data: [] as { id: string; name: string; slug: string }[] }));
   const categories = (categoriesRes as { data: { id: string; name: string; slug: string }[] }).data;
   const displayCats = categories.length ? categories.slice(0, 8) : CATEGORY_FALLBACK;
@@ -576,7 +579,7 @@ export default async function DirectoryPage({ searchParams }: Props) {
               </div>
             }
           >
-            <FeaturedCompanies searchParams={params} />
+            <FeaturedCompanies searchParams={locationParams} />
           </Suspense>
         </div>
       </section>

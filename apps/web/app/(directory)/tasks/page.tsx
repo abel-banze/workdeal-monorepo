@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import type { TaskView } from "@workdeal/shared";
 import { getCategories } from "@/lib/profiles";
 import { getPublicTasks, PROVINCES } from "@/lib/directory";
 import { TaskCard } from "@/components/features/task-card";
+import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
 
 export const revalidate = 0;
 
@@ -137,6 +139,7 @@ async function TasksList({ searchParams }: { searchParams: Record<string, string
 
 export default async function TasksPage({ searchParams }: Props) {
   const params = await searchParams;
+  const locationParams = applyDefaultLocation(params, parseLocationCookies(await cookies()));
   const activeStatus = STATUS_TABS.find((t) => t.key === (params.status ?? ""));
   const categoriesRes = await getCategories().catch(() => ({ data: [] as { id: string; name: string }[] }));
   const categories = (categoriesRes as { data: { id: string; name: string }[] }).data;
@@ -256,7 +259,7 @@ export default async function TasksPage({ searchParams }: Props) {
             </div>
           }
         >
-          <TasksList searchParams={params} />
+          <TasksList searchParams={locationParams} />
         </Suspense>
       </section>
     </div>

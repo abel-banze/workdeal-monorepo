@@ -7,7 +7,9 @@ export function EventCard({ event, categoryName, allowPast = true }: { event: Ev
   const when = formatEventWhen(event.startAt, event.endAt);
   const isPast = new Date(event.endAt) < new Date();
   if (isPast && !allowPast) return null;
-  const location = event.isOnline ? "Online" : event.venueName || [event.province, event.district].filter(Boolean).join(" · ") || "Local a definir";
+  const hasDistance = typeof event.distanceKm === "number" && Number.isFinite(event.distanceKm);
+  const distanceSuffix = hasDistance ? ` · ${(event.distanceKm as number).toFixed(1)} km` : "";
+  const location = event.isOnline ? "Online" : (event.venueName || [event.province, event.district].filter(Boolean).join(" · ") || "Local a definir") + distanceSuffix;
   const spotsLeft = event.capacity != null ? event.capacity - (event.registrationCount ?? 0) : null;
   const myReg = (event as { myRegistration?: EventRegistrationStatus | null }).myRegistration;
 
