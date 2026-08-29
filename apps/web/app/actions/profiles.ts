@@ -8,6 +8,8 @@ import type { CreateProfileInput, UpdateProfileInput } from "@workdeal/shared"
 import { apiFetchWithAuth, apiFetch } from "@/lib/api"
 import { requireAuth } from "@/lib/auth"
 
+const CV_COOKIE_NAME = "wd_verified_contacts"
+
 // Helpers
 async function getAuthToken(): Promise<string> {
   const store = await cookies()
@@ -39,9 +41,15 @@ export async function updateProfile(slug: string, input: UpdateProfileInput) {
 
   if (!slug?.trim()) throw new Error("Slug obrigatório")
 
+  // Encaminha os tokens HMAC dos contactos verificados via OTP (cookie httpOnly)
+  // para o backend persistir profile_contact_verification — mesmo bind do onboarding.
+  const store = await cookies()
+  const verified = store.get(CV_COOKIE_NAME)?.value ?? null
+
   const res = await apiFetchWithAuth(`/api/v1/profiles/${encodeURIComponent(slug)}`, token, {
     method: "PATCH",
     body: JSON.stringify(data),
+    headers: verified ? { "x-verified-contacts": verified } : undefined,
   })
 
   revalidateTag("profiles", "max")

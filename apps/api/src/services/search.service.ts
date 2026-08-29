@@ -98,7 +98,13 @@ export class SearchService {
 
     // Localização: SQL real sobre a MV known_locations (autoritativo, corrige
     // o threshold de pg_trgm) — nunca carrega a MV inteira em memória.
-    const location = await searchRepository.matchLocation(raw);
+    // Fallback: quando a MV não devolve nada mas o smart-search já detectou a
+    // província (ex: "empresa em nampula" com known_locations sem nampula),
+    // usamos essa província como filtro estruturado — evita devolver perfis de
+    // outra região por o filtro de localização nunca ser aplicado.
+    const location =
+      (await searchRepository.matchLocation(raw)) ??
+      (smart.province ? { kind: "province" as const, value: smart.province, province: smart.province, district: null } : null);
 
     // Texto residual: smart-search já removeu categoria + aliases de província
     // + stopwords; retiramos ainda os tokens da localização detectada.

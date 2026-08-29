@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, exists, inArray, isNull, sql } from "drizzle-orm";
-import { db, profile, profileCategory, category, profileLocation, profileBadge, badge } from "@workdeal/db";
+import { db, profile, profileCategory, category, profileLocation, profileBadge, badge, profileContactVerification } from "@workdeal/db";
+import type { ContactVerificationPayload } from "@workdeal/shared/lib/contact-verification";
 import type { ListProfilesQuery, ProfileBadgeLite } from "@workdeal/shared";
 import { boundingBox, isValidCoordinates } from "@workdeal/shared/lib/geo";
 
@@ -81,6 +82,7 @@ class ProfilesRepository {
     profileId: string,
     data: Partial<ProfileRow>,
     categories: CategoryRow[] | undefined,
+    verifiedContacts?: ContactVerificationPayload[],
   ): Promise<ProfileWithCategories | null> {
     return db.transaction(async (tx) => {
       await tx.update(profile).set(data).where(eq(profile.id, profileId));
@@ -95,6 +97,27 @@ class ProfilesRepository {
       if (categories) {
         await tx.delete(profileCategory).where(eq(profileCategory.profileId, profileId));
         await this.insertCategories(tx, profileId, categories);
+      }
+      // Contactos verificados via OTP (tokens HMAC do header x-verified-contacts).
+      // Semântica aditiva: só persiste os provados pelo servidor, nunca apaga
+      // verificações já existentes (o edit só re-verifica os contactos alterados).
+      const verified = (verifiedContacts ?? []).filter(
+        (v): v is ContactVerificationPayload & { channel: "whatsapp" | "phone" | "email" } =>
+          v.channel === "whatsapp" || v.channel === "phone" || v.channel === "email",
+      );
+      if (verified.length > 0) {
+        await tx
+          .insert(profileContactVerification)
+          .values(
+            verified.map((v) => ({
+              id: crypto.randomUUID(),
+              profileId,
+              channel: v.channel,
+              identifier: v.identifier,
+              verifiedAt: new Date(),
+            })),
+          )
+          .onConflictDoNothing({ target: [profileContactVerification.profileId, profileContactVerification.channel, profileContactVerification.identifier] });
       }
       const [row] = await tx.select(profileColumns).from(profile).where(eq(profile.id, profileId)).limit(1);
       if (!row) return null;

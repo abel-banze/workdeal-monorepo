@@ -2,6 +2,7 @@ import { getOrgRole } from "@workdeal/auth";
 import { hasOrgPermission, hasSelfPermission, normalizeBusinessHours } from "@workdeal/shared";
 import type { AuthUser, CreateProfileInput, DomainPermission, ListProfilesQuery, ProfileType, ProfileView, SmartSearchResult, UpdateProfileInput } from "@workdeal/shared";
 import type { CategoryView, PublicProfileView, PublicBadge, ProfileBadgeLite } from "@workdeal/shared";
+import type { ContactVerificationPayload } from "@workdeal/shared/lib/contact-verification";
 import { AppError } from "../lib/errors.js";
 import { profilesRepository } from "../repositories/profiles.repository.js";
 import type { ProfileWithCategories } from "../repositories/profiles.repository.js";
@@ -57,7 +58,7 @@ class ProfilesService {
     };
   }
 
-  async updateProfile(user: AuthUser, slug: string, input: UpdateProfileInput): Promise<ProfileView> {
+  async updateProfile(user: AuthUser, slug: string, input: UpdateProfileInput, verifiedContacts?: ContactVerificationPayload[]): Promise<ProfileView> {
     const existing = await profilesRepository.findBySlug(slug, { includeDeleted: true });
     if (!existing || existing.deletedAt) {
       throw new AppError(404, "NOT_FOUND", "Perfil não encontrado");
@@ -91,7 +92,7 @@ class ProfilesService {
       ...(input.businessHours !== undefined ? { businessHours: normalizeBusinessHours(input.businessHours) } : {}),
     };
 
-    const row = await profilesRepository.updateProfileAndCategories(existing.id, patch, categories);
+    const row = await profilesRepository.updateProfileAndCategories(existing.id, patch, categories, verifiedContacts);
     if (!row) {
       throw new AppError(404, "NOT_FOUND", "Perfil não encontrado");
     }
