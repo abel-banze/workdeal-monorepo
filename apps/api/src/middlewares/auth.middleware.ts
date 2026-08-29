@@ -13,7 +13,6 @@ export type Env = {
 const BETTER_AUTH_SESSION_COOKIES = ["__Secure-better-auth.session_token", "better-auth.session_token"] as const;
 
 export const requireAuth = createMiddleware<Env>(async (c, next) => {
-  const rid = (c.get("requestId" as never) as string | undefined) ?? "?";
   // 1. Tentar JWT (Authorization header ou cookie workdeal_jwt)
   const header = c.req.header("Authorization");
   let token: string | undefined;
@@ -23,10 +22,8 @@ export const requireAuth = createMiddleware<Env>(async (c, next) => {
   if (!token) {
     token = parseCookies(c.req.header("Cookie"))[JWT_COOKIE_NAME];
   }
-  console.warn(`[auth] ${rid} jwt=${token ? "present" : "none"} header=${header ? "yes" : "no"} cookies=${JSON.stringify(Object.keys(parseCookies(c.req.header("Cookie"))))}`);
   if (token) {
     const session = await verifyJwt(token);
-    console.warn(`[auth] ${rid} jwtVerified=${session ? "ok" : "FAIL"}`);
     if (session) {
       if ((session.user as unknown as { deletedAt?: string | null })?.deletedAt) {
         throw new AppError(401, "UNAUTHORIZED", "Conta desactivada");
@@ -39,20 +36,17 @@ export const requireAuth = createMiddleware<Env>(async (c, next) => {
   }
 
   // 2. Fallback: sessão better-auth (cookie de sessão)
-  const allCookies = parseCookies(c.req.header("Cookie"));
-  let sessionCookie: string | undefined;
-  for (const name of BETTER_AUTH_SESSION_COOKIES) {
-    if (allCookies[name]) {
-      sessionCookie = allCookies[name];
-      break;
-    }
-  }
-  if (sessionCookie) {
+  // Passa o header de cookies original na íntegra — preserva o nome de cookie real
+  // (`__Secure-better-auth.session_token` em https vs `better-auth.session_token` em http),
+  // que o getSession exige, tal como o getServerSession do frontend faz.
+  const rawCookieHeader = c.req.header("Cookie");
+  const allCookies = parseCookies(rawCookieHeader);
+  const hasSessionCookie = BETTER_AUTH_SESSION_COOKIES.some((name) => Boolean(allCookies[name]));
+  if (hasSessionCookie) {
     try {
       const session = await auth.api.getSession({
-        headers: new Headers({ Cookie: `better-auth.session_token=${sessionCookie}` }),
+        headers: new Headers({ Cookie: rawCookieHeader ?? "" }),
       });
-      console.warn(`[auth] ${rid} sessionCookie=${sessionCookie ? "present" : "none"} getSession=${session?.user ? "ok" : "FAIL"}`);
       if (session?.user) {
         const u = session.user as unknown as { deletedAt?: Date | null; id: string; email: string; name: string; image?: string | null; systemRole?: string; emailVerified?: boolean; phone?: string | null; locale?: string };
         if (u.deletedAt) {
