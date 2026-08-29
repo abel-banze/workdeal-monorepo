@@ -74,7 +74,11 @@ export const auth = betterAuth({
         },
       },
     }),
-    jwt({}),
+    jwt({
+      jwt: {
+        expirationTime: 60 * 60 * 24 * 7,
+      },
+    }),
     bearer(),
   ],
 });
