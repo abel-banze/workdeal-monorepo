@@ -8,7 +8,7 @@ const sections = [
   { title: "Verificações", href: "/dashboard/verifications", desc: "Aprovar selos e verificações — requer systemRole admin/moderator." },
 ];
 
-export async function ProfilesPage() {
+export default async function ProfilesPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Perfis</h1>

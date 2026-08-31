@@ -1,0 +1,60 @@
+"use server";
+
+import { cookies } from "next/headers";
+import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
+import type { AdminUserListQuery, AdminOrgListQuery } from "@workdeal/shared";
+import { apiFetch, apiFetchWithAuth } from "@/lib/api";
+import { requireSystemRole } from "@/lib/auth";
+
+async function getAuthToken(): Promise<string> {
+  const store = await cookies();
+  const token = store.get(JWT_COOKIE_NAME)?.value;
+  if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+  return token;
+}
+
+export async function listAdminUsers(query: AdminUserListQuery) {
+  await requireSystemRole("moderator", "admin");
+  const params = new URLSearchParams();
+  if (query.role) params.set("role", query.role);
+  if (query.search) params.set("search", query.search);
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const res = await apiFetch<unknown>(`/api/v1/admin/users${qs ? `?${qs}` : ""}`);
+  return res;
+}
+
+export async function listAdminOrganizations(query: AdminOrgListQuery) {
+  await requireSystemRole("moderator", "admin");
+  const params = new URLSearchParams();
+  if (query.verificationStatus) params.set("verificationStatus", query.verificationStatus);
+  if (query.search) params.set("search", query.search);
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const res = await apiFetch<unknown>(`/api/v1/admin/organizations${qs ? `?${qs}` : ""}`);
+  return res;
+}
+
+export async function updateUserRole(userId: string, systemRole: "user" | "moderator" | "admin") {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem alterar papéis de sistema");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/users/${userId}/role`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ systemRole }),
+  });
+  return res;
+}
+
+export async function updateOrgVerificationStatus(id: string, verificationStatus: "pending" | "in_review" | "verified" | "suspended") {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem alterar o estado de verificação");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/organizations/${id}/verification`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ verificationStatus }),
+  });
+  return res;
+}

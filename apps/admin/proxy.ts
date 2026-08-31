@@ -1,30 +1,20 @@
-import { auth } from "@workdeal/auth";
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server"
+import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies"
 
-// Proxy de autenticação — replica apps/web/proxy.ts
-// Protege rotas autenticadas e redireciona para /login quando sem sessão
-export async function proxy(request: NextRequest) {
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  });
+const PROTECTED_PREFIX = "/dashboard"
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/api/auth");
-
-  const isPublicRoute = request.nextUrl.pathname === "/" ||
-    request.nextUrl.pathname.startsWith("/_next") ||
-    request.nextUrl.pathname.startsWith("/favicon");
-
-  if (!session && !isAuthRoute && !isPublicRoute) {
-    // replica comportamento de web: deixa passar mas marca header para layout fazer redirect
-    // ou redireciona directamente — ajusta conforme web faz
-    return NextResponse.next();
+// Rede de segurança leve (edge-compatible) — o RBAC real acontece no layout
+// via requireSystemRole. Este proxy só redireciona não-autenticados a tempo,
+// poupando o render do dashboard quando não há sequer sessão.
+export function proxy(req: NextRequest) {
+  if (req.nextUrl.pathname.startsWith(PROTECTED_PREFIX) && !req.cookies.has(JWT_COOKIE_NAME)) {
+    const login = new URL("/login", req.url)
+    login.searchParams.set("next", req.nextUrl.pathname)
+    return NextResponse.redirect(login)
   }
-
-  return NextResponse.next();
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
-};
+  matcher: ["/dashboard/:path*"],
+}

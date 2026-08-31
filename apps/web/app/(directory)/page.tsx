@@ -7,7 +7,7 @@ import { ProfileCard } from "@/components/features/profile-card";
 import { HomeSearch } from "@/components/features/home-search";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
 
-export const revalidate = 3600;
+export const revalidate = 300;
 
 export async function generateMetadata() {
   return {

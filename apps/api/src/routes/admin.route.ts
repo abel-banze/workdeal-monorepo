@@ -7,6 +7,9 @@ import { verificationListQuerySchema, verificationReviewSchema } from "@workdeal
 import { verificationsController } from "../controllers/verifications.controller.js";
 import { reportsController } from "../controllers/reports.controller.js";
 import { reportListQuerySchema } from "@workdeal/shared";
+import { adminUsersController } from "../controllers/admin-users.controller.js";
+import { adminOrganizationsController } from "../controllers/admin-organizations.controller.js";
+import { adminUserListQuerySchema, adminOrgListQuerySchema, adminUpdateUserRoleSchema, adminUpdateOrgStatusSchema } from "@workdeal/shared";
 import { z } from "zod";
 
 export const adminRoute = new Hono<Env>();
@@ -38,6 +41,30 @@ adminRoute.get("/reports", zValidator("query", reportListQuerySchema), async (c)
 
 adminRoute.patch("/reports/:id", zValidator("json", z.object({ status: z.enum(["resolved", "dismissed"]) })), async (c) => {
   const { body, status } = await reportsController.updateStatus(c.req.param("id"), c.req.valid("json").status);
+  return c.json(body, status);
+});
+
+// --- Utilizadores ---
+adminRoute.get("/users", zValidator("query", adminUserListQuerySchema), async (c) => {
+  const { body, status } = await adminUsersController.list(c.req.valid("query"));
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
+adminRoute.patch("/users/:id/role", zValidator("json", adminUpdateUserRoleSchema), async (c) => {
+  const { body, status } = await adminUsersController.updateRole(c.get("user").systemRole, c.req.param("id"), c.req.valid("json"));
+  return c.json(body, status);
+});
+
+// --- Empresas (organizations) ---
+adminRoute.get("/organizations", zValidator("query", adminOrgListQuerySchema), async (c) => {
+  const { body, status } = await adminOrganizationsController.list(c.req.valid("query"));
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
+adminRoute.patch("/organizations/:id/verification", zValidator("json", adminUpdateOrgStatusSchema), async (c) => {
+  const { body, status } = await adminOrganizationsController.updateStatus(c.get("user").systemRole, c.req.param("id"), c.req.valid("json"));
   return c.json(body, status);
 });
 

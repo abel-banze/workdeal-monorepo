@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  transpilePackages: ["@workspace/ui", "@workdeal/auth", "@workdeal/shared", "@workdeal/db"],
 };
 
 export default nextConfig;
