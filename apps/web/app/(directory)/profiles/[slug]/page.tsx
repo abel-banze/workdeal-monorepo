@@ -3,6 +3,7 @@ import { getPublicProfile, getPortfolioItems } from "@/lib/profiles";
 import Link from "next/link";
 import { FaWhatsapp } from "react-icons/fa";
 import { FiPhone, FiGlobe, FiShare2 } from "react-icons/fi";
+import { VerificationBadge } from "@/components/features/verification-badge";
 import { HeroEmailButton, ProfileContacts } from "@/components/features/profile-contacts";
 import { ProfileMap } from "@/components/features/profile-map";
 import { ProfileServices } from "@/components/features/profile-services";
@@ -82,6 +83,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
   // Selo de verificação Workdeal — apenas quando a DB confirma (badge "verified" ativo)
   const verifiedBadge = p.badges.find((b) => b.slug === "verified" && b.status === "active") ?? null;
   const legalizingBadge = p.badges.find((b) => b.slug === "in-legalization" && b.status === "active") ?? null;
+  const verificationDegree = verifiedBadge ? 1 : legalizingBadge ? 2 : 3;
   const loc = p.location;
   const qual = p.qualification;
   const founded = qual?.foundedYear ? String(qual.foundedYear) : null;
@@ -153,10 +155,10 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
             </div>
             {/* logo — irmão do cover (fora do overflow-hidden) para não ser cortado; z-10 acima do cover */}
             <div className="absolute -bottom-10 left-5 z-10 flex items-end gap-3 sm:left-7">
-              <div className="relative size-[84px] overflow-hidden rounded-[18px] border-[3px] border-white bg-[#F6F3EE] shadow-[0_8px_24px_rgba(15,26,46,0.18)] sm:size-[96px]">
+              <div className="relative flex size-[84px] items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-white bg-white p-2 shadow-[0_8px_24px_rgba(15,26,46,0.18)] sm:size-[96px]">
                 {p.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.logoUrl} alt={p.name} className="size-full object-cover" />
+                  <img src={p.logoUrl} alt={p.name} className="size-full object-contain" />
                 ) : (
                   <div className="flex size-full items-center justify-center bg-[#F6F3EE] font-black tracking-[-0.04em] text-[#0F1A2E] text-xl">
                     {p.name.slice(0, 2).toUpperCase()}
@@ -175,6 +177,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
               </p>
               <h1 className="mt-2 inline-flex flex-wrap items-center gap-2 text-[26px] font-black leading-[0.95] tracking-[-0.05em] text-[#0F1A2E] sm:text-[32px]" style={{ fontFamily: "var(--font-display)" }}>
                 <span>{p.name}</span>
+                <VerificationBadge degree={verificationDegree} size={28} />
               </h1>
               {p.tagline ? <p className="mt-2 max-w-[56ch] text-[14px] leading-snug text-[#0F1A2E]/70">{p.tagline}</p> : null}
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -310,17 +313,17 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                 {(verifiedBadge || legalizingBadge) ? (
                   <div className="flex flex-col items-center text-center">
                     <div className="relative size-[148px] shrink-0 sm:size-[168px]">
-                      <div className="absolute inset-0 overflow-hidden rounded-full border border-[#D9D2C2] bg-white shadow-[0_8px_24px_rgba(15,26,46,0.10)]" aria-hidden>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/logo.png" alt="" aria-hidden className="absolute inset-0 size-full object-contain p-8 opacity-[0.08] select-none" />
+                      <div className="absolute inset-0 overflow-hidden rounded-full border border-[#D9D2C2] bg-[#0F1A2E] shadow-[0_8px_24px_rgba(15,26,46,0.18)]" aria-hidden>
                         <div
                           aria-hidden
-                          className="absolute inset-0 rounded-full opacity-[0.04]"
+                          className="absolute inset-0 rounded-full opacity-[0.06]"
                           style={{
-                            backgroundImage: "linear-gradient(to right, #0F1A2E 1px, transparent 1px), linear-gradient(to bottom, #0F1A2E 1px, transparent 1px)",
+                            backgroundImage: `linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)`,
                             backgroundSize: "22px 22px",
                           }}
                         />
+                        <div aria-hidden className="pointer-events-none absolute -right-8 -top-8 size-[120px] rounded-full bg-[#FF3B1F]/25 blur-[30px]" />
+                        <div aria-hidden className="pointer-events-none absolute -left-8 -bottom-8 size-[120px] rounded-full bg-[#0B5E56]/30 blur-[30px]" />
                       </div>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -330,13 +333,13 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                         height={168}
                         className="relative size-full rounded-full object-cover p-1.5"
                       />
-                      <div className={`pointer-events-none absolute inset-[11px] flex flex-col items-center justify-center rounded-full border-[1.5px] ${verifiedBadge ? "border-[#0B5E56]/15" : "border-[#1F5C99]/20"} text-center`}>
-                        <span className={`font-mono text-[9px] font-black uppercase tracking-[0.22em] ${verifiedBadge ? "text-[#0B5E56]" : "text-[#1F5C99]"}`}>Workdeal</span>
-                        <span className="mt-0.5 font-black tracking-[-0.04em] text-[#0F1A2E] text-[15px] leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                      <div className={`pointer-events-none absolute inset-[11px] flex flex-col items-center justify-center rounded-full border-[1.5px] ${verifiedBadge ? "border-[#0B5E56]/30" : "border-[#1F5C99]/40"} bg-[#0F1A2E]/20 text-center`}>
+                        <span className={`font-mono text-[9px] font-black uppercase tracking-[0.22em] ${verifiedBadge ? "text-[#4FD1C5]" : "text-[#7FB8E0]"}`}>Workdeal</span>
+                        <span className="mt-0.5 font-black tracking-[-0.04em] text-white text-[15px] leading-none" style={{ fontFamily: "var(--font-display)" }}>
                           {verifiedBadge ? "VERIFICADO" : "EM LEGALIZAÇÃO"}
                         </span>
-                        <span className="mt-1 h-px w-10 bg-[#D9D2C2]" aria-hidden />
-                        <span className="mt-1 font-mono text-[10px] font-bold tracking-[0.14em] text-[#0F1A2E]/40">
+                        <span className="mt-1 h-px w-10 bg-white/40" aria-hidden />
+                        <span className="mt-1 font-mono text-[10px] font-bold tracking-[0.14em] text-white/70">
                           {new Date((verifiedBadge ?? legalizingBadge)!.awardedAt).getFullYear()} · {displayProvince ? displayProvince.toUpperCase() : "MOÇAMBIQUE"}
                         </span>
                       </div>
