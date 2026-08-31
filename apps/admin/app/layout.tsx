@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import "@workdeal/ui/globals.css";
+import "@workspace/ui/globals.css";
 
 export const metadata: Metadata = {
   title: "Workdeal Admin",

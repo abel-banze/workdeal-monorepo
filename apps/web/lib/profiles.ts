@@ -16,30 +16,30 @@ export async function getProfiles(params: Record<string, string | undefined>) {
   // Pesquisa e "nearby" são dados voláteis — nunca cachear. Listagem geral cache 1h.
   const volatile = params.near !== undefined || params.q !== undefined;
   return apiFetch<ProfileView[]>(`/api/v1/profiles${qs ? `?${qs}` : ""}`, {
-    next: volatile ? { revalidate: 0 } : { revalidate: 3600, tags: ["profiles"] },
+    next: volatile ? { revalidate: 0 } : { revalidate: 300, tags: ["profiles"] },
   });
 }
 
 export async function getProfileBySlug(slug: string) {
   return apiFetch<ProfileView>(`/api/v1/profiles/${slug}`, {
-    next: { revalidate: 3600, tags: [`profile:${slug}`] },
+    next: { revalidate: 300, tags: [`profile:${slug}`] },
   });
 }
 
 export async function getPublicProfile(slug: string) {
   return apiFetch<PublicProfileView>(`/api/v1/profiles/${slug}/public`, {
-    next: { revalidate: 3600, tags: [`profile:${slug}`] },
+    next: { revalidate: 300, tags: [`profile:${slug}`] },
   });
 }
 
 export async function getCategories() {
   return apiFetch<CategoryView[]>(`/api/v1/categories`, {
-    next: { revalidate: 3600, tags: ["categories"] },
+    next: { revalidate: 300, tags: ["categories"] },
   });
 }
 
 export async function getPortfolioItems(profileId: string) {
   return apiFetch<PortfolioItem[]>(`/api/v1/portfolio/${profileId}`, {
-    next: { revalidate: 3600, tags: [`portfolio:${profileId}`] },
+    next: { revalidate: 300, tags: [`portfolio:${profileId}`] },
   });
 }

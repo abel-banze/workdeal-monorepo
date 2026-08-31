@@ -14,6 +14,7 @@ export * from "./schemas/place.js";
 export * from "./schemas/onboarding.js";
 export * from "./schemas/task.js";
 export * from "./schemas/event.js";
+export * from "./schemas/admin.js";
 export * from "./lib/geo.js";
 export * from "./lib/smart-search.js";
 export * from "./lib/parse-search-query.js";

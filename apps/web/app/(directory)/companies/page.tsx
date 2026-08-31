@@ -7,7 +7,7 @@ import { SearchImpressions } from "@/components/features/search-impressions";
 import { CompaniesFilters } from "@/components/features/companies-filters";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
 
-export const revalidate = 3600;
+export const revalidate = 300;
 
 export async function generateMetadata() {
   return {
@@ -108,7 +108,7 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
             {total} EMPRESAS • PÁGINA {page} • LIMITE {limit}
           </p>
           <p className="text-xs text-[#0F1A2E]/50">
-            Ordenação: <span className="font-semibold text-[#0F1A2E]">{searchParams.sort ?? "recent"}</span> {searchParams.near ? "• índice PostGIS" : "• revalidate 1h"}
+            Ordenação: <span className="font-semibold text-[#0F1A2E]">{searchParams.sort ?? "recent"}</span> {searchParams.near ? "• índice PostGIS" : "• revalidate 5m"}
           </p>
         </div>
         {smartFilters && (

@@ -131,25 +131,28 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
           <div className="h-[4px] w-full bg-[#D9D2C2]/60" />
 
           {/* cover — replica card "sem perfil" de /dashboard/profile/edit quando não há coverUrl */}
-          <div className="relative h-[132px] overflow-hidden bg-[#0F1A2E] sm:h-[168px]">
-            {p.coverUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.coverUrl} alt="" className="size-full object-cover opacity-90" />
-            ) : (
-              <>
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0 opacity-[0.06]"
-                  style={{
-                    backgroundImage: `linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)`,
-                    backgroundSize: "48px 48px",
-                  }}
-                />
-                <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 size-[280px] rounded-full bg-[#FF3B1F]/20 blur-[40px]" />
-                <div aria-hidden className="pointer-events-none absolute -left-20 bottom-0 size-[240px] rounded-full bg-[#0B5E56]/20 blur-[40px]" />
-              </>
-            )}
-            <div className="absolute -bottom-10 left-5 flex items-end gap-3 sm:left-7">
+          <div className="relative">
+            <div className="h-[132px] overflow-hidden bg-[#0F1A2E] sm:h-[168px]">
+              {p.coverUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={p.coverUrl} alt="" className="size-full object-cover opacity-90" />
+              ) : (
+                <>
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 opacity-[0.06]"
+                    style={{
+                      backgroundImage: `linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)`,
+                      backgroundSize: "48px 48px",
+                    }}
+                  />
+                  <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 size-[280px] rounded-full bg-[#FF3B1F]/20 blur-[40px]" />
+                  <div aria-hidden className="pointer-events-none absolute -left-20 bottom-0 size-[240px] rounded-full bg-[#0B5E56]/20 blur-[40px]" />
+                </>
+              )}
+            </div>
+            {/* logo — irmão do cover (fora do overflow-hidden) para não ser cortado; z-10 acima do cover */}
+            <div className="absolute -bottom-10 left-5 z-10 flex items-end gap-3 sm:left-7">
               <div className="relative size-[84px] overflow-hidden rounded-[18px] border-[3px] border-white bg-[#F6F3EE] shadow-[0_8px_24px_rgba(15,26,46,0.18)] sm:size-[96px]">
                 {p.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
