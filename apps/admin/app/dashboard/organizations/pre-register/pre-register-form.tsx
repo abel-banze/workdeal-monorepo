@@ -37,6 +37,10 @@ export interface PreRegisterFormValues {
   contactEmail: string;
   formattedAddress: string;
   googlePlaceId: string;
+  latitude?: number;
+  longitude?: number;
+  province?: string;
+  city?: string;
   logoUrl: string;
   categorySlugs: string[];
 }
@@ -70,6 +74,10 @@ export function PreRegisterForm({ isAdmin, categories, initial, id }: Props) {
   const [contactEmail, setContactEmail] = useState(initial?.contactEmail ?? "");
   const [formattedAddress, setFormattedAddress] = useState(initial?.formattedAddress ?? "");
   const [googlePlaceId, setGooglePlaceId] = useState(initial?.googlePlaceId ?? "");
+  const [latitude, setLatitude] = useState<number | undefined>(initial?.latitude);
+  const [longitude, setLongitude] = useState<number | undefined>(initial?.longitude);
+  const [province, setProvince] = useState(initial?.province ?? "");
+  const [city, setCity] = useState(initial?.city ?? "");
   const [logoUrl, setLogoUrl] = useState(initial?.logoUrl ?? "");
   const [categorySlugs, setCategorySlugs] = useState<string[]>(initial?.categorySlugs ?? []);
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
@@ -105,13 +113,30 @@ export function PreRegisterForm({ isAdmin, categories, initial, id }: Props) {
     }
   }
 
-  // Ao escolher uma sugestão do Google Places, o nome passa a ser o do Google Places.
-  function pickPlace(s: PlaceSuggestion) {
+  // Ao escolher uma sugestão do Google Places, o nome passa a ser o do Google Places
+  // e preenchem-se coordenadas + província/cidade a partir dos detalhes do lugar.
+  async function pickPlace(s: PlaceSuggestion) {
     setSuggestions([]);
     setName(s.mainText);
     setSlug(slugify(s.mainText));
     setFormattedAddress(s.secondaryText || s.mainText);
     setGooglePlaceId(s.placeId);
+    try {
+      const res = await fetch(`/api/places/details/${encodeURIComponent(s.placeId)}`);
+      const json = await res.json().catch(() => ({ success: false, data: null }));
+      const d = json?.data as
+        | { latitude?: number | null; longitude?: number | null; province?: string | null; district?: string | null }
+        | null
+        | undefined;
+      if (json?.success && d) {
+        setLatitude(d.latitude && Number.isFinite(d.latitude) ? d.latitude : undefined);
+        setLongitude(d.longitude && Number.isFinite(d.longitude) ? d.longitude : undefined);
+        if (d.province) setProvince(d.province);
+        if (d.district) setCity(d.district);
+      }
+    } catch {
+      // Sem detalhes (ex: rede) — o admin pode preencher província/cidade manualmente.
+    }
   }
 
   async function handleLogoUpload(file: File) {
@@ -166,6 +191,10 @@ export function PreRegisterForm({ isAdmin, categories, initial, id }: Props) {
         contactEmail: contactEmail.trim() || undefined,
         googlePlaceId: googlePlaceId || undefined,
         formattedAddress: formattedAddress.trim() || undefined,
+        latitude,
+        longitude,
+        province: province.trim() || undefined,
+        city: city.trim() || undefined,
         logoUrl: logoUrl.trim() || undefined,
         categorySlugs: categorySlugs.length > 0 ? categorySlugs : undefined,
       };
@@ -190,6 +219,10 @@ export function PreRegisterForm({ isAdmin, categories, initial, id }: Props) {
           setContactEmail("");
           setFormattedAddress("");
           setGooglePlaceId("");
+          setLatitude(undefined);
+          setLongitude(undefined);
+          setProvince("");
+          setCity("");
           setLogoUrl("");
           setCategorySlugs([]);
           router.refresh();
@@ -262,6 +295,22 @@ export function PreRegisterForm({ isAdmin, categories, initial, id }: Props) {
             />
           </div>
         </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Província (opcional)</label>
+            <input value={province} onChange={(e) => setProvince(e.target.value)} placeholder="Maputo" className={fieldCls} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Cidade (opcional)</label>
+            <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Maputo" className={fieldCls} />
+          </div>
+        </div>
+        {latitude !== undefined && longitude !== undefined && (
+          <p className="text-xs text-muted-foreground">
+            Coordenadas capturadas ({latitude.toFixed(5)}, {longitude.toFixed(5)}) — usadas na pesquisa por proximidade.
+          </p>
+        )}
       </section>
 
       {/* Apresentação: logo + categorias */}

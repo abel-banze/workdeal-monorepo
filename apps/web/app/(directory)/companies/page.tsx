@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { cookies } from "next/headers";
-import { getCategories, getProfiles, getPreRegisteredCompanies } from "@/lib/profiles";
+import { getCategories, getProfiles, getPreRegisteredCompanies, type PreRegisteredCompany } from "@/lib/profiles";
 import { ProfileCard } from "@/components/features/profile-card";
 import { PreRegisterCard } from "@/components/features/pre-register-card";
 import { SearchImpressions } from "@/components/features/search-impressions";
 import { CompaniesFilters } from "@/components/features/companies-filters";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
+import { haversineKm } from "@workdeal/shared/lib/geo";
 
 export const revalidate = 300;
 
@@ -69,7 +70,61 @@ function Pagination({ page, total, baseQs }: { page: number; total: number; base
   );
 }
 
-async function CompaniesList({ searchParams }: { searchParams: Record<string, string | undefined> }) {
+function parseNear(near: string | undefined): { latitude: number; longitude: number } | null {
+  if (!near) return null;
+  const [latStr, lngStr] = near.split(",");
+  const latitude = Number(latStr);
+  const longitude = Number(lngStr);
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) return { latitude, longitude };
+  return null;
+}
+
+function matchesPreRegistered(
+  company: PreRegisteredCompany,
+  q: string | undefined,
+  categorySlugs: Set<string>,
+  near: string | undefined,
+  radiusKm: number,
+) {
+  if (categorySlugs.size > 0 && !company.categorySlugs.some((s) => categorySlugs.has(s))) {
+    return false;
+  }
+  const query = q?.trim().toLowerCase();
+  if (query) {
+    const inName = company.name.toLowerCase().includes(query);
+    const inCategories = company.categorySlugs.some((s) => s.toLowerCase().includes(query));
+    const inProvince = (company.province ?? "").toLowerCase().includes(query);
+    const inCity = (company.city ?? "").toLowerCase().includes(query);
+    if (!inName && !inCategories && !inProvince && !inCity) return false;
+  }
+  // Proximidade por raio (nearby): só filtra se o pré-registo tiver coordenadas.
+  const center = parseNear(near);
+  if (center && company.latitude != null && company.longitude != null) {
+    const dist = haversineKm(center, { latitude: company.latitude, longitude: company.longitude });
+    if (dist > radiusKm) return false;
+  }
+  return true;
+}
+
+function PreRegisterSection({ companies }: { companies: PreRegisteredCompany[] }) {
+  return (
+    <section className="mb-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {companies.map((c) => (
+          <PreRegisterCard key={c.id} company={c} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+async function CompaniesList({
+  searchParams,
+  categories,
+}: {
+  searchParams: Record<string, string | undefined>;
+  categories: { id: string; name: string; slug: string }[];
+}) {
   const page = Math.max(1, Number(searchParams.page ?? "1") || 1);
   const limit = 12;
 
@@ -81,8 +136,21 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
     // fase 1: só empresas
     const companies = data.filter((p) => p.type === "company");
     const total = typeof meta?.total === "number" ? (meta.total as number) : companies.length;
-    const preRegistered =
+    const allPreRegistered =
       (preRegRes.data as Array<Parameters<typeof PreRegisterCard>[0]["company"]> | null) ?? [];
+
+    // As empresas em pré-registo acompanham sempre a listagem — também nas pesquisas.
+    // Filtram-se pelos mesmos critérios que as activas (texto e categoria).
+    const categorySlugs = new Set(
+      categories
+        .filter((c) => c.id === searchParams.categoryId)
+        .map((c) => c.slug),
+    );
+    const nearParam = searchParams.near || undefined;
+    const radiusKm = Math.max(1, Number(searchParams.radiusKm ?? 25) || 25);
+    const preRegistered = allPreRegistered.filter((c) =>
+      matchesPreRegistered(c, searchParams.q, categorySlugs, nearParam, radiusKm),
+    );
     const hasPreRegistered = preRegistered.length > 0;
 
     const search = meta?.search as
@@ -93,24 +161,52 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
     const baseQs = new URLSearchParams();
     for (const [k, v] of Object.entries(searchParams)) if (v && k !== "page") baseQs.set(k, v as string);
 
-    if (companies.length === 0) {
-      // mesmo sem empresas activas, mostramos as que estão em pré-registo
-      return (
-        <div className="space-y-6">
-          {hasPreRegistered && (
-            <section>
-              <div className="mb-3 flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-full bg-[#FFB020]/20 text-[#B27300]">⏳</span>
-                <h2 className="text-sm font-black tracking-tight text-[#0F1A2E]">Empresas em pré-registo</h2>
-                <span className="rounded-full bg-[#FFF1D6] px-2 py-0.5 text-[11px] font-bold text-[#B27300]">{preRegistered.length}</span>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {preRegistered.map((c) => (
-                  <PreRegisterCard key={c.id} company={c} />
-                ))}
-              </div>
-            </section>
-          )}
+    const isEmptyResult = companies.length === 0 && !hasPreRegistered;
+
+    return (
+      <div className="space-y-6">
+        {companies.length > 0 ? (
+          <>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#D9D2C2] pb-4">
+              <p className="text-xs font-bold tracking-[0.14em] text-[#0B5E56]">
+                {total} EMPRESAS • PÁGINA {page} • LIMITE {limit}
+              </p>
+              <p className="text-xs text-[#0F1A2E]/50">
+                Ordenação: <span className="font-semibold text-[#0F1A2E]">{searchParams.sort ?? "recent"}</span> {searchParams.near ? "• índice PostGIS" : "• revalidate 5m"}
+              </p>
+            </div>
+            {smartFilters && (
+              <p className="mb-4 rounded-[10px] border border-[#0B5E56]/20 bg-[#EAF4F2] px-3 py-2 text-xs text-[#0B5E56]">
+                Pesquisa interpretada: <span className="font-semibold">{smartFilters}</span> — resultados filtrados automaticamente.
+              </p>
+            )}
+          </>
+        ) : (
+          !isEmptyResult &&
+          smartFilters && (
+            <p className="rounded-[10px] border border-[#0B5E56]/20 bg-[#EAF4F2] px-3 py-2 text-xs text-[#0B5E56]">
+              Pesquisa interpretada: <span className="font-semibold">{smartFilters}</span> — resultados filtrados automaticamente.
+            </p>
+          )
+        )}
+
+        {companies.length > 0 && (
+          <>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {companies.map((p) => (
+                <ProfileCard key={p.id} profile={p as unknown as Parameters<typeof ProfileCard>[0]["profile"]} distanceKm={(p as unknown as { distanceKm?: number | null }).distanceKm ?? null} />
+              ))}
+            </div>
+            <SearchImpressions profileIds={companies.map((p) => p.id)} />
+            <div className="mt-8">
+              <Pagination page={page} total={total} baseQs={baseQs} />
+            </div>
+          </>
+        )}
+
+        {hasPreRegistered && <PreRegisterSection companies={preRegistered} />}
+
+        {isEmptyResult && (
           <div className="rounded-[16px] border border-dashed border-[#D9D2C2] bg-white px-6 py-14 text-center">
             <p className="inline-flex items-center gap-2 rounded-full bg-[#F6F3EE] border border-[#D9D2C2] px-3 py-1 text-xs font-bold tracking-widest text-[#0F1A2E]/60">
               <span className="size-1.5 rounded-full bg-[#FF3B1F]" /> NENHUM RESULTADO
@@ -121,49 +217,8 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
               Limpar filtros
             </Link>
           </div>
-        </div>
-      );
-    }
-
-    return (
-      <>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#D9D2C2] pb-4">
-          <p className="text-xs font-bold tracking-[0.14em] text-[#0B5E56]">
-            {total} EMPRESAS • PÁGINA {page} • LIMITE {limit}
-          </p>
-          <p className="text-xs text-[#0F1A2E]/50">
-            Ordenação: <span className="font-semibold text-[#0F1A2E]">{searchParams.sort ?? "recent"}</span> {searchParams.near ? "• índice PostGIS" : "• revalidate 5m"}
-          </p>
-        </div>
-        {smartFilters && (
-          <p className="mb-4 rounded-[10px] border border-[#0B5E56]/20 bg-[#EAF4F2] px-3 py-2 text-xs text-[#0B5E56]">
-            Pesquisa interpretada: <span className="font-semibold">{smartFilters}</span> — resultados filtrados automaticamente.
-          </p>
         )}
-        {hasPreRegistered && !searchParams.q && !smartFilters && (
-          <section className="mb-6">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-full bg-[#FFB020]/20 text-[#B27300]">⏳</span>
-              <h2 className="text-sm font-black tracking-tight text-[#0F1A2E]">Empresas em pré-registo</h2>
-              <span className="rounded-full bg-[#FFF1D6] px-2 py-0.5 text-[11px] font-bold text-[#B27300]">{preRegistered.length}</span>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {preRegistered.map((c) => (
-                <PreRegisterCard key={c.id} company={c} />
-              ))}
-            </div>
-          </section>
-        )}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {companies.map((p) => (
-            <ProfileCard key={p.id} profile={p as unknown as Parameters<typeof ProfileCard>[0]["profile"]} distanceKm={(p as unknown as { distanceKm?: number | null }).distanceKm ?? null} />
-          ))}
-        </div>
-        <SearchImpressions profileIds={companies.map((p) => p.id)} />
-        <div className="mt-8">
-          <Pagination page={page} total={total} baseQs={baseQs} />
-        </div>
-      </>
+      </div>
     );
   } catch (e) {
     return (
@@ -213,7 +268,7 @@ export default async function CompaniesPage({ searchParams }: Props) {
                 <span className="font-normal text-[#0F1A2E]/70">Filtro total, contacto directo.</span>
               </h1>
               <p className="mt-3 max-w-[560px] text-[14px] leading-relaxed text-[#0F1A2E]/60">
-                Pesquise por nome, categoria e proximidade. Ordene por recentes, nome ou distância (PostGIS). Paginação obrigatória, nunca lista completa sem <code className="rounded border bg-[#F6F3EE] px-1 py-0.5 font-mono text-xs">limit</code>.
+                Pesquise por nome, categoria e proximidade. Ordene por recentes, nome ou distância.
               </p>
               <div className="mt-4 hidden flex-wrap gap-1.5 lg:flex">
                 {[
@@ -263,7 +318,7 @@ export default async function CompaniesPage({ searchParams }: Props) {
               </div>
             }
           >
-            <CompaniesList searchParams={locationParams} />
+            <CompaniesList searchParams={locationParams} categories={categories} />
           </Suspense>
         </div>
       </section>

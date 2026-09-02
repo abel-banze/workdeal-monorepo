@@ -23,6 +23,10 @@ export interface PreRegisterRow {
 export interface PreRegisterMetadata {
   googlePlaceId?: string | null;
   formattedAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  province?: string | null;
+  city?: string | null;
   logoUrl?: string | null;
   categorySlugs?: string[];
 }
@@ -40,18 +44,45 @@ export function parsePreRegisterMetadata(metadata: string | null): PreRegisterMe
 export function buildPreRegisterMetadata(input: {
   googlePlaceId?: string | null;
   formattedAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  province?: string | null;
+  city?: string | null;
   logoUrl?: string | null;
   categorySlugs?: string[];
 }): string | null {
   const googlePlaceId = input.googlePlaceId || null;
   const formattedAddress = input.formattedAddress || null;
+  const latitude = typeof input.latitude === "number" && Number.isFinite(input.latitude) ? input.latitude : null;
+  const longitude = typeof input.longitude === "number" && Number.isFinite(input.longitude) ? input.longitude : null;
+  const province = input.province || null;
+  const city = input.city || null;
   const logoUrl = input.logoUrl || null;
   const categorySlugs =
     input.categorySlugs && input.categorySlugs.length > 0
       ? input.categorySlugs.map((s) => s.trim()).filter(Boolean)
       : undefined;
-  if (!googlePlaceId && !formattedAddress && !logoUrl && (!categorySlugs || categorySlugs.length === 0)) return null;
-  return JSON.stringify({ googlePlaceId, formattedAddress, logoUrl, categorySlugs });
+  const hasGeo = latitude !== null && longitude !== null;
+  if (
+    !googlePlaceId &&
+    !formattedAddress &&
+    !hasGeo &&
+    !province &&
+    !city &&
+    !logoUrl &&
+    (!categorySlugs || categorySlugs.length === 0)
+  )
+    return null;
+  return JSON.stringify({
+    googlePlaceId,
+    formattedAddress,
+    latitude,
+    longitude,
+    province,
+    city,
+    logoUrl,
+    categorySlugs,
+  });
 }
 
 export const preRegisterRepository = {
@@ -180,6 +211,10 @@ export const preRegisterRepository = {
     name: string;
     slug: string;
     formattedAddress: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    province: string | null;
+    city: string | null;
     logoUrl: string | null;
     categorySlugs: string[];
     preRegisteredAt: Date;
@@ -202,6 +237,10 @@ export const preRegisterRepository = {
         name: r.name,
         slug: r.slug,
         formattedAddress: meta.formattedAddress ?? null,
+        latitude: meta.latitude ?? null,
+        longitude: meta.longitude ?? null,
+        province: meta.province ?? null,
+        city: meta.city ?? null,
         logoUrl: meta.logoUrl ?? null,
         categorySlugs: meta.categorySlugs ?? [],
         preRegisteredAt: r.preRegisteredAt ?? new Date(),

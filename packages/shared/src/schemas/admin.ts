@@ -37,6 +37,12 @@ const preRegisterBaseSchema = z.object({
   contactEmail: z.string().trim().email().optional(),
   googlePlaceId: z.string().trim().max(200).optional(),
   formattedAddress: z.string().trim().max(500).optional(),
+  // Localização — coordenadas + província/cidade (persistidas no metadata JSON).
+  // Capturadas automaticamente via Google Places details, mas editáveis.
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  province: z.string().trim().max(100).optional(),
+  city: z.string().trim().max(100).optional(),
   // Logo (URL) e categorias (slugs) — persistidos no metadata JSON do pre-registo
   logoUrl: z.string().trim().url().max(1000).optional(),
   categorySlugs: z.array(z.string().trim().min(1).max(100)).max(10).optional(),
