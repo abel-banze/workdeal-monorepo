@@ -62,12 +62,17 @@ export function PreRegisterCard({ company }: { company: PreRegisteredCompany }) 
         </div>
       )}
 
-      {/* morada */}
-      {company.formattedAddress && (
-        <div className="mx-5 mt-3 flex items-center gap-1.5 border-t border-[#D9D2C2]/60 pt-3 text-[12px] text-[#0F1A2E]/60">
-          <span className="truncate">{company.formattedAddress}</span>
-        </div>
-      )}
+      {/* localização — cidade/província (com morada como fallback) */}
+      {(() => {
+        const place =
+          [company.city, company.province].filter(Boolean).join(", ") || company.formattedAddress || null;
+        if (!place) return null;
+        return (
+          <div className="mx-5 mt-3 flex items-center gap-1.5 border-t border-[#D9D2C2]/60 pt-3 text-[12px] text-[#0F1A2E]/60">
+            <span className="truncate">{place}</span>
+          </div>
+        );
+      })()}
 
       {/* footer */}
       <div className="mt-4 flex items-center justify-between gap-2 bg-[#FFF1D6]/40 px-5 py-3">

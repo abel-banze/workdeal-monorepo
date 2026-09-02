@@ -49,6 +49,10 @@ export interface PreRegisteredCompany {
   name: string;
   slug: string;
   formattedAddress: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  province: string | null;
+  city: string | null;
   logoUrl: string | null;
   categorySlugs: string[];
   preRegisteredAt: string;

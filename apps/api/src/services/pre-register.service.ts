@@ -15,10 +15,14 @@ class PreRegisterService {
     const completionToken = randomUUID();
     const completionTokenExpiresAt = new Date(Date.now() + COMPLETION_TOKEN_TTL_MS);
 
-    // metadata (JSON) guarda os dados do Google Places, logo e categorias para o promoter
+    // metadata (JSON) guarda os dados do Google Places, localização, logo e categorias para o promoter
     const metadata = buildPreRegisterMetadata({
       googlePlaceId: input.googlePlaceId,
       formattedAddress: input.formattedAddress,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      province: input.province,
+      city: input.city,
       logoUrl: input.logoUrl,
       categorySlugs: input.categorySlugs,
     });
@@ -66,6 +70,10 @@ class PreRegisterService {
         createdAt: item.createdAt.toISOString(),
         preRegisteredAt: item.preRegisteredAt?.toISOString() ?? null,
         formattedAddress: meta.formattedAddress ?? null,
+        latitude: meta.latitude ?? null,
+        longitude: meta.longitude ?? null,
+        province: meta.province ?? null,
+        city: meta.city ?? null,
         logoUrl: meta.logoUrl ?? null,
         categorySlugs: meta.categorySlugs ?? [],
       };
@@ -90,6 +98,10 @@ class PreRegisterService {
       contactPhone: org.contactPhone,
       contactEmail: org.contactEmail,
       formattedAddress: meta.formattedAddress ?? null,
+      latitude: meta.latitude ?? null,
+      longitude: meta.longitude ?? null,
+      province: meta.province ?? null,
+      city: meta.city ?? null,
       logoUrl: meta.logoUrl ?? null,
       categorySlugs: meta.categorySlugs ?? [],
       metadata: org.metadata,
@@ -128,6 +140,10 @@ class PreRegisterService {
     const nextMeta = buildPreRegisterMetadata({
       googlePlaceId: input.googlePlaceId !== undefined ? input.googlePlaceId : existingMeta.googlePlaceId,
       formattedAddress: input.formattedAddress !== undefined ? input.formattedAddress : existingMeta.formattedAddress,
+      latitude: input.latitude !== undefined ? input.latitude : existingMeta.latitude,
+      longitude: input.longitude !== undefined ? input.longitude : existingMeta.longitude,
+      province: input.province !== undefined ? input.province : existingMeta.province,
+      city: input.city !== undefined ? input.city : existingMeta.city,
       logoUrl: input.logoUrl !== undefined ? input.logoUrl : existingMeta.logoUrl,
       categorySlugs:
         input.categorySlugs !== undefined
@@ -182,6 +198,10 @@ class PreRegisterService {
       contactEmail: org.contactEmail,
       formattedAddress: meta.formattedAddress ?? null,
       googlePlaceId: meta.googlePlaceId ?? null,
+      latitude: meta.latitude ?? null,
+      longitude: meta.longitude ?? null,
+      province: meta.province ?? null,
+      city: meta.city ?? null,
       logoUrl: meta.logoUrl ?? null,
       categorySlugs: meta.categorySlugs ?? [],
       completionUrl: org.completionToken ? `${origin}/pre-register/${org.completionToken}` : null,
