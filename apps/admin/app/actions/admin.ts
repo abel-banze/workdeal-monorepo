@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
-import type { AdminUserListQuery, AdminOrgListQuery } from "@workdeal/shared";
+import type { AdminUserListQuery, AdminOrgListQuery, PreRegisterCompanyInput } from "@workdeal/shared";
 import { apiFetch, apiFetchWithAuth } from "@/lib/api";
 import { requireSystemRole } from "@/lib/auth";
 
@@ -55,6 +55,37 @@ export async function updateOrgVerificationStatus(id: string, verificationStatus
   const res = await apiFetchWithAuth(`/api/v1/admin/organizations/${id}/verification`, token, {
     method: "PATCH",
     body: JSON.stringify({ verificationStatus }),
+  });
+  return res;
+}
+
+export async function preRegisterCompany(input: PreRegisterCompanyInput) {
+  const session = await requireSystemRole("moderator", "admin");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/organizations/pre-register`, token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return res;
+}
+
+export async function listPreRegisteredCompanies(query: AdminOrgListQuery) {
+  await requireSystemRole("moderator", "admin");
+  const params = new URLSearchParams();
+  if (query.search) params.set("search", query.search);
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const res = await apiFetch<unknown>(`/api/v1/admin/organizations/pre-registered${qs ? `?${qs}` : ""}`);
+  return res;
+}
+
+export async function regeneratePreRegisterToken(id: string) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem gerar novos links");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/organizations/${id}/pre-register/regenerate-token`, token, {
+    method: "POST",
   });
   return res;
 }

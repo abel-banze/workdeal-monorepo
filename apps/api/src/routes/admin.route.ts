@@ -9,8 +9,9 @@ import { reportsController } from "../controllers/reports.controller.js";
 import { reportListQuerySchema } from "@workdeal/shared";
 import { adminUsersController } from "../controllers/admin-users.controller.js";
 import { adminOrganizationsController } from "../controllers/admin-organizations.controller.js";
-import { adminUserListQuerySchema, adminOrgListQuerySchema, adminUpdateUserRoleSchema, adminUpdateOrgStatusSchema } from "@workdeal/shared";
+import { adminUserListQuerySchema, adminOrgListQuerySchema, adminUpdateUserRoleSchema, adminUpdateOrgStatusSchema, preRegisterCompanySchema } from "@workdeal/shared";
 import { z } from "zod";
+import { preRegisterController } from "../controllers/pre-register.controller.js";
 
 export const adminRoute = new Hono<Env>();
 
@@ -65,6 +66,23 @@ adminRoute.get("/organizations", zValidator("query", adminOrgListQuerySchema), a
 
 adminRoute.patch("/organizations/:id/verification", zValidator("json", adminUpdateOrgStatusSchema), async (c) => {
   const { body, status } = await adminOrganizationsController.updateStatus(c.get("user").systemRole, c.req.param("id"), c.req.valid("json"));
+  return c.json(body, status);
+});
+
+// --- Pré-registo de empresas (promoter) ---
+adminRoute.post("/organizations/pre-register", zValidator("json", preRegisterCompanySchema), async (c) => {
+  const { body, status } = await preRegisterController.create(c.get("user").id, c.req.valid("json"));
+  return c.json(body, status);
+});
+
+adminRoute.get("/organizations/pre-registered", zValidator("query", adminOrgListQuerySchema), async (c) => {
+  const { body, status } = await preRegisterController.list(c.req.valid("query"));
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
+adminRoute.post("/organizations/:id/pre-register/regenerate-token", async (c) => {
+  const { body, status } = await preRegisterController.regenerateToken(c.get("user").systemRole, c.req.param("id"));
   return c.json(body, status);
 });
 
