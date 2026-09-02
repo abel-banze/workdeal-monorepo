@@ -31,12 +31,12 @@ export const adminOrganizationsRepository = {
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const memberCountSub = db
-      .select({ id: member.organizationId, count: count(member.id).as("count") })
+      .select({ id: member.organizationId, count: count(member.id).as("member_count") })
       .from(member)
       .groupBy(member.organizationId)
       .as("mc");
     const profileCountSub = db
-      .select({ id: profile.organizationId, count: count(profile.id).as("count") })
+      .select({ id: profile.organizationId, count: count(profile.id).as("profile_count") })
       .from(profile)
       .groupBy(profile.organizationId)
       .as("pc");
