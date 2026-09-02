@@ -336,9 +336,6 @@ importers:
       '@types/pg':
         specifier: ^8.20.4
         version: 8.20.4
-      '@workdeal/auth':
-        specifier: workspace:*
-        version: link:../auth
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config

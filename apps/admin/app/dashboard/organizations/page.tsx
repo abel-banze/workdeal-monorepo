@@ -17,13 +17,6 @@ interface OrgRow {
   profileCount: number;
 }
 
-interface OrgsApiData {
-  items: OrgRow[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pendente",
   in_review: "Em análise",
@@ -42,9 +35,8 @@ export default async function OrganizationsPage({
   const page = sp.page ? Number(sp.page) : 1;
 
   const res = await listAdminOrganizations({ verificationStatus, search: q || undefined, page, limit: 20 });
-  const data = res.data as OrgsApiData | null;
-  const items = data?.items ?? [];
-  const total = data?.total ?? 0;
+  const items = (res.data as OrgRow[] | null) ?? [];
+  const total = (res.meta?.total as number) ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / 20));
 
   const buildHref = (overrides: Record<string, string | undefined>) => {

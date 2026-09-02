@@ -29,16 +29,36 @@ type ContactProps = {
 
 type ContactVerification = PublicContactVerification;
 
-function normalizeId(channel: string, value: string): string {
-  const v = value.trim().toLowerCase();
-  return channel === "email" || channel === "website" ? v : v.replace(/\D/g, "");
+// Normalização canónica para comparação "verificado" vs "gravado":
+// - MZ mobile/fixo: "84..." / "+25884..." / "25884..." → "25884..." (indicativo 258)
+// - email: lowercase trimmed
+// - website: sem protocolo www/esquema e barra final, lowercase
+function normalizeId(channel: string, value: string): string | null {
+  const v = value.trim();
+  if (!v) return null;
+  if (channel === "email") {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? v.toLowerCase() : null;
+  }
+  if (channel === "website") {
+    const clean = v.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "").toLowerCase();
+    return clean || null;
+  }
+  // phone / whatsapp — colocar em forma canónica MZ (258 + 9 dígitos)
+  let digits = v.replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length === 9) digits = `258${digits}`;
+  // mobile MZ: 8[2-7]\d{7} · fixo: 2[0-8]\d{7} (com indicativo 258 → 12 dígitos)
+  return /^258(?:8[2-7]|2[0-8])\d{7}$/.test(digits) ? digits : null;
 }
 
 function isChannelVerified(channel: string, value: string | null, verifications: ContactVerification[]): boolean {
   if (!value) return false;
+  const normalized = normalizeId(channel, value);
+  if (!normalized) return false;
   return verifications.some((v) => {
     if (v.channel !== channel) return false;
-    return normalizeId(channel, value) === normalizeId(channel, v.identifier);
+    return normalizeId(channel, v.identifier) === normalized;
   });
 }
 

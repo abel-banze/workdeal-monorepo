@@ -263,6 +263,43 @@ export function resetPasswordHtml(params: { name: string; resetUrl: string }): s
   return baseLayout(`Redefine a tua palavra-passe — ${BRAND}`, "SEGURANÇA DA CONTA", inner);
 }
 
+export function preRegisterCompanyHtml(params: {
+  companyName: string;
+  contactName: string;
+  promoterName?: string;
+  completionUrl: string;
+  formattedAddress?: string | null;
+}): string {
+  const { companyName, contactName, promoterName, completionUrl, formattedAddress } = params;
+  const safeCompany = escapeHtml(companyName);
+  const safeContact = escapeHtml(contactName);
+  const safePromoter = promoterName ? escapeHtml(promoterName) : "a nossa equipa";
+  const addressHtml = formattedAddress ? `<p style="margin:0 0 16px;font-size:14px;color:#0F1A2E;opacity:0.7;line-height:1.6;">📍 <strong>${escapeHtml(formattedAddress)}</strong></p>` : "";
+  const inner = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#0F1A2E;line-height:1.1;">${safeCompany} no Workdeal</h1>
+    <p style="margin:0 0 16px;font-size:14px;color:#0F1A2E;opacity:0.7;line-height:1.6;">
+      Olá ${safeContact}, durante o nosso contacto (${safePromoter}) registámos a ${safeCompany} para fazer parte do Workdeal — o ecossistema onde os negócios de Moçambique se encontram.
+    </p>
+    ${addressHtml}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+      <tr><td style="background:#F6F3EE;border:1px solid #D9D2C2;border-radius:12px;padding:16px;">
+        <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#0F1A2E;">Falta só um passo</p>
+        <p style="margin:0;font-size:13px;color:#0F1A2E;opacity:0.65;line-height:1.5;">Cria a tua conta, completa os dados da empresa e o teu perfil fica disponível para milhares de pessoas recomendarem, encontrarem e contactarem o teu negócio.</p>
+      </td></tr>
+    </table>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 20px;">
+      <tr>
+        <td align="center" style="background-color:#FF3B1F;border-radius:999px;">
+          <a href="${completionUrl}" style="display:inline-block;padding:14px 28px;font-size:14px;font-weight:800;color:#ffffff;text-decoration:none;">Completar registo →</a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 8px;font-size:12px;color:#0F1A2E;opacity:0.5;line-height:1.5;">Se o botão não funcionar, copia e cola este link:</p>
+    <p style="margin:0;font-size:12px;word-break:break-all;"><a href="${completionUrl}" style="color:#0B5E56;text-decoration:underline;">${completionUrl}</a></p>
+  `;
+  return baseLayout(`Registo da ${companyName} no Workdeal`, "REGISTO INICIADO", inner);
+}
+
 function escapeHtml(str: string): string {
   return str.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
 }

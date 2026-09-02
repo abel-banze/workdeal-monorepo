@@ -10,8 +10,7 @@ export const metadata = {
 export default async function UsersRolesPage() {
   const session = await requireSystemRole("moderator", "admin");
   const res = await listAdminUsers({ page: 1, limit: 100 });
-  const data = res.data as { items: Array<{ id: string; name: string; email: string; systemRole: string }> } | null;
-  const users = data?.items ?? [];
+  const users = (res.data as Array<{ id: string; name: string; email: string; systemRole: string }> | null) ?? [];
 
   return (
     <div className="space-y-4">

@@ -10,8 +10,7 @@ export const metadata = {
 export default async function OrganizationsPendingPage() {
   const session = await requireSystemRole("moderator", "admin");
   const res = await listAdminOrganizations({ verificationStatus: "pending", page: 1, limit: 100 });
-  const data = res.data as { items: Array<{ id: string; name: string; slug: string; verificationStatus: string }> } | null;
-  const orgs = data?.items ?? [];
+  const orgs = (res.data as Array<{ id: string; name: string; slug: string; verificationStatus: string }> | null) ?? [];
 
   return (
     <div className="space-y-4">

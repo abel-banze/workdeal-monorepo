@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ProfileView } from "@workdeal/shared";
+import { VerificationBadge, degreeFromBadges } from "@/components/features/verification-badge";
 
 type CardBadge = { slug: string; name: string; type: string };
 
@@ -30,6 +31,7 @@ export function ProfileCard({ profile, verified, sizeLabel, district, province, 
   const initials = profile.name.slice(0, 2).toUpperCase();
   const badges = badgesProp ?? (profile as { badges?: CardBadge[] }).badges ?? [];
   const isVerified = verified ?? badges.some((b) => b.slug === "verified");
+  const verificationDegree = degreeFromBadges(badges);
   const topBar = isVerified ? "bg-[#0B5E56]" : "bg-[#D9D2C2]/60";
   const distanceKm = distanceKmProp ?? (profile as { distanceKm?: number | null }).distanceKm ?? null;
   const hasDistance = typeof distanceKm === "number" && Number.isFinite(distanceKm);
@@ -37,7 +39,10 @@ export function ProfileCard({ profile, verified, sizeLabel, district, province, 
   const pDistrict = district ?? (profile as { district?: string | null }).district ?? null;
   const provinceLine = [pDistrict, pProvince].filter(Boolean).join(" · ");
   const hasLocation = Boolean(pProvince || pDistrict);
+  // Exclui selos de verificação (verified / in-legalization) — a verificação é
+  // comunicada pelo HiCheckBadge junto ao nome, não por pill de "Verificado".
   const cardBadges = [...badges]
+    .filter((b) => b.slug !== "verified" && b.slug !== "in-legalization")
     .sort((a, b) => (BADGE_PRIORITY.indexOf(a.slug) - BADGE_PRIORITY.indexOf(b.slug)) || 0)
     .slice(0, 3);
 
@@ -59,11 +64,6 @@ export function ProfileCard({ profile, verified, sizeLabel, district, province, 
               initials
             )}
           </div>
-          {isVerified ? (
-            <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border-2 border-white bg-[#0B5E56] text-[10px] font-black text-white">
-              ✓
-            </span>
-          ) : null}
         </div>
 
         <div className="min-w-0 flex-1">
@@ -85,10 +85,11 @@ export function ProfileCard({ profile, verified, sizeLabel, district, province, 
           )}
 
           <h3
-            className="mt-1 line-clamp-1 text-[17px] font-black leading-none tracking-[-0.03em] text-[#0F1A2E]"
+            className="mt-1 flex items-center gap-1.5 text-[17px] font-black leading-none tracking-[-0.03em] text-[#0F1A2E]"
             style={{ fontFamily: "var(--font-display), ui-serif, Georgia, serif" }}
           >
-            {profile.name}
+            <span className="min-w-0 truncate">{profile.name}</span>
+            <VerificationBadge degree={verificationDegree} size={20} />
           </h3>
           {profile.tagline ? (
             <p className="mt-1 line-clamp-2 min-h-[2.2rem] text-[13px] leading-snug text-[#0F1A2E]/60">{profile.tagline}</p>

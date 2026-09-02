@@ -52,6 +52,7 @@ const groups: { label: string; items: NavMainItem[] }[] = [
           { title: "Todas", url: "/dashboard/organizations" },
           { title: "Membros", url: "/dashboard/organizations/members" },
           { title: "Pendentes", url: "/dashboard/organizations/pending" },
+          { title: "Pré-registo", url: "/dashboard/organizations/pre-register" },
         ],
       },
       {

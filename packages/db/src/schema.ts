@@ -17,7 +17,7 @@ import {
 
 export const systemRoleEnum = pgEnum("system_role", ["user", "moderator", "admin"]);
 export const orgRoleEnum = pgEnum("org_role", ["owner", "admin", "editor", "member"]);
-export const verificationStatusEnum = pgEnum("verification_status", ["pending", "in_review", "verified", "suspended"]);
+export const verificationStatusEnum = pgEnum("verification_status", ["pre_registered", "pending", "in_review", "verified", "suspended"]);
 export const invitationStatusEnum = pgEnum("invitation_status", ["pending", "accepted", "rejected", "canceled"]);
 
 // PostGIS geography(Point,4326). O drizzle-kit (v0.31) não sabe emitir tipos
@@ -127,8 +127,20 @@ export const organization = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     verificationStatus: verificationStatusEnum("verification_status").notNull().default("pending"),
     verifiedAt: timestamp("verified_at"),
+    // Pré-registo (promoter) — empresa recolhida, ainda sem conta no Workdeal
+    preRegisteredAt: timestamp("pre_registered_at"),
+    preRegisteredBy: text("pre_registered_by").references(() => user.id),
+    contactName: text("contact_name"),
+    contactPhone: text("contact_phone"),
+    contactEmail: text("contact_email"),
+    completionToken: text("completion_token"),
+    completionTokenExpiresAt: timestamp("completion_token_expires_at"),
   },
-  (table) => [index("organization_slug_idx").on(table.slug)],
+  (table) => [
+    index("organization_slug_idx").on(table.slug),
+    index("organization_completion_token_idx").on(table.completionToken),
+    index("organization_pre_registered_idx").on(table.verificationStatus),
+  ],
 );
 
 export const member = pgTable(

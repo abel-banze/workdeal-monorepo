@@ -17,13 +17,6 @@ interface UserRow {
   createdAt: string;
 }
 
-interface UsersApiData {
-  items: UserRow[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   moderator: "Moderador",
@@ -41,9 +34,8 @@ export default async function UsersPage({
   const page = sp.page ? Number(sp.page) : 1;
 
   const res = await listAdminUsers({ role, search: q || undefined, page, limit: 20 });
-  const data = res.data as UsersApiData | null;
-  const items = data?.items ?? [];
-  const total = data?.total ?? 0;
+  const items = (res.data as UserRow[] | null) ?? [];
+  const total = (res.meta?.total as number) ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / 20));
 
   const buildHref = (overrides: Record<string, string | undefined>) => {
