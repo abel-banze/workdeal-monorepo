@@ -3,12 +3,30 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { preRegisterCompany } from "@/app/actions/admin";
+import { preRegisterCompany, updatePreRegister } from "@/app/actions/admin";
 
 interface PlaceSuggestion {
   placeId: string;
   mainText: string;
   secondaryText: string;
+}
+
+export interface CategoryOption {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+export interface PreRegisterFormValues {
+  name: string;
+  slug: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
+  formattedAddress: string;
+  googlePlaceId: string;
+  logoUrl: string;
+  categorySlugs: string[];
 }
 
 function slugify(name: string): string {
@@ -20,15 +38,26 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-export function PreRegisterForm({ isAdmin }: { isAdmin: boolean }) {
+interface Props {
+  isAdmin: boolean;
+  categories: CategoryOption[];
+  // Em modo edição, os valores iniciais preenchem o formulário
+  initial?: Partial<PreRegisterFormValues> | null;
+  id?: string;
+}
+
+export function PreRegisterForm({ isAdmin, categories, initial, id }: Props) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [formattedAddress, setFormattedAddress] = useState("");
-  const [googlePlaceId, setGooglePlaceId] = useState("");
+  const isEdit = Boolean(id);
+  const [name, setName] = useState(initial?.name ?? "");
+  const [slug, setSlug] = useState(initial?.slug ?? "");
+  const [contactName, setContactName] = useState(initial?.contactName ?? "");
+  const [contactPhone, setContactPhone] = useState(initial?.contactPhone ?? "");
+  const [contactEmail, setContactEmail] = useState(initial?.contactEmail ?? "");
+  const [formattedAddress, setFormattedAddress] = useState(initial?.formattedAddress ?? "");
+  const [googlePlaceId, setGooglePlaceId] = useState(initial?.googlePlaceId ?? "");
+  const [logoUrl, setLogoUrl] = useState(initial?.logoUrl ?? "");
+  const [categorySlugs, setCategorySlugs] = useState<string[]>(initial?.categorySlugs ?? []);
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,12 +81,17 @@ export function PreRegisterForm({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  // Ao escolher uma sugestão do Google Places, o nome passa a ser o do Google Places.
   function pickPlace(s: PlaceSuggestion) {
     setSuggestions([]);
-    if (!name) setName(s.mainText);
-    if (!slug) setSlug(slugify(s.mainText));
+    setName(s.mainText);
+    setSlug(slugify(s.mainText));
     setFormattedAddress(s.secondaryText || s.mainText);
     setGooglePlaceId(s.placeId);
+  }
+
+  function toggleCategory(slug: string) {
+    setCategorySlugs((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -66,7 +100,7 @@ export function PreRegisterForm({ isAdmin }: { isAdmin: boolean }) {
     setError(null);
     setSuccess(null);
     try {
-      const res = await preRegisterCompany({
+      const payload = {
         name: name.trim(),
         slug: slug.trim() || slugify(name.trim()),
         contactName: contactName.trim(),
@@ -74,29 +108,44 @@ export function PreRegisterForm({ isAdmin }: { isAdmin: boolean }) {
         contactEmail: contactEmail.trim() || undefined,
         googlePlaceId: googlePlaceId || undefined,
         formattedAddress: formattedAddress.trim() || undefined,
-      });
-      if (!res.success) {
-        setError(res.error?.message ?? "Falha ao criar pré-registo");
+        logoUrl: logoUrl.trim() || undefined,
+        categorySlugs: categorySlugs.length > 0 ? categorySlugs : undefined,
+      };
+      if (isEdit) {
+        const res = await updatePreRegister(id!, payload);
+        if (!res.success) {
+          setError(res.error?.message ?? "Falha ao actualizar pré-registo");
+        } else {
+          setSuccess("Pré-registo actualizado.");
+          router.refresh();
+        }
       } else {
-        setSuccess(`${name.trim()} registada. Notificação enviada por email, SMS e WhatsApp.`);
-        setName("");
-        setSlug("");
-        setContactName("");
-        setContactPhone("");
-        setContactEmail("");
-        setFormattedAddress("");
-        setGooglePlaceId("");
-        router.refresh();
+        const res = await preRegisterCompany(payload);
+        if (!res.success) {
+          setError(res.error?.message ?? "Falha ao criar pré-registo");
+        } else {
+          setSuccess(`${name.trim()} registada. Notificação enviada por email, SMS e WhatsApp.`);
+          setName("");
+          setSlug("");
+          setContactName("");
+          setContactPhone("");
+          setContactEmail("");
+          setFormattedAddress("");
+          setGooglePlaceId("");
+          setLogoUrl("");
+          setCategorySlugs([]);
+          router.refresh();
+        }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao criar pré-registo");
+      setError(err instanceof Error ? err.message : "Falha ao guardar pré-registo");
     } finally {
       setBusy(false);
     }
   }
 
   if (!isAdmin) {
-    return <p className="text-sm text-muted-foreground">Só administradores podem criar pré-registos.</p>;
+    return <p className="text-sm text-muted-foreground">Só administradores podem {isEdit ? "editar" : "criar"} pré-registos.</p>;
   }
 
   return (
@@ -105,15 +154,17 @@ export function PreRegisterForm({ isAdmin }: { isAdmin: boolean }) {
       {success && <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">{success}</div>}
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Nome da empresa</label>
+        <label className="mb-1 block text-xs font-medium text-muted-foreground">Nome da empresa *</label>
         <input
           value={name}
           onChange={(e) => {
             setName(e.target.value);
+            if (isEdit) return;
             if (!slug || slug === slugify(name)) setSlug(slugify(e.target.value));
             void searchPlaces(e.target.value);
           }}
           placeholder="Pesquisar no Google Places ou escrever manualmente"
+          required
           className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
         />
         {suggestions.length > 0 && (
@@ -136,7 +187,7 @@ export function PreRegisterForm({ isAdmin }: { isAdmin: boolean }) {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Slug (URL)</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Slug / URL</label>
           <input
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
@@ -153,6 +204,38 @@ export function PreRegisterForm({ isAdmin }: { isAdmin: boolean }) {
           />
         </div>
       </div>
+
+      <div>
+        <label className="mb-1 block text-xs font-medium text-muted-foreground">Logo (URL, opcional)</label>
+        <input
+          value={logoUrl}
+          onChange={(e) => setLogoUrl(e.target.value)}
+          placeholder="https://…/logo.png"
+          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        />
+        {logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt="Pré-visualização do logo" className="mt-2 h-12 w-12 rounded object-cover" />
+        )}
+      </div>
+
+      {categories.length > 0 && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Categorias</label>
+          <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-input p-2">
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => toggleCategory(c.slug)}
+                className={`rounded-full border px-2.5 py-1 text-xs ${categorySlugs.includes(c.slug) ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background hover:bg-accent"}`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
@@ -186,9 +269,16 @@ export function PreRegisterForm({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </div>
 
-      <Button type="submit" disabled={busy}>
-        {busy ? "A registar…" : "Registar empresa"}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={busy}>
+          {busy ? "A guardar…" : isEdit ? "Guardar alterações" : "Registar empresa"}
+        </Button>
+        {isEdit && (
+          <Button type="button" variant="outline" onClick={() => router.push("/dashboard/organizations/pre-register")}>
+            Cancelar
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

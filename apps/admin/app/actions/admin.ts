@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
-import type { AdminUserListQuery, AdminOrgListQuery, PreRegisterCompanyInput } from "@workdeal/shared";
+import type { AdminUserListQuery, AdminOrgListQuery, PreRegisterCompanyInput, PreRegisterUpdateInput } from "@workdeal/shared";
 import { apiFetch, apiFetchWithAuth } from "@/lib/api";
 import { requireSystemRole } from "@/lib/auth";
 
@@ -87,5 +87,46 @@ export async function regeneratePreRegisterToken(id: string) {
   const res = await apiFetchWithAuth(`/api/v1/admin/organizations/${id}/pre-register/regenerate-token`, token, {
     method: "POST",
   });
+  return res;
+}
+
+export async function resendPreRegisterNotification(id: string) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem reenviar notificações");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/organizations/${id}/pre-register/resend-notification`, token, {
+    method: "POST",
+  });
+  return res;
+}
+
+export async function updatePreRegister(id: string, input: PreRegisterUpdateInput) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem editar pré-registos");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/organizations/pre-register/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return res;
+}
+
+export async function deletePreRegister(id: string) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem eliminar pré-registos");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/organizations/pre-register/${id}`, token, {
+    method: "DELETE",
+  });
+  return res;
+}
+
+export async function getPreRegisterById(id: string) {
+  await requireSystemRole("moderator", "admin");
+  return apiFetch<unknown>(`/api/v1/admin/organizations/pre-register/${id}`);
+}
+
+export async function listCategories() {
+  const res = await apiFetch<Array<{ id: string; slug: string; name: string }>>(`/api/v1/categories`);
   return res;
 }

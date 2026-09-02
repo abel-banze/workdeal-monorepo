@@ -24,7 +24,7 @@ export const adminUpdateOrgStatusSchema = z.object({
   note: z.string().trim().max(1000).optional(),
 });
 
-export const preRegisterCompanySchema = z.object({
+const preRegisterBaseSchema = z.object({
   name: z.string().trim().min(2).max(200),
   slug: z
     .string()
@@ -37,10 +37,26 @@ export const preRegisterCompanySchema = z.object({
   contactEmail: z.string().trim().email().optional(),
   googlePlaceId: z.string().trim().max(200).optional(),
   formattedAddress: z.string().trim().max(500).optional(),
+  // Logo (URL) e categorias (slugs) — persistidos no metadata JSON do pre-registo
+  logoUrl: z.string().trim().url().max(1000).optional(),
+  categorySlugs: z.array(z.string().trim().min(1).max(100)).max(10).optional(),
 });
+
+// Criação de pré-registo — name/slug/contact obrigatórios
+export const preRegisterCompanySchema = preRegisterBaseSchema;
+
+// Edição de pré-registo — todos os campos opcionais, com a possibilidade
+// de limpar logo (logoUrl: null) e categorias (categorySlugs: null)
+export const preRegisterUpdateSchema = preRegisterBaseSchema
+  .partial()
+  .extend({
+    logoUrl: z.string().trim().url().max(1000).optional().nullable(),
+    categorySlugs: z.array(z.string().trim().min(1).max(100)).max(10).optional().nullable(),
+  });
 
 export type AdminUserListQuery = z.infer<typeof adminUserListQuerySchema>;
 export type AdminOrgListQuery = z.infer<typeof adminOrgListQuerySchema>;
 export type AdminUpdateUserRoleInput = z.infer<typeof adminUpdateUserRoleSchema>;
 export type AdminUpdateOrgStatusInput = z.infer<typeof adminUpdateOrgStatusSchema>;
 export type PreRegisterCompanyInput = z.infer<typeof preRegisterCompanySchema>;
+export type PreRegisterUpdateInput = z.infer<typeof preRegisterUpdateSchema>;

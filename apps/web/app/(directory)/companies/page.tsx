@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { cookies } from "next/headers";
-import { getCategories, getProfiles } from "@/lib/profiles";
+import { getCategories, getProfiles, getPreRegisteredCompanies } from "@/lib/profiles";
 import { ProfileCard } from "@/components/features/profile-card";
+import { PreRegisterCard } from "@/components/features/pre-register-card";
 import { SearchImpressions } from "@/components/features/search-impressions";
 import { CompaniesFilters } from "@/components/features/companies-filters";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
@@ -73,10 +74,16 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
   const limit = 12;
 
   try {
-    const { data, meta } = await getProfiles({ ...searchParams, page: String(page), limit: String(limit) });
+    const [{ data, meta }, preRegRes] = await Promise.all([
+      getProfiles({ ...searchParams, page: String(page), limit: String(limit) }),
+      getPreRegisteredCompanies().catch(() => ({ data: [] })),
+    ]);
     // fase 1: só empresas
     const companies = data.filter((p) => p.type === "company");
     const total = typeof meta?.total === "number" ? (meta.total as number) : companies.length;
+    const preRegistered =
+      (preRegRes.data as Array<Parameters<typeof PreRegisterCard>[0]["company"]> | null) ?? [];
+    const hasPreRegistered = preRegistered.length > 0;
 
     const search = meta?.search as
       | { matchedProvince?: string | null; matchedCategory?: string | null }
@@ -87,16 +94,33 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
     for (const [k, v] of Object.entries(searchParams)) if (v && k !== "page") baseQs.set(k, v as string);
 
     if (companies.length === 0) {
+      // mesmo sem empresas activas, mostramos as que estão em pré-registo
       return (
-        <div className="rounded-[16px] border border-dashed border-[#D9D2C2] bg-white px-6 py-14 text-center">
-          <p className="inline-flex items-center gap-2 rounded-full bg-[#F6F3EE] border border-[#D9D2C2] px-3 py-1 text-xs font-bold tracking-widest text-[#0F1A2E]/60">
-            <span className="size-1.5 rounded-full bg-[#FF3B1F]" /> NENHUM RESULTADO
-          </p>
-          <h3 className="mt-4 text-lg font-black tracking-tight text-[#0F1A2E]">Nenhuma empresa encontrada</h3>
-          <p className="mx-auto mt-2 max-w-[460px] text-sm leading-relaxed text-[#0F1A2E]/60">Tente ajustar os filtros — limpe a pesquisa, escolha outra categoria ou aumente o raio de proximidade.</p>
-          <Link href="/companies" className="mt-5 inline-flex h-9 items-center rounded-full bg-[#0F1A2E] px-5 text-sm font-bold text-white hover:bg-black">
-            Limpar filtros
-          </Link>
+        <div className="space-y-6">
+          {hasPreRegistered && (
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex size-6 items-center justify-center rounded-full bg-[#FFB020]/20 text-[#B27300]">⏳</span>
+                <h2 className="text-sm font-black tracking-tight text-[#0F1A2E]">Empresas em pré-registo</h2>
+                <span className="rounded-full bg-[#FFF1D6] px-2 py-0.5 text-[11px] font-bold text-[#B27300]">{preRegistered.length}</span>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {preRegistered.map((c) => (
+                  <PreRegisterCard key={c.id} company={c} />
+                ))}
+              </div>
+            </section>
+          )}
+          <div className="rounded-[16px] border border-dashed border-[#D9D2C2] bg-white px-6 py-14 text-center">
+            <p className="inline-flex items-center gap-2 rounded-full bg-[#F6F3EE] border border-[#D9D2C2] px-3 py-1 text-xs font-bold tracking-widest text-[#0F1A2E]/60">
+              <span className="size-1.5 rounded-full bg-[#FF3B1F]" /> NENHUM RESULTADO
+            </p>
+            <h3 className="mt-4 text-lg font-black tracking-tight text-[#0F1A2E]">Nenhuma empresa encontrada</h3>
+            <p className="mx-auto mt-2 max-w-[460px] text-sm leading-relaxed text-[#0F1A2E]/60">Tente ajustar os filtros — limpe a pesquisa, escolha outra categoria ou aumente o raio de proximidade.</p>
+            <Link href="/companies" className="mt-5 inline-flex h-9 items-center rounded-full bg-[#0F1A2E] px-5 text-sm font-bold text-white hover:bg-black">
+              Limpar filtros
+            </Link>
+          </div>
         </div>
       );
     }
@@ -115,6 +139,20 @@ async function CompaniesList({ searchParams }: { searchParams: Record<string, st
           <p className="mb-4 rounded-[10px] border border-[#0B5E56]/20 bg-[#EAF4F2] px-3 py-2 text-xs text-[#0B5E56]">
             Pesquisa interpretada: <span className="font-semibold">{smartFilters}</span> — resultados filtrados automaticamente.
           </p>
+        )}
+        {hasPreRegistered && !searchParams.q && !smartFilters && (
+          <section className="mb-6">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex size-6 items-center justify-center rounded-full bg-[#FFB020]/20 text-[#B27300]">⏳</span>
+              <h2 className="text-sm font-black tracking-tight text-[#0F1A2E]">Empresas em pré-registo</h2>
+              <span className="rounded-full bg-[#FFF1D6] px-2 py-0.5 text-[11px] font-bold text-[#B27300]">{preRegistered.length}</span>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {preRegistered.map((c) => (
+                <PreRegisterCard key={c.id} company={c} />
+              ))}
+            </div>
+          </section>
         )}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {companies.map((p) => (

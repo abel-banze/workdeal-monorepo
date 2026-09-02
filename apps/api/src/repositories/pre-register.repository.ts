@@ -20,6 +20,40 @@ export interface PreRegisterRow {
   promoterEmail: string | null;
 }
 
+export interface PreRegisterMetadata {
+  googlePlaceId?: string | null;
+  formattedAddress?: string | null;
+  logoUrl?: string | null;
+  categorySlugs?: string[];
+}
+
+export function parsePreRegisterMetadata(metadata: string | null): PreRegisterMetadata {
+  if (!metadata) return {};
+  try {
+    const parsed = JSON.parse(metadata) as PreRegisterMetadata;
+    return parsed ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export function buildPreRegisterMetadata(input: {
+  googlePlaceId?: string | null;
+  formattedAddress?: string | null;
+  logoUrl?: string | null;
+  categorySlugs?: string[];
+}): string | null {
+  const googlePlaceId = input.googlePlaceId || null;
+  const formattedAddress = input.formattedAddress || null;
+  const logoUrl = input.logoUrl || null;
+  const categorySlugs =
+    input.categorySlugs && input.categorySlugs.length > 0
+      ? input.categorySlugs.map((s) => s.trim()).filter(Boolean)
+      : undefined;
+  if (!googlePlaceId && !formattedAddress && !logoUrl && (!categorySlugs || categorySlugs.length === 0)) return null;
+  return JSON.stringify({ googlePlaceId, formattedAddress, logoUrl, categorySlugs });
+}
+
 export const preRegisterRepository = {
   async list(query: AdminOrgListQuery): Promise<{ items: PreRegisterRow[]; total: number }> {
     const page = query.page ?? 1;
@@ -102,6 +136,29 @@ export const preRegisterRepository = {
     return row;
   },
 
+  async update(
+    id: string,
+    input: {
+      name?: string;
+      slug?: string;
+      contactName?: string;
+      contactPhone?: string;
+      contactEmail?: string | null;
+      metadata?: string | null;
+    },
+  ) {
+    const [row] = await db
+      .update(organization)
+      .set({ ...input, updatedAt: new Date() })
+      .where(and(eq(organization.id, id), eq(organization.verificationStatus, "pre_registered" as never)))
+      .returning();
+    return row ?? null;
+  },
+
+  async remove(id: string) {
+    await db.delete(organization).where(and(eq(organization.id, id), eq(organization.verificationStatus, "pre_registered" as never)));
+  },
+
   async findByToken(token: string) {
     const [row] = await db
       .select()
@@ -114,6 +171,42 @@ export const preRegisterRepository = {
   async findByIdOrg(id: string) {
     const [row] = await db.select().from(organization).where(eq(organization.id, id)).limit(1);
     return row ?? null;
+  },
+
+  // Listagem pública de empresas pré-registadas (cartões "Em breve" no directório).
+  // Só as que ainda estão em pré-registo (com token activo, ainda não reclamadas) aparecem.
+  async listPublic(): Promise<Array<{
+    id: string;
+    name: string;
+    slug: string;
+    formattedAddress: string | null;
+    logoUrl: string | null;
+    categorySlugs: string[];
+    preRegisteredAt: Date;
+  }>> {
+    const rows = await db
+      .select({
+        id: organization.id,
+        name: organization.name,
+        slug: organization.slug,
+        metadata: organization.metadata,
+        preRegisteredAt: organization.preRegisteredAt,
+      })
+      .from(organization)
+      .where(and(eq(organization.verificationStatus, "pre_registered" as never), sql`${organization.completionToken} IS NOT NULL`))
+      .orderBy(desc(organization.preRegisteredAt));
+    return rows.map((r) => {
+      const meta = parsePreRegisterMetadata(r.metadata);
+      return {
+        id: r.id,
+        name: r.name,
+        slug: r.slug,
+        formattedAddress: meta.formattedAddress ?? null,
+        logoUrl: meta.logoUrl ?? null,
+        categorySlugs: meta.categorySlugs ?? [],
+        preRegisteredAt: r.preRegisteredAt ?? new Date(),
+      };
+    });
   },
 
   async findBySlug(slug: string) {
