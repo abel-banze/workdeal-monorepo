@@ -6,6 +6,13 @@ import { preRegisterController } from "../controllers/pre-register.controller.js
 // Rotas públicas de completamento do pré-registo — acesso via token único.
 export const preRegisterRoute = new Hono<Env>();
 
+// Listagem pública de empresas pré-registadas — cartões "Em breve" no directório.
+preRegisterRoute.get("/", async (c) => {
+  const { body, status } = await preRegisterController.listPublic();
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
 // Devolve os dados da empresa associada ao token (sem auth — o token é a credencial).
 preRegisterRoute.get("/:token", async (c) => {
   const { body, status } = await preRegisterController.lookup(c.req.param("token"));

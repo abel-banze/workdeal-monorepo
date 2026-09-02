@@ -22,11 +22,13 @@ export async function notifyCompanyPreRegister(input: PreRegisterNotifyInput) {
   return { email: emailResult, sms: smsResult, whatsapp: whatsappResult };
 }
 
-function webOrigin(): string {
-  return (process.env.ALLOWED_ORIGINS?.split(",")[0]?.trim() ?? "https://workdeal.co.mz").replace(/\/+$/, "");
+export const BASE_URL = "https://workdeal.co.mz";
+
+export function webOrigin(): string {
+  return BASE_URL;
 }
 
-async function sendEmail(input: PreRegisterNotifyInput) {
+export async function sendEmail(input: PreRegisterNotifyInput) {
   if (!input.contactEmail) {
     console.warn(`[pre-register email] sem contactEmail para ${input.companyName} — skip`);
     return { ok: true as const, skipped: true as const };
@@ -65,7 +67,7 @@ async function sendEmail(input: PreRegisterNotifyInput) {
   }
 }
 
-async function sendSms(input: PreRegisterNotifyInput) {
+export async function sendSms(input: PreRegisterNotifyInput) {
   if (!input.contactPhone) {
     console.warn(`[pre-register sms] sem contactPhone para ${input.companyName} — skip`);
     return { ok: true as const, skipped: true as const };
@@ -104,7 +106,7 @@ async function sendSms(input: PreRegisterNotifyInput) {
   }
 }
 
-async function sendWhatsApp(input: PreRegisterNotifyInput) {
+export async function sendWhatsApp(input: PreRegisterNotifyInput) {
   if (!input.contactPhone) {
     console.warn(`[pre-register whatsapp] sem contactPhone para ${input.companyName} — skip`);
     return { ok: true as const, skipped: true as const };
@@ -115,10 +117,10 @@ async function sendWhatsApp(input: PreRegisterNotifyInput) {
   const isProd = process.env.NODE_ENV === "production";
   if (!token || !accountId) {
     if (isProd) return { ok: false as const, skipped: false as const, error: "ZERNIO_API_KEY/PHONE_ID em falta" };
-    console.warn(`[pre-register whatsapp] ZERNIO em falta — mock: enviaria para +${digits} template pre_register_company ({{1}}=nome, {{2}}=link)`);
+    console.warn(`[pre-register whatsapp] ZERNIO em falta — mock: enviaria para +${digits} template onboarding_request ({{1}}=nome, {{2}}=link)`);
     return { ok: true as const, skipped: false as const };
   }
-  const templateName = process.env.WHATSAPP_PREREGISTER_TEMPLATE ?? "pre_register_company";
+  const templateName = process.env.WHATSAPP_PREREGISTER_TEMPLATE ?? "onboarding_request";
   const templateLanguage = "pt_PT";
   try {
     const res = await fetch("https://zernio.com/api/v1/inbox/conversations", {

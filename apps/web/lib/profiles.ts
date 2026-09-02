@@ -43,3 +43,20 @@ export async function getPortfolioItems(profileId: string) {
     next: { revalidate: 300, tags: [`portfolio:${profileId}`] },
   });
 }
+
+export interface PreRegisteredCompany {
+  id: string;
+  name: string;
+  slug: string;
+  formattedAddress: string | null;
+  logoUrl: string | null;
+  categorySlugs: string[];
+  preRegisteredAt: string;
+}
+
+export async function getPreRegisteredCompanies() {
+  return apiFetch<PreRegisteredCompany[]>(`/api/v1/pre-register`, {
+    // Dados voláteis (empresas que vão surgindo) — cache curta
+    next: { revalidate: 60 },
+  });
+}

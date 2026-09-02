@@ -9,6 +9,8 @@ export const preRegisterLookupSchema = z.object({
   contactPhone: z.string().nullable(),
   contactEmail: z.string().nullable(),
   formattedAddress: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  categorySlugs: z.array(z.string()).nullable(),
   metadata: z.string().nullable(),
   verificationStatus: z.string(),
   preRegisteredAt: z.string().nullable(),
