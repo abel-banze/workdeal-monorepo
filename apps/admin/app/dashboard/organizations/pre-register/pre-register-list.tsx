@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@workspace/ui/components/dropdown-menu";
@@ -163,7 +164,9 @@ export function PreRegisterList({ items, isAdmin }: { items: PreRegisterListItem
                         }
                       />
                       <DropdownMenuContent align="end" sideOffset={4}>
-                        <DropdownMenuLabel>{o.name}</DropdownMenuLabel>
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel>{o.name}</DropdownMenuLabel>
+                        </DropdownMenuGroup>
                         {o.completionUrl && (
                           <DropdownMenuItem
                             onClick={() => void copyLink(o.completionUrl!, o.id)}
