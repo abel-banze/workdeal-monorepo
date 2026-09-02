@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
 import type { AdminUserListQuery, AdminOrgListQuery, PreRegisterCompanyInput, PreRegisterUpdateInput } from "@workdeal/shared";
-import { apiFetch, apiFetchWithAuth } from "@/lib/api";
+import { apiFetch, apiFetchWithAuth, apiUpload } from "@/lib/api";
 import { requireSystemRole } from "@/lib/auth";
 
 async function getAuthToken(): Promise<string> {
@@ -128,5 +128,25 @@ export async function getPreRegisterById(id: string) {
 
 export async function listCategories() {
   const res = await apiFetch<Array<{ id: string; slug: string; name: string }>>(`/api/v1/categories`);
+  return res;
+}
+
+interface UploadedFile {
+  id: string;
+  url: string;
+  publicId: string;
+  originalFilename: string;
+  bytes: number;
+}
+
+export async function uploadPreRegisterLogo(file: File) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem carregar logos");
+  if (!file) throw new Error("Selecciona um ficheiro de imagem");
+  const token = await getAuthToken();
+  const formData = new FormData();
+  formData.set("file", file);
+  formData.set("purpose", "logo");
+  const res = await apiUpload<UploadedFile>(`/api/v1/files/upload`, token, formData);
   return res;
 }
