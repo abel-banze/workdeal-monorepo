@@ -8,6 +8,7 @@ import { SearchImpressions } from "@/components/features/search-impressions";
 import { CompaniesFilters } from "@/components/features/companies-filters";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
 import { haversineKm } from "@workdeal/shared/lib/geo";
+import { parseSmartSearch, STOPWORDS_PT } from "@workdeal/shared/lib/smart-search";
 
 export const revalidate = 300;
 
@@ -91,10 +92,20 @@ function matchesPreRegistered(
   }
   const query = q?.trim().toLowerCase();
   if (query) {
+    // Tokens com valor semântico (sem stopwords) para correspondência parcial:
+    // "empresa de eventos" → ["eventos"] casa com o slug da categoria.
+    const tokens = query.match(/[\p{L}\p{N}]+/gu) ?? [];
+    const meaningful = tokens.filter((t) => !STOPWORDS_PT.has(t));
+
     const inName = company.name.toLowerCase().includes(query);
-    const inCategories = company.categorySlugs.some((s) => s.toLowerCase().includes(query));
     const inProvince = (company.province ?? "").toLowerCase().includes(query);
     const inCity = (company.city ?? "").toLowerCase().includes(query);
+    const inCategories =
+      meaningful.length > 0 &&
+      company.categorySlugs.some((s) => {
+        const slug = s.toLowerCase().replace(/[-_]/g, " ");
+        return meaningful.some((t) => slug.includes(t));
+      });
     if (!inName && !inCategories && !inProvince && !inCity) return false;
   }
   // Proximidade por raio (nearby): só filtra se o pré-registo tiver coordenadas.
@@ -104,18 +115,6 @@ function matchesPreRegistered(
     if (dist > radiusKm) return false;
   }
   return true;
-}
-
-function PreRegisterSection({ companies }: { companies: PreRegisteredCompany[] }) {
-  return (
-    <section className="mb-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {companies.map((c) => (
-          <PreRegisterCard key={c.id} company={c} />
-        ))}
-      </div>
-    </section>
-  );
 }
 
 async function CompaniesList({
@@ -146,6 +145,14 @@ async function CompaniesList({
         .filter((c) => c.id === searchParams.categoryId)
         .map((c) => c.slug),
     );
+    // Resolve a categoria detectada na query natural ("empresa de eventos" →
+    // "eventos") e alinha o filtro de pré-registo com o motor de pesquisa dos
+    // perfis activos.
+    const smart = parseSmartSearch(
+      searchParams.q ?? "",
+      categories.map((c) => ({ slug: c.slug, name: c.name })),
+    );
+    if (smart.categorySlug) categorySlugs.add(smart.categorySlug);
     const nearParam = searchParams.near || undefined;
     const radiusKm = Math.max(1, Number(searchParams.radiusKm ?? 25) || 25);
     const preRegistered = allPreRegistered.filter((c) =>
@@ -162,6 +169,17 @@ async function CompaniesList({
     for (const [k, v] of Object.entries(searchParams)) if (v && k !== "page") baseQs.set(k, v as string);
 
     const isEmptyResult = companies.length === 0 && !hasPreRegistered;
+
+    // Listagem única em grid: primeiro as empresas activas (fora do pré-registo),
+    // depois as que estão em pré-registo.
+    const allCards: (
+      | { kind: "active"; data: (typeof companies)[number] }
+      | { kind: "pre"; data: (typeof preRegistered)[number] }
+    )[] = [
+      ...companies.map((c) => ({ kind: "active" as const, data: c })),
+      ...preRegistered.map((c) => ({ kind: "pre" as const, data: c })),
+    ];
+    const hasResults = allCards.length > 0;
 
     return (
       <div className="space-y-6">
@@ -190,12 +208,20 @@ async function CompaniesList({
           )
         )}
 
-        {companies.length > 0 && (
+        {hasResults && (
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {companies.map((p) => (
-                <ProfileCard key={p.id} profile={p as unknown as Parameters<typeof ProfileCard>[0]["profile"]} distanceKm={(p as unknown as { distanceKm?: number | null }).distanceKm ?? null} />
-              ))}
+              {allCards.map((item) =>
+                item.kind === "active" ? (
+                  <ProfileCard
+                    key={item.data.id}
+                    profile={item.data as unknown as Parameters<typeof ProfileCard>[0]["profile"]}
+                    distanceKm={(item.data as unknown as { distanceKm?: number | null }).distanceKm ?? null}
+                  />
+                ) : (
+                  <PreRegisterCard key={item.data.id} company={item.data} />
+                ),
+              )}
             </div>
             <SearchImpressions profileIds={companies.map((p) => p.id)} />
             <div className="mt-8">
@@ -203,8 +229,6 @@ async function CompaniesList({
             </div>
           </>
         )}
-
-        {hasPreRegistered && <PreRegisterSection companies={preRegistered} />}
 
         {isEmptyResult && (
           <div className="rounded-[16px] border border-dashed border-[#D9D2C2] bg-white px-6 py-14 text-center">

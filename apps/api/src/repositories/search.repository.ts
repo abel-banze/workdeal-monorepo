@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, exists, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, ilike, inArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, profile, profileCategory, category, profileLocation, profileBadge, badge } from "@workdeal/db";
 import type { ProfileBadgeLite } from "@workdeal/shared";
@@ -21,7 +21,8 @@ export interface SearchParams {
   /** Texto residual para websearch_to_tsquery (já unaccent lower). Vazio → só filtros estruturados. */
   text: string;
   location: SearchLocation | null;
-  categoryId?: string;
+  /** Categoria-alvo + todas as suas subcategorias (uma L1 cobre os filhos). */
+  categoryIds?: string[];
   near?: SearchNear | null;
   radiusKm?: number;
   sort?: "recent" | "name" | "distance";
@@ -77,10 +78,10 @@ export class SearchRepository {
       }
     }
 
-    if (params.categoryId) {
+    if (params.categoryIds?.length) {
       base.push(
         exists(
-          db.select({ one: sql`1` }).from(profileCategory).where(and(eq(profileCategory.profileId, profile.id), eq(profileCategory.categoryId, params.categoryId))),
+          db.select({ one: sql`1` }).from(profileCategory).where(and(eq(profileCategory.profileId, profile.id), inArray(profileCategory.categoryId, params.categoryIds))),
         ) as unknown as SQL,
       );
     }
