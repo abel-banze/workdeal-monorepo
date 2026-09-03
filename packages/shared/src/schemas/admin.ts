@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SYSTEM_ROLES } from "../types.js";
+import { NOTIFY_CHANNELS } from "./pre-register.js";
 
 export const adminUserListQuerySchema = z.object({
   role: z.enum(SYSTEM_ROLES).optional(),
@@ -46,6 +47,9 @@ const preRegisterBaseSchema = z.object({
   // Logo (URL) e categorias (slugs) — persistidos no metadata JSON do pre-registo
   logoUrl: z.string().trim().url().max(1000).optional(),
   categorySlugs: z.array(z.string().trim().min(1).max(100)).max(10).optional(),
+  // Canais de notificação (email, sms, whatsapp) — enviados à empresa após o pré-registo.
+  // Persistidos no metadata JSON para reenvio e edição respeitarem a escolha.
+  notifyChannels: z.array(z.enum(NOTIFY_CHANNELS)).min(1).max(3).optional(),
 });
 
 // Criação de pré-registo — name/slug/contact obrigatórios

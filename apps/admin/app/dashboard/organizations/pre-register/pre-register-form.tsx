@@ -16,6 +16,8 @@ import {
   useComboboxAnchor,
 } from "@workspace/ui/components/combobox";
 import { ImagePlusIcon, TrashIcon, LoaderCircleIcon } from "lucide-react";
+import { NOTIFY_CHANNELS, DEFAULT_NOTIFY_CHANNELS, type NotifyChannel } from "@workdeal/shared/schemas/pre-register";
+import { Switch } from "@workspace/ui/components/switch";
 
 interface PlaceSuggestion {
   placeId: string;
@@ -43,6 +45,7 @@ export interface PreRegisterFormValues {
   city?: string;
   logoUrl: string;
   categorySlugs: string[];
+  notifyChannels?: NotifyChannel[];
 }
 
 function slugify(name: string): string {
@@ -80,6 +83,11 @@ export function PreRegisterForm({ isAdmin, categories, initial, id }: Props) {
   const [city, setCity] = useState(initial?.city ?? "");
   const [logoUrl, setLogoUrl] = useState(initial?.logoUrl ?? "");
   const [categorySlugs, setCategorySlugs] = useState<string[]>(initial?.categorySlugs ?? []);
+  const [notifyChannels, setNotifyChannels] = useState<NotifyChannel[]>(
+    initial?.notifyChannels && initial.notifyChannels.length > 0
+      ? initial.notifyChannels
+      : [...DEFAULT_NOTIFY_CHANNELS],
+  );
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -197,6 +205,7 @@ export function PreRegisterForm({ isAdmin, categories, initial, id }: Props) {
         city: city.trim() || undefined,
         logoUrl: logoUrl.trim() || undefined,
         categorySlugs: categorySlugs.length > 0 ? categorySlugs : undefined,
+        notifyChannels: notifyChannels.length > 0 ? notifyChannels : undefined,
       };
       if (isEdit) {
         const res = await updatePreRegister(id!, payload);
@@ -211,7 +220,7 @@ export function PreRegisterForm({ isAdmin, categories, initial, id }: Props) {
         if (!res.success) {
           setError(res.error?.message ?? "Falha ao criar pré-registo");
         } else {
-          setSuccess(`${name.trim()} registada. Notificação enviada por email, SMS e WhatsApp.`);
+          setSuccess(`${name.trim()} registada. Convite enviado por ${notifyChannels.length > 0 ? notifyChannels.join(", ") : "—"}.`);
           setName("");
           setSlug("");
           setContactName("");
@@ -450,6 +459,46 @@ export function PreRegisterForm({ isAdmin, categories, initial, id }: Props) {
               className={fieldCls}
             />
           </div>
+        </div>
+      </section>
+
+      {/* Método de notificação */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-sm font-medium">Método de notificação</h2>
+          <p className="text-xs text-muted-foreground">Como queremos informar a empresa sobre o convite para completar o registo.</p>
+        </div>
+        <div className="space-y-3">
+          {NOTIFY_CHANNELS.map((channel) => {
+            const checked = notifyChannels.includes(channel);
+            const isDefault = channel !== "sms";
+            return (
+              <label
+                key={channel}
+                className="flex items-center justify-between gap-4 rounded-md border border-input bg-background px-3 py-2.5"
+              >
+                <div>
+                  <p className="text-sm font-medium capitalize">{channel}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {channel === "email"
+                      ? "Enviar convite por email"
+                      : channel === "sms"
+                        ? "Enviar convite por SMS"
+                        : "Enviar convite por WhatsApp"}
+                    {isDefault ? " · ligado por defeito" : ""}
+                  </p>
+                </div>
+                <Switch
+                  checked={checked}
+                  onCheckedChange={(next) => {
+                    setNotifyChannels((prev) =>
+                      next ? [...new Set([...prev, channel])] : prev.filter((c) => c !== channel),
+                    );
+                  }}
+                />
+              </label>
+            );
+          })}
         </div>
       </section>
 

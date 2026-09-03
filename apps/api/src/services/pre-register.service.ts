@@ -25,6 +25,7 @@ class PreRegisterService {
       city: input.city,
       logoUrl: input.logoUrl,
       categorySlugs: input.categorySlugs,
+      notifyChannels: input.notifyChannels,
     });
 
     const org = await preRegisterRepository.create({
@@ -49,6 +50,7 @@ class PreRegisterService {
         contactEmail: org.contactEmail,
         formattedAddress: input.formattedAddress,
         completionUrl: `${preRegisterNotificationService.webOrigin()}/pre-register/${completionToken}`,
+        channels: input.notifyChannels,
       })
       .catch((e) => console.error("[pre-register] falha ao notificar:", e instanceof Error ? e.message : String(e)));
 
@@ -76,6 +78,7 @@ class PreRegisterService {
         city: meta.city ?? null,
         logoUrl: meta.logoUrl ?? null,
         categorySlugs: meta.categorySlugs ?? [],
+        notifyChannels: meta.notifyChannels ?? [],
       };
     });
     return { items: mapped, total, page, limit };
@@ -151,6 +154,10 @@ class PreRegisterService {
             ? []
             : input.categorySlugs
           : existingMeta.categorySlugs,
+      notifyChannels:
+        input.notifyChannels !== undefined && input.notifyChannels !== null
+          ? input.notifyChannels
+          : existingMeta.notifyChannels,
     });
 
     const row = await preRegisterRepository.update(id, {
@@ -204,6 +211,7 @@ class PreRegisterService {
       city: meta.city ?? null,
       logoUrl: meta.logoUrl ?? null,
       categorySlugs: meta.categorySlugs ?? [],
+      notifyChannels: meta.notifyChannels ?? [],
       completionUrl: org.completionToken ? `${origin}/pre-register/${org.completionToken}` : null,
       completionTokenExpiresAt: org.completionTokenExpiresAt?.toISOString() ?? null,
       preRegisteredAt: org.preRegisteredAt?.toISOString() ?? null,
@@ -222,6 +230,7 @@ class PreRegisterService {
     const token = randomUUID();
     const expiresAt = new Date(Date.now() + COMPLETION_TOKEN_TTL_MS);
     await preRegisterRepository.updateToken(id, token, expiresAt);
+    const meta = parsePreRegisterMetadata(org.metadata);
     void preRegisterNotificationService
       .notifyCompanyPreRegister({
         companyName: org.name,
@@ -229,6 +238,7 @@ class PreRegisterService {
         contactPhone: org.contactPhone,
         contactEmail: org.contactEmail,
         completionUrl: `${preRegisterNotificationService.webOrigin()}/pre-register/${token}`,
+        channels: meta.notifyChannels,
       })
       .catch((e) => console.error("[pre-register] falha ao notificar:", e instanceof Error ? e.message : String(e)));
     return { completionToken: token, completionTokenExpiresAt: expiresAt.toISOString() };
@@ -246,6 +256,7 @@ class PreRegisterService {
     if (!org.completionToken) {
       throw new AppError(409, "NO_TOKEN", "Esta empresa não tem um link de registo para notificar");
     }
+    const meta = parsePreRegisterMetadata(org.metadata);
     await preRegisterNotificationService
       .notifyCompanyPreRegister({
         companyName: org.name,
@@ -253,6 +264,7 @@ class PreRegisterService {
         contactPhone: org.contactPhone,
         contactEmail: org.contactEmail,
         completionUrl: `${preRegisterNotificationService.webOrigin()}/pre-register/${org.completionToken}`,
+        channels: meta.notifyChannels,
       })
       .catch((e) => console.error("[pre-register] falha ao notificar:", e instanceof Error ? e.message : String(e)));
     return { renotified: true };

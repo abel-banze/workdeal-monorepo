@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export const NOTIFY_CHANNELS = ["email", "sms", "whatsapp"] as const;
+export type NotifyChannel = (typeof NOTIFY_CHANNELS)[number];
+
+// Canais enviados por defeito: email e WhatsApp ligados; SMS desligado
+// (o admin liga-o explicitamente no formulário de pré-registo).
+export const DEFAULT_NOTIFY_CHANNELS: NotifyChannel[] = ["email", "whatsapp"];
+
 // Dados visíveis publicamente através do token de completamento (sem auth).
 export const preRegisterLookupSchema = z.object({
   id: z.string(),

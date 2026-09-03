@@ -5,6 +5,7 @@ import { getPreRegisterById, listCategories } from "@/app/actions/admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PreRegisterForm } from "../../pre-register-form";
+import type { NotifyChannel } from "@workdeal/shared/schemas/pre-register";
 
 export const metadata = {
   title: "Editar pré-registo | Workdeal Admin",
@@ -21,6 +22,7 @@ interface EditPreRegister {
   googlePlaceId: string | null;
   logoUrl: string | null;
   categorySlugs: string[];
+  notifyChannels?: string[];
 }
 
 interface CategoryOption {
@@ -70,6 +72,7 @@ export default async function EditPreRegisterPage({ params }: { params: Promise<
               googlePlaceId: data.googlePlaceId ?? "",
               logoUrl: data.logoUrl ?? "",
               categorySlugs: data.categorySlugs,
+              notifyChannels: (data.notifyChannels as NotifyChannel[] | undefined) ?? undefined,
             }}
           />
         </CardContent>

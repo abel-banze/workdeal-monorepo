@@ -2,6 +2,7 @@ import { and, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, member, organization, user } from "@workdeal/db";
 import type { AdminOrgListQuery } from "@workdeal/shared";
+import type { NotifyChannel } from "@workdeal/shared/schemas/pre-register";
 import { randomUUID } from "node:crypto";
 
 export interface PreRegisterRow {
@@ -29,6 +30,7 @@ export interface PreRegisterMetadata {
   city?: string | null;
   logoUrl?: string | null;
   categorySlugs?: string[];
+  notifyChannels?: NotifyChannel[];
 }
 
 export function parsePreRegisterMetadata(metadata: string | null): PreRegisterMetadata {
@@ -50,6 +52,7 @@ export function buildPreRegisterMetadata(input: {
   city?: string | null;
   logoUrl?: string | null;
   categorySlugs?: string[];
+  notifyChannels?: NotifyChannel[];
 }): string | null {
   const googlePlaceId = input.googlePlaceId || null;
   const formattedAddress = input.formattedAddress || null;
@@ -62,6 +65,10 @@ export function buildPreRegisterMetadata(input: {
     input.categorySlugs && input.categorySlugs.length > 0
       ? input.categorySlugs.map((s) => s.trim()).filter(Boolean)
       : undefined;
+  const notifyChannels =
+    input.notifyChannels && input.notifyChannels.length > 0
+      ? [...new Set(input.notifyChannels)]
+      : undefined;
   const hasGeo = latitude !== null && longitude !== null;
   if (
     !googlePlaceId &&
@@ -70,7 +77,8 @@ export function buildPreRegisterMetadata(input: {
     !province &&
     !city &&
     !logoUrl &&
-    (!categorySlugs || categorySlugs.length === 0)
+    (!categorySlugs || categorySlugs.length === 0) &&
+    (!notifyChannels || notifyChannels.length === 0)
   )
     return null;
   return JSON.stringify({
@@ -82,6 +90,7 @@ export function buildPreRegisterMetadata(input: {
     city,
     logoUrl,
     categorySlugs,
+    notifyChannels,
   });
 }
 

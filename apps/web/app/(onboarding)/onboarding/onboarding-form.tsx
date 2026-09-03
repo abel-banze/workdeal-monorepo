@@ -81,6 +81,7 @@ export function OnboardingForm({
   userEmail: _userEmail,
   initialOrganizationId,
   initialOrganizationName,
+  initialMetadata,
 }: {
   categories: Category[];
   tags: { slug: string; name: string }[];
@@ -88,14 +89,34 @@ export function OnboardingForm({
   userEmail: string;
   initialOrganizationId: string | null;
   initialOrganizationName: string | null;
+  initialMetadata?: {
+    categorySlugs?: string[];
+    formattedAddress?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    googlePlaceId?: string | null;
+    province?: string | null;
+    city?: string | null;
+    logoUrl?: string | null;
+    contactPhone?: string | null;
+    contactEmail?: string | null;
+  };
 }) {
   const router = useRouter();
   const [organizationId, setOrganizationId] = useState<string | null>(initialOrganizationId);
 
+  const initialSelectedCats = (() => {
+    const slugs = initialMetadata?.categorySlugs;
+    if (!slugs || slugs.length === 0) return [];
+    return categories
+      .filter((c) => slugs.includes(c.slug))
+      .map((c) => c.id);
+  })();
+
   // core — se já existe organização (ex: Codebaz), pré-preenche com nome da empresa, não com dados pessoais
   const [profileName, setProfileName] = useState(initialOrganizationName ?? userName);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(initialMetadata?.logoUrl ?? null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(initialMetadata?.logoUrl ?? null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [tagline, setTagline] = useState("");
   const [description, setDescription] = useState("");
@@ -108,18 +129,18 @@ export function OnboardingForm({
   const [alvara, setAlvara] = useState("");
   const [licenses, setLicenses] = useState("");
 
-  const [selectedCats, setSelectedCats] = useState<string[]>([]);
-  const [province, setProvince] = useState("");
-  const [district, setDistrict] = useState("");
+  const [selectedCats, setSelectedCats] = useState<string[]>(initialSelectedCats);
+  const [province, setProvince] = useState(initialMetadata?.province ?? "");
+  const [district, setDistrict] = useState(initialMetadata?.city ?? "");
   const [bairro, setBairro] = useState("");
   const [interestTags, setInterestTags] = useState<string[]>([]);
   const [website, setWebsite] = useState("");
 
   // Localização Google — tudo opcional (skip = deixar em branco)
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [googlePlaceId, setGooglePlaceId] = useState<string | null>(null);
-  const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
+  const [latitude, setLatitude] = useState<number | null>(initialMetadata?.latitude ?? null);
+  const [longitude, setLongitude] = useState<number | null>(initialMetadata?.longitude ?? null);
+  const [googlePlaceId, setGooglePlaceId] = useState<string | null>(initialMetadata?.googlePlaceId ?? null);
+  const [formattedAddress, setFormattedAddress] = useState<string | null>(initialMetadata?.formattedAddress ?? null);
   const [placeQuery, setPlaceQuery] = useState("");
   const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([]);
   // idle | loading | empty | error — alimenta o feedback visual sob o input
@@ -134,9 +155,9 @@ export function OnboardingForm({
   const [catQuery, setCatQuery] = useState("");
 
   // contacts + OTP
-  const [whatsapp, setWhatsapp] = useState("");
+  const [whatsapp, setWhatsapp] = useState(initialMetadata?.contactPhone ?? "");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialMetadata?.contactEmail ?? "");
 
   const [whatsappOtp, setWhatsappOtp] = useState<string | null>(null);
   const [whatsappInput, setWhatsappInput] = useState("");
