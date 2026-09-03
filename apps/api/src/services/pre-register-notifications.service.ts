@@ -1,5 +1,6 @@
 import { resend, EMAIL_FROM } from "../lib/resend.js";
 import { preRegisterCompanyHtml } from "@workdeal/shared/lib/email-templates";
+import { DEFAULT_NOTIFY_CHANNELS, type NotifyChannel } from "@workdeal/shared/schemas/pre-register";
 
 export interface PreRegisterNotifyInput {
   companyName: string;
@@ -8,17 +9,20 @@ export interface PreRegisterNotifyInput {
   contactEmail?: string | null;
   completionUrl: string;
   formattedAddress?: string | null;
+  channels?: NotifyChannel[];
 }
 
 /**
- * Notifica a empresa pré-registada via email, SMS e WhatsApp (fire-and-forget).
+ * Notifica a empresa pré-registada via canais seleccionados (fire-and-forget).
+ * Por defeito envia email e WhatsApp — SMS fica desligado até o admin activar explicitamente.
  * Todos os canais são non-blocking e com graceful mock fallback em dev —
  * o fim do pre-registo nunca deve falhar por causa de uma notificação.
  */
 export async function notifyCompanyPreRegister(input: PreRegisterNotifyInput) {
-  const emailResult = await sendEmail(input);
-  const smsResult = await sendSms(input);
-  const whatsappResult = await sendWhatsApp(input);
+  const channels = input.channels ?? DEFAULT_NOTIFY_CHANNELS;
+  const emailResult = channels.includes("email") ? await sendEmail(input) : { ok: true as const, skipped: true as const };
+  const smsResult = channels.includes("sms") ? await sendSms(input) : { ok: true as const, skipped: true as const };
+  const whatsappResult = channels.includes("whatsapp") ? await sendWhatsApp(input) : { ok: true as const, skipped: true as const };
   return { email: emailResult, sms: smsResult, whatsapp: whatsappResult };
 }
 

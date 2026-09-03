@@ -3,7 +3,11 @@ import { getServerSession } from "@/lib/auth";
 import { getCategories } from "@/lib/profiles";
 import { OnboardingForm } from "./onboarding-form";
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const session = await getServerSession();
   if (!session) redirect("/login");
 
@@ -38,19 +42,65 @@ export default async function OnboardingPage() {
     tags = [];
   }
 
-  // SSR-first: fetch inicial de organizações no servidor, nunca via useEffect no cliente
+  // SSR-first: fetch inicial de organizações no servidor, nunca via useEffect no cliente.
+  // Quando o claim pre-register redireciona para /onboarding?orgId=..., usamos esse id
+  // para seleccionar a organização certa e pré-preencher com a metadata capturada.
+  const requestedOrgId = (() => {
+    const raw = searchParams?.orgId;
+    if (!raw) return null;
+    const v = Array.isArray(raw) ? raw[0] : raw;
+    return v && v.trim() ? v.trim() : null;
+  })();
+
   let initialOrganizationId: string | null = null;
   let initialOrganizationName: string | null = null;
+  let initialMetadata: {
+    categorySlugs?: string[];
+    formattedAddress?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    googlePlaceId?: string | null;
+    province?: string | null;
+    city?: string | null;
+    logoUrl?: string | null;
+    contactPhone?: string | null;
+    contactEmail?: string | null;
+  } | undefined;
+
   try {
-    const { listUserOrganizations } = await import("@workdeal/auth/repository");
+    const { listUserOrganizations, getOrganizationOnboardingData } = await import("@workdeal/auth/repository");
     const orgs = await listUserOrganizations(session.user.id);
-    if (orgs.length > 0 && orgs[0]?.id) {
-      initialOrganizationId = orgs[0].id;
-      initialOrganizationName = orgs[0].name ?? null;
+
+    const chosenId =
+      (requestedOrgId && orgs.some((o) => o.id === requestedOrgId) ? requestedOrgId : null) ??
+      (orgs.length > 0 ? orgs[0]?.id ?? null : null);
+
+    if (chosenId) {
+      initialOrganizationId = chosenId;
+      initialOrganizationName = orgs.find((o) => o.id === chosenId)?.name ?? null;
+
+      const orgData = await getOrganizationOnboardingData(chosenId);
+      if (orgData?.metadata) {
+        initialMetadata = {
+          categorySlugs: Array.isArray(orgData.metadata.categorySlugs)
+            ? (orgData.metadata.categorySlugs as string[])
+            : undefined,
+          formattedAddress: typeof orgData.metadata.formattedAddress === "string" ? orgData.metadata.formattedAddress : null,
+          latitude: typeof orgData.metadata.latitude === "number" ? orgData.metadata.latitude : null,
+          longitude: typeof orgData.metadata.longitude === "number" ? orgData.metadata.longitude : null,
+          googlePlaceId: typeof orgData.metadata.googlePlaceId === "string" ? orgData.metadata.googlePlaceId : null,
+          province: typeof orgData.metadata.province === "string" ? orgData.metadata.province : null,
+          city: typeof orgData.metadata.city === "string" ? orgData.metadata.city : null,
+          logoUrl: typeof orgData.metadata.logoUrl === "string" ? orgData.metadata.logoUrl : null,
+          contactPhone: orgData.contactPhone ?? null,
+          contactEmail: orgData.contactEmail ?? null,
+        };
+      }
     }
   } catch {
     initialOrganizationId = null;
     initialOrganizationName = null;
+    initialMetadata = undefined;
   }
 
   return (
@@ -61,6 +111,7 @@ export default async function OnboardingPage() {
       userEmail={session.user.email}
       initialOrganizationId={initialOrganizationId}
       initialOrganizationName={initialOrganizationName}
+      initialMetadata={initialMetadata}
     />
   );
 }

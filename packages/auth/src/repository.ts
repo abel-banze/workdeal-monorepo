@@ -37,3 +37,49 @@ export async function listUserOrganizations(userId: string): Promise<UserOrganiz
     .where(eq(member.userId, userId));
   return rows as UserOrganization[];
 }
+
+export interface OrganizationOnboardingData {
+  id: string;
+  name: string;
+  slug: string;
+  verificationStatus: string | null;
+  metadata: Record<string, unknown> | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+}
+
+export async function getOrganizationOnboardingData(organizationId: string): Promise<OrganizationOnboardingData | null> {
+  const [row] = await db
+    .select({
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      verificationStatus: organization.verificationStatus,
+      metadata: organization.metadata,
+      contactName: organization.contactName,
+      contactPhone: organization.contactPhone,
+      contactEmail: organization.contactEmail,
+    })
+    .from(organization)
+    .where(eq(organization.id, organizationId))
+    .limit(1);
+  if (!row) return null;
+  const meta = (() => {
+    try {
+      return row.metadata ? (JSON.parse(row.metadata) as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  })();
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    verificationStatus: row.verificationStatus,
+    metadata: meta,
+    contactName: row.contactName,
+    contactPhone: row.contactPhone,
+    contactEmail: row.contactEmail,
+  };
+}
