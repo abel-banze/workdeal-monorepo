@@ -84,6 +84,7 @@ function matchesPreRegistered(
   company: PreRegisteredCompany,
   q: string | undefined,
   categorySlugs: Set<string>,
+  province: string | null,
   near: string | undefined,
   radiusKm: number,
 ) {
@@ -108,6 +109,15 @@ function matchesPreRegistered(
       });
     if (!inName && !inCategories && !inProvince && !inCity) return false;
   }
+  // Localização detectada na query ("empresa de eventos em maputo" → Cidade de
+  // Maputo): filtra de forma bloqueante, tal como o backend faz para os perfis
+  // activos — evita devolver pré-registados de outra província.
+  if (province) {
+    const normProv = normalizeProvince(province);
+    const companyProv = normalizeProvince(company.province);
+    const companyCity = normalizeProvince(company.city);
+    if (!(companyProv.includes(normProv) || companyCity.includes(normProv))) return false;
+  }
   // Proximidade por raio (nearby): só filtra se o pré-registo tiver coordenadas.
   const center = parseNear(near);
   if (center && company.latitude != null && company.longitude != null) {
@@ -115,6 +125,13 @@ function matchesPreRegistered(
     if (dist > radiusKm) return false;
   }
   return true;
+}
+
+function normalizeProvince(value: string | null | undefined): string {
+  return (value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 async function CompaniesList({
@@ -156,7 +173,7 @@ async function CompaniesList({
     const nearParam = searchParams.near || undefined;
     const radiusKm = Math.max(1, Number(searchParams.radiusKm ?? 25) || 25);
     const preRegistered = allPreRegistered.filter((c) =>
-      matchesPreRegistered(c, searchParams.q, categorySlugs, nearParam, radiusKm),
+      matchesPreRegistered(c, searchParams.q, categorySlugs, smart.province, nearParam, radiusKm),
     );
     const hasPreRegistered = preRegistered.length > 0;
 
