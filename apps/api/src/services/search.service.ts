@@ -83,14 +83,29 @@ export class SearchService {
     // resolve o slug detectado no texto para o id (filtro `exists` no repo).
     const catSlug = input.categorySlug ?? smart.categorySlug;
     const finalCatId = input.categoryId ?? (catSlug ? cats.find((c) => c.slug === catSlug)?.id : undefined);
-    let categoryId: string | undefined;
+    let categoryIds: string[] | undefined;
     let categorySlug: string | null = null;
     let matchedCategory: string | null = null;
     if (finalCatId) {
       const cat = cats.find((c) => c.id === finalCatId);
-      categoryId = finalCatId;
       categorySlug = cat?.slug ?? null;
       matchedCategory = cat?.name ?? null;
+      // Uma categoria L1 (pai) inclui também os perfis das suas subcategorias.
+      // Ex: filtrar por "Eventos" retorna também quem está em "Decoração" ou
+      // "Catering" — senão a pesquisa natural "empresa de eventos" perdia
+      // empresas cujo perfil aponta para a categoria filha.
+      const descendants = new Set<string>([finalCatId]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const c of cats) {
+          if (c.parentId && descendants.has(c.parentId) && !descendants.has(c.id)) {
+            descendants.add(c.id);
+            grew = true;
+          }
+        }
+      }
+      categoryIds = [...descendants];
     } else {
       categorySlug = smart.categorySlug;
       matchedCategory = smart.matchedCategory;
@@ -115,7 +130,7 @@ export class SearchService {
     const res = await searchRepository.search({
       text,
       location,
-      categoryId,
+      categoryIds,
       near,
       radiusKm: input.radiusKm,
       sort: input.sort,
@@ -128,9 +143,9 @@ export class SearchService {
       text,
       province: location ? (location.province as Province) : (smart.province ?? null),
       matchedProvince: location?.value ?? smart.matchedProvince,
-      categorySlug: categoryId ? categorySlug : null,
+      categorySlug: categoryIds ? categorySlug : null,
       matchedCategory,
-      structured: location !== null || categoryId !== undefined,
+      structured: location !== null || (categoryIds?.length ?? 0) > 0,
       location,
     };
 

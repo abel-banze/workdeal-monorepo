@@ -148,7 +148,7 @@ const CATEGORY_ALIASES: Record<string, string> = {
  * que sobra depois de extrair província/categoria. Não inclui "servicos"
  * porque pode ser a própria categoria pretendida.
  */
-const STOPWORDS_PT = new Set([
+export const STOPWORDS_PT = new Set([
   "a", "as", "o", "os", "um", "uma", "uns", "umas",
   "de", "da", "do", "das", "dos",
   "em", "na", "no", "nas", "nos",
