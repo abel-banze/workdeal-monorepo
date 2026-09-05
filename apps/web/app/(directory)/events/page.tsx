@@ -153,25 +153,31 @@ export default async function EventsPage({ searchParams }: Props) {
             backgroundSize: "40px 40px",
           }}
         />
-        <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-[0.14em]">
-            <Link href="/" className="text-[#0F1A2E]/40 hover:text-[#0F1A2E]">
-              Início
-            </Link>
-            <span className="text-[#D9D2C2]">/</span>
-            <span className="text-[#0B5E56]">EVENTOS</span>
+        <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+          {/* índice — breadcrumb + contagem */}
+          <div className="flex items-center justify-between gap-4 font-mono text-[10px] font-bold uppercase tracking-[0.18em]">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2">
+              <Link href="/" className="text-[#0F1A2E]/40 transition-colors hover:text-[#0F1A2E]">
+                Início
+              </Link>
+              <span className="text-[#D9D2C2]">/</span>
+              <span className="text-[#0B5E56]">Eventos</span>
+            </nav>
+            <span className="hidden tabular-nums text-[#0F1A2E]/45 sm:block">
+              {categories.length} categorias · 11 províncias
+            </span>
           </div>
-          <div className="mt-3 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+
+          <div className="mt-2.5 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
             <div>
-              <h1 className="font-black tracking-[-0.05em] leading-[0.9] text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(28px, 4.5vw, 44px)" }}>
-                Agendas de negócios.
-                <br />
-                <span className="font-normal text-[#0F1A2E]/70">Feiras, lançamentos e networking.</span>
+              <h1 className="font-black leading-[1.05] tracking-[-0.04em] text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(19px, 2.4vw, 27px)" }}>
+                Agendas de negócios.{" "}
+                <span className="font-normal text-[#0B5E56]">Feiras, lançamentos e networking.</span>
               </h1>
-              <p className="mt-3 max-w-[560px] text-[14px] leading-relaxed text-[#0F1A2E]/60">
+              <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-[#0F1A2E]/60">
                 Siga os próximos eventos do ecossistema Workdeal e inscreva-se em segundos. Presença confirmada, networking real.
               </p>
-              <div className="mt-4 flex flex-wrap gap-1.5">
+              <div className="mt-4 flex flex-wrap items-center gap-1.5">
                 <Link
                   href="/events"
                   className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${scope === "upcoming" ? "border-[#0F1A2E] bg-[#0F1A2E] text-white" : "border-[#0F1A2E]/10 bg-white text-[#0F1A2E]/70 hover:bg-[#0F1A2E] hover:text-white"}`}
