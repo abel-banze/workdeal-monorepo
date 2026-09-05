@@ -146,6 +146,13 @@ class ProfilesService {
         page,
         limit,
         status: query.status,
+        province: query.province,
+        city: query.city,
+        badgeSlug: query.badgeSlug,
+        companySize: query.companySize,
+        minYear: query.minYear,
+        maxYear: query.maxYear,
+        verificationStatus: query.verificationStatus,
       });
       return {
         items: result.items.map((r) => this.toProfileView({ ...r, categories: r.categories ?? [] } as unknown as ProfileWithCategories)),

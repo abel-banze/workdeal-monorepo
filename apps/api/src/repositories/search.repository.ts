@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, exists, ilike, inArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { db, profile, profileCategory, category, profileLocation, profileBadge, badge } from "@workdeal/db";
+import { db, profile, profileCategory, category, profileLocation, profileBadge, badge, organization, companyQualification } from "@workdeal/db";
 import type { ProfileBadgeLite } from "@workdeal/shared";
 import { profileColumns } from "./profiles.repository.js";
 import { boundingBox } from "@workdeal/shared/lib/geo";
@@ -29,6 +29,14 @@ export interface SearchParams {
   page?: number;
   limit?: number;
   status?: string;
+  /** Filtros avançados — directório de empresas */
+  province?: string;
+  city?: string;
+  badgeSlug?: string;
+  companySize?: string;
+  minYear?: number;
+  maxYear?: number;
+  verificationStatus?: string;
 }
 
 export class SearchRepository {
@@ -82,6 +90,73 @@ export class SearchRepository {
       base.push(
         exists(
           db.select({ one: sql`1` }).from(profileCategory).where(and(eq(profileCategory.profileId, profile.id), inArray(profileCategory.categoryId, params.categoryIds))),
+        ) as unknown as SQL,
+      );
+    }
+
+    // Filtro por província exacta (profile_location.province)
+    if (params.province) {
+      base.push(
+        exists(
+          db.select({ one: sql`1` }).from(profileLocation).where(and(eq(profileLocation.profileId, profile.id), eq(profileLocation.province, params.province))),
+        ) as unknown as SQL,
+      );
+    }
+
+    // Filtro por cidade/local (profile_location.label) — correspondência parcial
+    if (params.city) {
+      base.push(
+        exists(
+          db.select({ one: sql`1` }).from(profileLocation).where(and(eq(profileLocation.profileId, profile.id), ilike(profileLocation.label, `%${params.city}%`))),
+        ) as unknown as SQL,
+      );
+    }
+
+    // Selo de qualidade: perfil tem o badge ativo com o slug pedido
+    if (params.badgeSlug) {
+      base.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(profileBadge)
+            .innerJoin(badge, eq(profileBadge.badgeId, badge.id))
+            .where(and(eq(profileBadge.profileId, profile.id), eq(profileBadge.status, "active"), eq(badge.slug, params.badgeSlug))),
+        ) as unknown as SQL,
+      );
+    }
+
+    // Dimensão da empresa (company_qualification.company_size)
+    if (params.companySize) {
+      base.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(companyQualification)
+            .where(and(eq(companyQualification.profileId, profile.id), eq(companyQualification.companySize, params.companySize as any))),
+        ) as unknown as SQL,
+      );
+    }
+
+    // Tempo no mercado — faixa de ano de fundação
+    if (params.minYear !== undefined || params.maxYear !== undefined) {
+      const years: SQL[] = [];
+      if (params.minYear !== undefined) years.push(sql`${companyQualification.foundedYear} >= ${params.minYear}`);
+      if (params.maxYear !== undefined) years.push(sql`${companyQualification.foundedYear} <= ${params.maxYear}`);
+      base.push(
+        exists(
+          db.select({ one: sql`1` }).from(companyQualification).where(and(eq(companyQualification.profileId, profile.id), ...years)),
+        ) as unknown as SQL,
+      );
+    }
+
+    // Identidade/registo — estado de verificação da organização ligada à empresa
+    if (params.verificationStatus) {
+      base.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(organization)
+            .where(and(eq(organization.id, profile.organizationId), eq(organization.verificationStatus, params.verificationStatus as any))),
         ) as unknown as SQL,
       );
     }

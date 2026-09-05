@@ -14,6 +14,13 @@ export interface SearchInput {
   page?: number;
   limit?: number;
   status?: string;
+  province?: string;
+  city?: string;
+  badgeSlug?: string;
+  companySize?: string;
+  minYear?: number;
+  maxYear?: number;
+  verificationStatus?: string;
 }
 
 export type SearchParsed = SmartSearchResult & { location: SearchLocation | null };
@@ -137,6 +144,13 @@ export class SearchService {
       page: input.page,
       limit: input.limit,
       status: input.status,
+      province: input.province,
+      city: input.city,
+      badgeSlug: input.badgeSlug,
+      companySize: input.companySize,
+      minYear: input.minYear,
+      maxYear: input.maxYear,
+      verificationStatus: input.verificationStatus,
     });
 
     const parsed: SearchParsed = {

@@ -108,6 +108,20 @@ export const listProfilesQuerySchema = z.object({
     .optional(),
   radiusKm: z.coerce.number().min(0.5).max(500).default(25).optional(),
   status: profileStatusSchema.default("active").optional(),
+  // --- Filtros avançados (directório de empresas) ---
+  // Província exacta (profile_location.province)
+  province: z.string().trim().max(80).optional(),
+  // Cidade/local (profile_location.label)
+  city: z.string().trim().max(80).optional(),
+  // Selo de qualidade (slug do badge, ex: "verified", "msme")
+  badgeSlug: z.string().trim().max(64).optional(),
+  // Dimensão da empresa (companyQualification.company_size)
+  companySize: z.string().trim().max(16).optional(),
+  // Tempo no mercado (companyQualification.founded_year) — faixa de anos de fundação
+  minYear: z.coerce.number().int().min(1900).max(3000).optional(),
+  maxYear: z.coerce.number().int().min(1900).max(3000).optional(),
+  // Identidade/registo (organization.verification_status): "verified" | "in_review" | "pending" | "pre_registered"
+  verificationStatus: z.enum(["verified", "in_review", "pending", "pre_registered", "suspended"]).optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20).optional(),
   sort: z.enum(["recent", "name", "distance"]).default("recent").optional(),

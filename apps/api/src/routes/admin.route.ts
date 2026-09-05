@@ -9,9 +9,10 @@ import { reportsController } from "../controllers/reports.controller.js";
 import { reportListQuerySchema } from "@workdeal/shared";
 import { adminUsersController } from "../controllers/admin-users.controller.js";
 import { adminOrganizationsController } from "../controllers/admin-organizations.controller.js";
-import { adminUserListQuerySchema, adminOrgListQuerySchema, adminUpdateUserRoleSchema, adminUpdateOrgStatusSchema, preRegisterCompanySchema, preRegisterUpdateSchema } from "@workdeal/shared";
+import { adminUserListQuerySchema, adminOrgListQuerySchema, adminUpdateUserRoleSchema, adminUpdateOrgStatusSchema, preRegisterCompanySchema, preRegisterUpdateSchema, categoryListQuerySchema, categoryCreateSchema, categoryUpdateSchema } from "@workdeal/shared";
 import { z } from "zod";
 import { preRegisterController } from "../controllers/pre-register.controller.js";
+import { categoriesController } from "../controllers/categories.controller.js";
 
 export const adminRoute = new Hono<Env>();
 
@@ -122,4 +123,36 @@ adminRoute.post("/badges/run", async (c) => {
   const { runBadgeJob } = await import("../services/badges.job.js");
   await runBadgeJob();
   return c.json({ success: true, data: { ranAt: new Date().toISOString() } });
+});
+
+// --- Categorias ---
+adminRoute.get("/categories", zValidator("query", categoryListQuerySchema), async (c) => {
+  const { body, status } = await categoriesController.list(c.req.valid("query"));
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
+adminRoute.post("/categories", zValidator("json", categoryCreateSchema), async (c) => {
+  const { body, status } = await categoriesController.create(c.req.valid("json"));
+  return c.json(body, status);
+});
+
+adminRoute.get("/categories/:id", async (c) => {
+  const { body, status } = await categoriesController.getById(c.req.param("id"));
+  return c.json(body, status);
+});
+
+adminRoute.patch("/categories/:id", zValidator("json", categoryUpdateSchema), async (c) => {
+  const { body, status } = await categoriesController.update(c.req.param("id"), c.req.valid("json"));
+  return c.json(body, status);
+});
+
+adminRoute.delete("/categories/:id", async (c) => {
+  const { body, status } = await categoriesController.remove(c.req.param("id"));
+  return c.json(body, status);
+});
+
+adminRoute.post("/categories/:id/toggle", async (c) => {
+  const { body, status } = await categoriesController.toggleActive(c.req.param("id"));
+  return c.json(body, status);
 });
