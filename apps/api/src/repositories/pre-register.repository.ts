@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { db, member, organization, user } from "@workdeal/db";
+import { db, member, organization, profile, user } from "@workdeal/db";
 import type { AdminOrgListQuery } from "@workdeal/shared";
 import type { NotifyChannel } from "@workdeal/shared/schemas/pre-register";
 import { randomUUID } from "node:crypto";
@@ -213,8 +213,11 @@ export const preRegisterRepository = {
     return row ?? null;
   },
 
-  // Listagem pública de empresas pré-registadas (cartões "Em breve" no directório).
-  // Só as que ainda estão em pré-registo (com token activo, ainda não reclamadas) aparecem.
+  // Listagem pública de empresas "Em breve" no directório:
+  // - pré-registadas ainda não reclamadas (token activo);
+  // - organizações verified/pending AINDA SEM perfil publicável — empresas
+  //   legítimas cujo dono ainda não criou o perfil; aparecem como "Em breve"
+  //   até o publicarem (e o perfil existir, desaparecem via NOT EXISTS).
   async listPublic(): Promise<Array<{
     id: string;
     name: string;
@@ -237,8 +240,19 @@ export const preRegisterRepository = {
         preRegisteredAt: organization.preRegisteredAt,
       })
       .from(organization)
-      .where(and(eq(organization.verificationStatus, "pre_registered" as never), sql`${organization.completionToken} IS NOT NULL`))
-      .orderBy(desc(organization.preRegisteredAt));
+      .where(
+        or(
+          and(
+            eq(organization.verificationStatus, "pre_registered" as never),
+            sql`${organization.completionToken} IS NOT NULL`,
+          ),
+          and(
+            sql`${organization.verificationStatus} IN ('verified','pending')`,
+            sql`NOT EXISTS (SELECT 1 FROM ${profile} WHERE ${profile.organizationId} = ${organization.id})`,
+          ),
+        ),
+      )
+      .orderBy(sql`COALESCE(${organization.preRegisteredAt}, ${organization.createdAt}) DESC`);
     return rows.map((r) => {
       const meta = parsePreRegisterMetadata(r.metadata);
       return {

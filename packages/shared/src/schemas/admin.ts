@@ -64,9 +64,49 @@ export const preRegisterUpdateSchema = preRegisterBaseSchema
     categorySlugs: z.array(z.string().trim().min(1).max(100)).max(10).optional().nullable(),
   });
 
+// --- Categorias ---
+
+export const categoryListQuerySchema = z.object({
+  search: z.string().trim().max(100).optional(),
+  isActive: z.coerce.boolean().optional(),
+  parentId: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20).optional(),
+});
+
+export const categoryCreateSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  slug: z
+    .string()
+    .trim()
+    .min(2)
+    .max(100)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug deve conter apenas letras minúsculas, números e hífens"),
+  description: z.string().trim().max(500).optional(),
+  parentId: z.string().optional().nullable(),
+  isActive: z.boolean().optional().default(true),
+});
+
+export const categoryUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(100).optional(),
+  slug: z
+    .string()
+    .trim()
+    .min(2)
+    .max(100)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug deve conter apenas letras minúsculas, números e hífens")
+    .optional(),
+  description: z.string().trim().max(500).optional().nullable(),
+  parentId: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+
 export type AdminUserListQuery = z.infer<typeof adminUserListQuerySchema>;
 export type AdminOrgListQuery = z.infer<typeof adminOrgListQuerySchema>;
 export type AdminUpdateUserRoleInput = z.infer<typeof adminUpdateUserRoleSchema>;
 export type AdminUpdateOrgStatusInput = z.infer<typeof adminUpdateOrgStatusSchema>;
 export type PreRegisterCompanyInput = z.infer<typeof preRegisterCompanySchema>;
 export type PreRegisterUpdateInput = z.infer<typeof preRegisterUpdateSchema>;
+export type CategoryListQuery = z.infer<typeof categoryListQuerySchema>;
+export type CategoryCreateInput = z.infer<typeof categoryCreateSchema>;
+export type CategoryUpdateInput = z.infer<typeof categoryUpdateSchema>;

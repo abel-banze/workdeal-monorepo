@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
-import type { AdminUserListQuery, AdminOrgListQuery, PreRegisterCompanyInput, PreRegisterUpdateInput } from "@workdeal/shared";
+import type { AdminUserListQuery, AdminOrgListQuery, PreRegisterCompanyInput, PreRegisterUpdateInput, CategoryListQuery, CategoryCreateInput, CategoryUpdateInput } from "@workdeal/shared";
 import { apiFetch, apiFetchWithAuth, apiUpload } from "@/lib/api";
 import { requireSystemRole } from "@/lib/auth";
 
@@ -128,6 +128,66 @@ export async function getPreRegisterById(id: string) {
 
 export async function listCategories() {
   const res = await apiFetch<Array<{ id: string; slug: string; name: string }>>(`/api/v1/categories`);
+  return res;
+}
+
+export async function listAdminCategories(query: CategoryListQuery) {
+  await requireSystemRole("moderator", "admin");
+  const params = new URLSearchParams();
+  if (query.search) params.set("search", query.search);
+  if (query.isActive !== undefined) params.set("isActive", String(query.isActive));
+  if (query.parentId) params.set("parentId", query.parentId);
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const res = await apiFetch<unknown>(`/api/v1/admin/categories${qs ? `?${qs}` : ""}`);
+  return res;
+}
+
+export async function getCategoryById(id: string) {
+  await requireSystemRole("moderator", "admin");
+  return apiFetch<unknown>(`/api/v1/admin/categories/${id}`);
+}
+
+export async function createCategory(input: CategoryCreateInput) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem criar categorias");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/categories`, token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return res;
+}
+
+export async function updateCategory(id: string, input: CategoryUpdateInput) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem editar categorias");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/categories/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return res;
+}
+
+export async function deleteCategory(id: string) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem eliminar categorias");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/categories/${id}`, token, {
+    method: "DELETE",
+  });
+  return res;
+}
+
+export async function toggleCategoryActive(id: string) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem activar/desactivar categorias");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth(`/api/v1/admin/categories/${id}/toggle`, token, {
+    method: "POST",
+  });
   return res;
 }
 

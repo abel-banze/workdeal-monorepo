@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, exists, inArray, isNull, sql } from "drizzle-orm";
-import { db, profile, profileCategory, category, profileLocation, profileBadge, badge, profileContactVerification } from "@workdeal/db";
+import { and, asc, desc, eq, exists, ilike, inArray, isNull, sql } from "drizzle-orm";
+import { db, profile, profileCategory, category, profileLocation, profileBadge, badge, organization, companyQualification, profileContactVerification } from "@workdeal/db";
 import type { ContactVerificationPayload } from "@workdeal/shared/lib/contact-verification";
 import type { ListProfilesQuery, ProfileBadgeLite } from "@workdeal/shared";
 import { boundingBox, isValidCoordinates } from "@workdeal/shared/lib/geo";
+import { ttlCache } from "../lib/ttl-cache.js";
 
 /**
  * Colunas seguras para SELECT — exclui geom (geography) e searchTsv (tsvector)
@@ -52,6 +53,20 @@ export interface ProfileCategoryLink {
 export interface ProfileWithCategories extends ProfileRow {
   categories: Array<{ id: string; slug: string; name: string; isPrimary: boolean }>;
 }
+
+// Categorias são dados de referência (quase estáticos) e pesadas em leitura —
+// cada pesquisa/preview faz esta query OBRIGATÓRIA. Com TTL curto (60s) + um só
+// loader em voo, o directório deixa de estourar o query_timeout da BD prod em
+// cenários de cargas. Admin muda categorias raramente; staleness <= 1 min.
+const getActiveCategoriesCached = ttlCache(
+  () =>
+    db
+      .select()
+      .from(category)
+      .where(eq(category.isActive, true))
+      .orderBy(asc(category.name)),
+  60_000,
+);
 
 class ProfilesRepository {
   async createProfileWithCategories(
@@ -163,11 +178,7 @@ class ProfilesRepository {
   }
 
   async listActiveCategories(): Promise<CategoryRow[]> {
-    return db
-      .select()
-      .from(category)
-      .where(eq(category.isActive, true))
-      .orderBy(asc(category.name));
+    return getActiveCategoriesCached();
   }
 
   async listProfiles(query: ListProfilesQuery): Promise<{ items: ProfileWithCategories[]; total: number }> {
@@ -198,6 +209,82 @@ class ProfilesRepository {
             .select({ one: sql`1` })
             .from(profileCategory)
             .where(and(eq(profileCategory.profileId, profile.id), eq(profileCategory.categoryId, cat[0].id))),
+        ),
+      );
+    }
+
+    // Filtro por província exacta (profile_location.province)
+    if (query.province) {
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(profileLocation)
+            .where(and(eq(profileLocation.profileId, profile.id), eq(profileLocation.province, query.province))),
+        ),
+      );
+    }
+
+    // Filtro por cidade/local (profile_location.label) — correspondência parcial
+    if (query.city) {
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(profileLocation)
+            .where(and(eq(profileLocation.profileId, profile.id), ilike(profileLocation.label, `%${query.city}%`))),
+        ),
+      );
+    }
+
+    // Selo de qualidade: perfil tem o badge ativo com o slug pedido
+    if (query.badgeSlug) {
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(profileBadge)
+            .innerJoin(badge, eq(profileBadge.badgeId, badge.id))
+            .where(and(eq(profileBadge.profileId, profile.id), eq(profileBadge.status, "active"), eq(badge.slug, query.badgeSlug))),
+        ),
+      );
+    }
+
+    // Dimensão da empresa (company_qualification.company_size)
+    if (query.companySize) {
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(companyQualification)
+            .where(and(eq(companyQualification.profileId, profile.id), eq(companyQualification.companySize, query.companySize as any))),
+        ),
+      );
+    }
+
+    // Tempo no mercado — faixa de ano de fundação
+    if (query.minYear !== undefined || query.maxYear !== undefined) {
+      const years: (ReturnType<typeof sql>)[] = [];
+      if (query.minYear !== undefined) years.push(sql`${companyQualification.foundedYear} >= ${query.minYear}`);
+      if (query.maxYear !== undefined) years.push(sql`${companyQualification.foundedYear} <= ${query.maxYear}`);
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(companyQualification)
+            .where(and(eq(companyQualification.profileId, profile.id), ...years)),
+        ),
+      );
+    }
+
+    // Identidade/registo — estado de verificação da organização ligada à empresa
+    if (query.verificationStatus) {
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(organization)
+            .where(and(eq(organization.id, profile.organizationId), eq(organization.verificationStatus, query.verificationStatus as any))),
         ),
       );
     }
