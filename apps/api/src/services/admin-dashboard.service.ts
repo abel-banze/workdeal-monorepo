@@ -23,7 +23,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     counts,
     queues,
     northStar: { conexoesSemana: northStar.conexoesSemana, crescimento },
-    series: series.map((s) => ({ label: s.label, perfis: s.perfis, tarefas: s.tarefas, contactos: s.contactos })),
+    series: series.map((s) => ({
+      label: s.label,
+      usuarios: s.usuarios,
+      preRegistros: s.preRegistros,
+      conversoes: s.conversoes,
+      perfis: s.perfis,
+      tarefas: s.tarefas,
+      contactos: s.contactos,
+    })),
     recent: recent.map((r) => ({ id: r.id, kind: r.kind, title: r.title, href: r.href, at: r.at.toISOString() })),
   };
 }

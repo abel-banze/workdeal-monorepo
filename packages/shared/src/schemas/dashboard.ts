@@ -31,6 +31,10 @@ export const dashboardStatsSchema = z.object({
   series: z.array(
     z.object({
       label: z.string(), // DD/MM
+      // Movimento da plataforma por dia
+      usuarios: z.number().int().nonnegative(),
+      preRegistros: z.number().int().nonnegative(),
+      conversoes: z.number().int().nonnegative(),
       perfis: z.number().int().nonnegative(),
       tarefas: z.number().int().nonnegative(),
       contactos: z.number().int().nonnegative(),
