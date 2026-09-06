@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { listPreRegisteredCompanies } from "@/app/actions/admin";
 import { requireSystemRole } from "@/lib/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PreRegisterList } from "./pre-register-list";
 
@@ -27,39 +26,30 @@ export interface PreRegisterListItem {
   completionUrl: string | null;
 }
 
-export default async function PreRegisterPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ search?: string; page?: string }>;
-}) {
+export default async function PreRegisterPage() {
   const session = await requireSystemRole("moderator", "admin");
-  const sp = await searchParams;
-  const q = sp.search ?? "";
-  const page = sp.page ? Number(sp.page) : 1;
-
-  const res = await listPreRegisteredCompanies({ search: q || undefined, page, limit: 20 });
-  const items = (res.data as PreRegisterListItem[] | null) ?? [];
-  const total = (res.meta?.total as number) ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / 20));
   const isAdmin = session.user.systemRole === "admin";
 
-  const buildHref = (overrides: Record<string, string | undefined>) => {
-    const params = new URLSearchParams();
-    const nextQ = overrides.search !== undefined ? overrides.search : q;
-    const nextPage = overrides.page ?? (page === 1 ? undefined : String(page));
-    if (nextQ) params.set("search", nextQ);
-    if (nextPage) params.set("page", nextPage);
-    const s = params.toString();
-    return `/dashboard/organizations/pre-register${s ? `?${s}` : ""}`;
-  };
+  const res = await listPreRegisteredCompanies({ limit: 500 });
+  const items = (res.data as PreRegisterListItem[] | null) ?? [];
+  const total = (res.meta?.total as number) ?? items.length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Pré-registo de empresas</h1>
-          <p className="text-sm text-muted-foreground">
-            Empresas recolhidas pela equipa (ex: FACIM). A empresa é notificada por email, SMS e WhatsApp para completar o registo.
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#0B5E56]">
+            Organizações · Lista de equipa
+          </p>
+          <h1
+            className="mt-2 text-2xl font-black leading-tight tracking-[-0.04em] text-[#0F1A2E] sm:text-[26px]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Pré-registo de empresas
+          </h1>
+          <p className="mt-1 max-w-xl text-sm text-[#0F1A2E]/50">
+            Empresas recolhidas pela equipa (ex: FACIM). Gera o convite, copia o link e notifica a empresa por email, SMS
+            e WhatsApp para completar o registo.
           </p>
         </div>
         <Button variant="outline" size="sm" asChild>
@@ -67,37 +57,7 @@ export default async function PreRegisterPage({
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Lista de pré-registos ({total})</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form method="GET" action="/dashboard/organizations/pre-register" className="flex flex-wrap items-center gap-2">
-            <input
-              name="search"
-              defaultValue={q}
-              placeholder="Pesquisar por nome, contacto ou email"
-              className="h-9 w-72 rounded-md border border-input bg-background px-3 text-sm"
-            />
-            <Button type="submit" size="sm">Filtrar</Button>
-          </form>
-
-          <PreRegisterList items={items} isAdmin={isAdmin} />
-
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Total: {total} pré-registos</span>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={buildHref({ page: String(Math.max(1, page - 1)) })}>Anterior</Link>
-              </Button>
-              <span>Página {page} de {totalPages}</span>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={buildHref({ page: String(Math.min(totalPages, page + 1)) })}>Seguinte</Link>
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <PreRegisterList items={items} isAdmin={isAdmin} total={total} />
     </div>
   );
 }

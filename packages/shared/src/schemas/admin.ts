@@ -13,7 +13,7 @@ export const adminOrgListQuerySchema = z.object({
   verificationStatus: z.enum(["pre_registered", "pending", "in_review", "verified", "suspended"]).optional(),
   search: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(20).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(20).optional(),
 });
 
 export const adminUpdateUserRoleSchema = z.object({
