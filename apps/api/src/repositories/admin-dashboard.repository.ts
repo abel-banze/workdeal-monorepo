@@ -38,6 +38,9 @@ export interface NorthStar {
 export interface SeriesPoint {
   date: string; // YYYY-MM-DD
   label: string; // DD/MM
+  usuarios: number;
+  preRegistros: number;
+  conversoes: number;
   perfis: number;
   tarefas: number;
   contactos: number;
@@ -130,7 +133,28 @@ class AdminDashboardRepository {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const dayExpr = sql<string>`TO_CHAR(${quoteRequest.createdAt}::date, 'YYYY-MM-DD')`;
 
-    const [perfis, tarefas, contactos] = await Promise.all([
+    const [usuarios, preRegistros, conversoes, perfis, tarefas, contactos] = await Promise.all([
+      db
+        .select({ date: sql<string>`TO_CHAR(${user.createdAt}::date, 'YYYY-MM-DD')`, value: count(user.id) })
+        .from(user)
+        .where(and(isNull(user.deletedAt), gte(user.createdAt, since)))
+        .groupBy(sql`${user.createdAt}::date`),
+      db
+        .select({ date: sql<string>`TO_CHAR(${organization.preRegisteredAt}::date, 'YYYY-MM-DD')`, value: count(organization.id) })
+        .from(organization)
+        .where(and(eq(organization.verificationStatus, "pre_registered"), gte(organization.preRegisteredAt, since)))
+        .groupBy(sql`${organization.preRegisteredAt}::date`),
+      db
+        .select({ date: sql<string>`TO_CHAR(${organization.updatedAt}::date, 'YYYY-MM-DD')`, value: count(organization.id) })
+        .from(organization)
+        .where(
+          and(
+            sql`${organization.preRegisteredAt} IS NOT NULL`,
+            sql`${organization.verificationStatus} <> 'pre_registered'`,
+            gte(organization.updatedAt, since),
+          ),
+        )
+        .groupBy(sql`${organization.updatedAt}::date`),
       db
         .select({ date: sql<string>`TO_CHAR(${profile.createdAt}::date, 'YYYY-MM-DD')`, value: count(profile.id) })
         .from(profile)
@@ -141,9 +165,16 @@ class AdminDashboardRepository {
         .from(task)
         .where(gte(task.createdAt, since))
         .groupBy(sql`${task.createdAt}::date`),
-      db.select({ date: dayExpr, value: count(quoteRequest.id) }).from(quoteRequest).where(gte(quoteRequest.createdAt, since)).groupBy(sql`${quoteRequest.createdAt}::date`),
+      db
+        .select({ date: dayExpr, value: count(quoteRequest.id) })
+        .from(quoteRequest)
+        .where(gte(quoteRequest.createdAt, since))
+        .groupBy(sql`${quoteRequest.createdAt}::date`),
     ]);
 
+    const usuariosMap = new Map(usuarios.map((r) => [r.date, r.value]));
+    const preRegistrosMap = new Map(preRegistros.map((r) => [r.date, r.value]));
+    const conversoesMap = new Map(conversoes.map((r) => [r.date, r.value]));
     const perfisMap = new Map(perfis.map((r) => [r.date, r.value]));
     const tarefasMap = new Map(tarefas.map((r) => [r.date, r.value]));
     const contactosMap = new Map(contactos.map((r) => [r.date, r.value]));
@@ -157,6 +188,9 @@ class AdminDashboardRepository {
       result.push({
         date: dateStr,
         label,
+        usuarios: usuariosMap.get(dateStr) ?? 0,
+        preRegistros: preRegistrosMap.get(dateStr) ?? 0,
+        conversoes: conversoesMap.get(dateStr) ?? 0,
         perfis: perfisMap.get(dateStr) ?? 0,
         tarefas: tarefasMap.get(dateStr) ?? 0,
         contactos: contactosMap.get(dateStr) ?? 0,

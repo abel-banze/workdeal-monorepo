@@ -175,10 +175,12 @@ export function DashboardOverview({ initial }: { initial: DashboardStats }) {
           <section className="rounded-2xl border border-[#D9D2C2] bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div>
-                <Eyebrow>Actividade · últimos 30 dias</Eyebrow>
-                <PanelTitle>Criações no directório</PanelTitle>
+                <Eyebrow>Movimento · últimos 30 dias</Eyebrow>
+                <PanelTitle>Como a plataforma está a crescer</PanelTitle>
               </div>
-              <p className="text-xs text-[#0F1A2E]/50">Novos perfis, tarefas e pedidos de contacto por dia</p>
+              <p className="text-xs text-[#0F1A2E]/50">
+                Utilizadores novos, pré-registos, conversões e acção no directório por dia
+              </p>
             </div>
             <div className="mt-4">
               <ActivityChart series={stats.series} />

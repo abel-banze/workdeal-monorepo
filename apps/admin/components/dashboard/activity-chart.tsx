@@ -10,27 +10,35 @@ import {
 } from "@workspace/ui/components/chart";
 import type { DashboardStats } from "@workdeal/shared";
 
+// Movimento da plataforma nos últimos 30 dias — empilhado para ler o volume
+// total por dia e o peso de cada etapa (utilizadores → empresas → directório).
 const CHART_CONFIG = {
-  perfis: { label: "Perfis", color: "#0F1A2E" },
-  tarefas: { label: "Tarefas", color: "#0B5E56" },
-  contactos: { label: "Contactos", color: "#B27300" },
+  usuarios: { label: "Novos utilizadores", color: "#0F1A2E" },
+  perfis: { label: "Perfis publicados", color: "#0B5E56" },
+  tarefas: { label: "Novas tarefas", color: "#B27300" },
+  preRegistros: { label: "Pré-registos", color: "#C2462B" },
+  contactos: { label: "Pedidos de contacto", color: "#4FD1C5" },
+  conversoes: { label: "Deram seguimento", color: "#64748B" },
 } as const;
 
-const AREA_DEFS = [
-  { key: "perfis", fillId: "fillPerfis", color: "#0F1A2E", opacity: 0.18 },
-  { key: "tarefas", fillId: "fillTarefas", color: "#0B5E56", opacity: 0.2 },
-  { key: "contactos", fillId: "fillContactos", color: "#B27300", opacity: 0.2 },
-] as const;
+const AREA_DEFS: Array<{ key: keyof typeof CHART_CONFIG; color: string }> = [
+  { key: "usuarios", color: "#0F1A2E" },
+  { key: "perfis", color: "#0B5E56" },
+  { key: "tarefas", color: "#B27300" },
+  { key: "preRegistros", color: "#C2462B" },
+  { key: "contactos", color: "#4FD1C5" },
+  { key: "conversoes", color: "#64748B" },
+];
 
 export function ActivityChart({ series }: { series: DashboardStats["series"] }) {
   return (
-    <ChartContainer config={CHART_CONFIG} className="h-[280px] w-full">
+    <ChartContainer config={CHART_CONFIG} className="h-[300px] w-full">
       <AreaChart data={series} margin={{ left: 0, right: 8, top: 16, bottom: 4 }}>
         <defs>
           {AREA_DEFS.map((d) => (
-            <linearGradient key={d.fillId} id={d.fillId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={d.color} stopOpacity={d.opacity} />
-              <stop offset="95%" stopColor={d.color} stopOpacity={0.02} />
+            <linearGradient key={d.key} id={`fill${d.key}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={d.color} stopOpacity={0.6} />
+              <stop offset="95%" stopColor={d.color} stopOpacity={0.1} />
             </linearGradient>
           ))}
         </defs>
@@ -56,12 +64,14 @@ export function ActivityChart({ series }: { series: DashboardStats["series"] }) 
           <Area
             key={d.key}
             dataKey={d.key}
+            name={CHART_CONFIG[d.key].label}
             type="monotone"
-            fill={`url(#${d.fillId})`}
+            stackId="total"
+            fill={`url(#fill${d.key})`}
             stroke={d.color}
-            strokeWidth={2}
+            strokeWidth={1.5}
             dot={false}
-            activeDot={{ r: 4, strokeWidth: 0 }}
+            activeDot={{ r: 3, strokeWidth: 0 }}
           />
         ))}
       </AreaChart>
