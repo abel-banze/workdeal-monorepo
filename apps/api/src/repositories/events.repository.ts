@@ -1,5 +1,5 @@
 import { db, event, eventRegistration, profile, user } from "@workdeal/db";
-import { and, asc, count, desc, eq, gt, inArray, isNull, ne, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, ne, sql, type SQL } from "drizzle-orm";
 import { boundingBox } from "@workdeal/shared/lib/geo";
 
 type EventStatus = (typeof event.status.enumValues)[number];
@@ -122,10 +122,11 @@ export const eventsRepository = {
     return rows.length > 0;
   },
 
-  async list(params: { status?: string; categoryId?: string; province?: string; upcoming?: boolean; organizerSlug?: string; near?: string; radiusKm?: number; page: number; limit: number }) {
-    const conds: SQL[] = [];
-    if (params.status) conds.push(eq(event.status, asEventStatus(params.status)));
-    if (params.categoryId) conds.push(eq(event.categoryId, params.categoryId));
+async list(params: { status?: string; q?: string; categoryId?: string; province?: string; upcoming?: boolean; organizerSlug?: string; near?: string; radiusKm?: number; page: number; limit: number }) {
+      const conds: SQL[] = [];
+      if (params.status) conds.push(eq(event.status, asEventStatus(params.status)));
+      if (params.q) conds.push(ilike(event.title, `%${params.q}%`));
+      if (params.categoryId) conds.push(eq(event.categoryId, params.categoryId));
     if (params.province) conds.push(eq(event.province, params.province));
     if (params.upcoming) conds.push(gt(event.startAt, new Date()));
     let nearCoords: { latitude: number; longitude: number } | null = null;

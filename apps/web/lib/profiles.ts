@@ -1,4 +1,4 @@
-import type { ProfileView, CategoryView, PublicProfileView } from "@workdeal/shared";
+import type { ProfileView, CategoryView, PublicProfileView, TagView } from "@workdeal/shared";
 import { apiFetch } from "@/lib/api";
 
 export type PortfolioItem = {
@@ -35,6 +35,18 @@ export async function getPublicProfile(slug: string) {
 export async function getCategories() {
   return apiFetch<CategoryView[]>(`/api/v1/categories`, {
     next: { revalidate: 300, tags: ["categories"] },
+  });
+}
+
+export async function getTags() {
+  return apiFetch<TagView[]>(`/api/v1/tags`, {
+    next: { revalidate: 3600, tags: ["tags"] },
+  });
+}
+
+export async function getProfileTags(profileId: string) {
+  return apiFetch<TagView[]>(`/api/v1/tags/profile/${profileId}`, {
+    next: { revalidate: 60, tags: [`profile-tags:${profileId}`] },
   });
 }
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { cookies } from "next/headers";
-import { getCategories, getProfiles, getPreRegisteredCompanies, type PreRegisteredCompany } from "@/lib/profiles";
+import { getCategories, getProfiles, getPreRegisteredCompanies, getTags, type PreRegisteredCompany } from "@/lib/profiles";
 import { ProfileCard } from "@/components/features/profile-card";
 import { PreRegisterCard } from "@/components/features/pre-register-card";
 import { SearchImpressions } from "@/components/features/search-impressions";
@@ -111,7 +111,10 @@ function matchesPreRegistered(
   province: string | null,
   near: string | undefined,
   radiusKm: number,
+  tagSlug?: string,
 ) {
+  // Pré-registadas não têm tags/competências — sob filtro de competência ficam de fora.
+  if (tagSlug) return false;
   if (categorySlugs.size > 0 && !company.categorySlugs.some((s) => categorySlugs.has(s))) {
     return false;
   }
@@ -188,7 +191,7 @@ async function CompaniesList({
     const nearParam = searchParams.near || undefined;
     const radiusKm = Math.max(1, Number(searchParams.radiusKm ?? 25) || 25);
     const preRegistered = allPreRegistered.filter((c) =>
-      matchesPreRegistered(c, searchParams.q, categorySlugs, smart.province, nearParam, radiusKm),
+      matchesPreRegistered(c, searchParams.q, categorySlugs, smart.province, nearParam, radiusKm, searchParams.tagSlug),
     );
 
     // Paginação unificada: pré-registadas entram nas posições livres (12/página).
@@ -295,6 +298,8 @@ export default async function CompaniesPage({ searchParams }: Props) {
   const locationParams = applyDefaultLocation(params, parseLocationCookies(await cookies()));
   const categoriesRes = await getCategories().catch(() => ({ data: [] as { id: string; name: string; slug: string }[] }));
   const categories = (categoriesRes as { data: { id: string; name: string; slug: string }[] }).data;
+  const tagsRes = await getTags().catch(() => ({ data: [] as { id: string; slug: string; name: string; category: string | null }[] }));
+  const tags = (tagsRes as { data: { id: string; slug: string; name: string; category: string | null }[] }).data;
 
   return (
     <div className="bg-[#F6F3EE]">
@@ -325,7 +330,11 @@ export default async function CompaniesPage({ searchParams }: Props) {
 
           {/* command bar — pesquisa + categoria + filtros */}
           <div className="mt-4 max-w-[860px]">
-            <CompaniesFilters categories={categories as { id: string; name: string; slug: string }[]} initialParams={params} />
+            <CompaniesFilters
+              categories={categories as { id: string; name: string; slug: string }[]}
+              tags={tags as { id: string; slug: string; name: string; category: string | null }[]}
+              initialParams={params}
+            />
           </div>
         </div>
       </section>

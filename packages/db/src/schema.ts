@@ -255,6 +255,7 @@ export const profile = pgTable(
     searchTsv: text("search_tsv"),
     searchCategoryText: text("search_category_text"),
     searchLocationText: text("search_location_text"),
+    searchTagText: text("search_tag_text"),
     whatsapp: text("whatsapp"),
     phone: text("phone"),
     email: text("email"),

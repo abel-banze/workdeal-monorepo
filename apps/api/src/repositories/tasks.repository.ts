@@ -1,5 +1,5 @@
 import { db, task, taskProposal, taskBid, profile, member, user } from "@workdeal/db";
-import { and, count, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { boundingBox } from "@workdeal/shared/lib/geo";
 
 type TaskStatus = (typeof task.status.enumValues)[number];
@@ -139,10 +139,21 @@ export const tasksRepository = {
     return { ...row, ...enriched.get(row.id) } as TaskRow & RequesterEnrichment;
   },
 
-  async list(params: { status?: string; categoryId?: string; province?: string; near?: string; radiusKm?: number; page: number; limit: number }) {
+  async list(params: { status?: string; title?: string; categoryId?: string; categoryIds?: string[]; district?: string; priceMin?: number; priceMax?: number; province?: string; near?: string; radiusKm?: number; page: number; limit: number }) {
     const conds: SQL[] = [];
     if (params.status) conds.push(eq(task.status, asTaskStatus(params.status)));
+    if (params.title) conds.push(ilike(task.title, `%${params.title}%`));
     if (params.categoryId) conds.push(eq(task.categoryId, params.categoryId));
+    if (params.categoryIds && params.categoryIds.length > 0) conds.push(inArray(task.categoryId, params.categoryIds));
+    if (params.district) conds.push(ilike(task.district, `%${params.district}%`));
+    if (params.priceMin != null) {
+      const cond = or(and(isNotNull(task.priceMaxMzn), gte(task.priceMaxMzn, params.priceMin)), isNull(task.priceMaxMzn));
+      if (cond) conds.push(cond);
+    }
+    if (params.priceMax != null) {
+      const cond = or(and(isNotNull(task.priceMinMzn), lte(task.priceMinMzn, params.priceMax)), isNull(task.priceMinMzn));
+      if (cond) conds.push(cond);
+    }
     if (params.province) conds.push(eq(task.province, params.province));
     let nearCoords: { latitude: number; longitude: number } | null = null;
     if (params.near) {

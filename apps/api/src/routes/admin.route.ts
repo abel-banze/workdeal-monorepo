@@ -13,6 +13,7 @@ import { adminUserListQuerySchema, adminOrgListQuerySchema, adminUpdateUserRoleS
 import { z } from "zod";
 import { preRegisterController } from "../controllers/pre-register.controller.js";
 import { categoriesController } from "../controllers/categories.controller.js";
+import { adminDashboardController } from "../controllers/admin-dashboard.controller.js";
 
 export const adminRoute = new Hono<Env>();
 
@@ -107,16 +108,16 @@ adminRoute.post("/organizations/:id/pre-register/resend-notification", async (c)
   return c.json(body, status);
 });
 
+adminRoute.get("/dashboard", async (c) => {
+  const { body, status } = await adminDashboardController.getStats();
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
 adminRoute.get("/metrics", async (c) => {
-  const { db, verificationRequest, report } = await import("@workdeal/db");
-  const { sql } = await import("drizzle-orm");
-  const [pendingVerifications] = await db.select({ count: sql<number>`count(*)::int` }).from(verificationRequest).where(sql`${verificationRequest.status} = 'pending'`);
-  const [pendingReports] = await db.select({ count: sql<number>`count(*)::int` }).from(report).where(sql`${report.status} = 'pending'`);
-  const [avg] = await db
-    .select({ avgHours: sql<number>`avg(EXTRACT(EPOCH FROM (${verificationRequest.reviewedAt} - ${verificationRequest.createdAt}))/3600)::float` })
-    .from(verificationRequest)
-    .where(sql`${verificationRequest.reviewedAt} IS NOT NULL`);
-  return c.json({ success: true, data: { pendingVerifications: pendingVerifications?.count ?? 0, pendingReports: pendingReports?.count ?? 0, avgVerificationHours: avg?.avgHours ?? null } });
+  const { body, status } = await adminDashboardController.getMetrics();
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
 });
 
 adminRoute.post("/badges/run", async (c) => {

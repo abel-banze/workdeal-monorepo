@@ -52,6 +52,7 @@ export const updateEventSchema = eventFormFields.partial().extend({
 export const eventListQuerySchema = z.object({
   status: eventStatusSchema.optional().default("published"),
   upcoming: z.coerce.boolean().optional(),
+  q: z.string().trim().max(100).optional(),
   categoryId: z.string().min(1).optional(),
   province: z.string().min(1).optional(),
   organizerSlug: z.string().min(1).optional(),

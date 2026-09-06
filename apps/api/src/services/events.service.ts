@@ -59,17 +59,18 @@ export const eventsService = {
   async listEvents(query: EventListQuery) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const { items, total } = await eventsRepository.list({
-      status: query.status ?? "published",
-      categoryId: query.categoryId,
-      province: query.province,
-      upcoming: query.upcoming,
-      organizerSlug: query.organizerSlug,
-      near: query.near,
-      radiusKm: query.radiusKm,
-      page,
-      limit,
-    });
+const { items, total } = await eventsRepository.list({
+        status: query.status ?? "published",
+        q: query.q,
+        categoryId: query.categoryId,
+        province: query.province,
+        upcoming: query.upcoming,
+        organizerSlug: query.organizerSlug,
+        near: query.near,
+        radiusKm: query.radiusKm,
+        page,
+        limit,
+      });
     return { items, total, page, limit };
   },
 

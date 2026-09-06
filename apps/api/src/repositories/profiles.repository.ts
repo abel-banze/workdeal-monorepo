@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, exists, ilike, inArray, isNull, sql } from "drizzle-orm";
-import { db, profile, profileCategory, category, profileLocation, profileBadge, badge, organization, companyQualification, profileContactVerification } from "@workdeal/db";
+import { db, profile, profileCategory, category, profileLocation, profileBadge, badge, organization, companyQualification, profileContactVerification, profileTag, tag } from "@workdeal/db";
 import type { ContactVerificationPayload } from "@workdeal/shared/lib/contact-verification";
 import type { ListProfilesQuery, ProfileBadgeLite } from "@workdeal/shared";
 import { boundingBox, isValidCoordinates } from "@workdeal/shared/lib/geo";
@@ -21,6 +21,7 @@ export const profileColumns = {
   description: profile.description,
   searchCategoryText: profile.searchCategoryText,
   searchLocationText: profile.searchLocationText,
+  searchTagText: profile.searchTagText,
   logoUrl: profile.logoUrl,
   coverUrl: profile.coverUrl,
   latitude: profile.latitude,
@@ -246,6 +247,19 @@ class ProfilesRepository {
             .from(profileBadge)
             .innerJoin(badge, eq(profileBadge.badgeId, badge.id))
             .where(and(eq(profileBadge.profileId, profile.id), eq(profileBadge.status, "active"), eq(badge.slug, query.badgeSlug))),
+        ),
+      );
+    }
+
+    // Competência: perfil com a tag (por slug) associada
+    if (query.tagSlug) {
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(profileTag)
+            .innerJoin(tag, eq(profileTag.tagId, tag.id))
+            .where(and(eq(profileTag.profileId, profile.id), eq(tag.slug, query.tagSlug))),
         ),
       );
     }

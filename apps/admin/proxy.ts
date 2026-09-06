@@ -7,6 +7,14 @@ const PROTECTED_PREFIX = "/dashboard"
 // via requireSystemRole. Este proxy só redireciona não-autenticados a tempo,
 // poupando o render do dashboard quando não há sequer sessão.
 export function proxy(req: NextRequest) {
+  // Rota SSE: quem tem sessão switcha para o stream; sem sessão o próprio
+  // handler devolve 401 a tempo (um redirect aqui quebraria o EventSource).
+  if (req.nextUrl.pathname === "/dashboard/live") {
+    const missingAuth = !req.cookies.has(JWT_COOKIE_NAME)
+    const login = new URL("/login", req.url)
+    login.searchParams.set("next", req.nextUrl.pathname)
+    return missingAuth ? NextResponse.redirect(login) : NextResponse.next()
+  }
   if (req.nextUrl.pathname.startsWith(PROTECTED_PREFIX) && !req.cookies.has(JWT_COOKIE_NAME)) {
     const login = new URL("/login", req.url)
     login.searchParams.set("next", req.nextUrl.pathname)
