@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 type Props = {
   categories: { id: string; name: string; slug: string }[];
+  tags: { id: string; slug: string; name: string; category: string | null }[];
   initialParams: Record<string, string | undefined>;
 };
 
@@ -36,6 +37,28 @@ const IDENTITIES = [
 ];
 
 const NOW_YEAR = new Date().getFullYear();
+
+const TAG_CATEGORY_LABELS: Record<string, string> = {
+  servico: "Atributos de serviço",
+  construcao: "Construção",
+  energia: "Energia e Água",
+  avac: "Climatização",
+  tecnologia: "Tecnologia",
+  marketing: "Marketing e Design",
+  eventos: "Eventos",
+  transporte: "Transporte e Logística",
+  limpeza: "Limpeza e Higiene",
+  seguranca: "Segurança",
+  agro: "Agronegócio",
+  empresariais: "Serviços Empresariais",
+  saude: "Saúde",
+  automovel: "Automóvel",
+};
+
+function tagCategoryLabel(category: string | null): string {
+  if (!category) return "Outros";
+  return TAG_CATEGORY_LABELS[category] ?? category.slice(0, 1).toUpperCase() + category.slice(1);
+}
 
 // Anos de experiência (mínimos cumulativos): empresas com PELO MENOS X anos no
 // mercado — o valor é o limiar de anos; experiência >= X  =>  fundada em <= (ano - X).
@@ -66,7 +89,7 @@ function experienceToMaxYear(experience: string): number | undefined {
 
 const RADII = ["5", "10", "25", "50", "100"];
 
-export function CompaniesFilters({ categories, initialParams }: Props) {
+export function CompaniesFilters({ categories, tags, initialParams }: Props) {
   const router = useRouter();
   const [q, setQ] = useState(initialParams.q ?? "");
   const [categoryId, setCategoryId] = useState(initialParams.categoryId ?? "");
@@ -75,6 +98,7 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
   const [province, setProvince] = useState(initialParams.province ?? "");
   const [city, setCity] = useState(initialParams.city ?? "");
   const [badgeSlug, setBadgeSlug] = useState(initialParams.badgeSlug ?? "");
+  const [tagSlug, setTagSlug] = useState(initialParams.tagSlug ?? "");
   const [companySize, setCompanySize] = useState(initialParams.companySize ?? "");
   const [experience, setExperience] = useState(() => experienceFromParams(initialParams));
   const [verificationStatus, setVerificationStatus] = useState(initialParams.verificationStatus ?? "");
@@ -84,6 +108,7 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
   const [catQuery, setCatQuery] = useState("");
   const [provOpen, setProvOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const [tagQuery, setTagQuery] = useState("");
 
   const catRef = useRef<HTMLDivElement>(null);
   const provRef = useRef<HTMLDivElement>(null);
@@ -99,6 +124,27 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
     if (!ql) return categories;
     return categories.filter((c) => c.name.toLowerCase().includes(ql) || c.slug.toLowerCase().includes(ql));
   }, [categories, catQuery]);
+
+  const filteredTagGroups = useMemo(() => {
+    const ql = tagQuery.trim().toLowerCase();
+    const list = !ql
+      ? tags
+      : tags.filter((t) => t.name.toLowerCase().includes(ql) || t.slug.toLowerCase().includes(ql));
+    const groups: { id: string; label: string; items: typeof tags }[] = [];
+    for (const t of list) {
+      const key = t.category || "outros";
+      let group = groups.find((g) => g.id === key);
+      if (!group) {
+        group = { id: key, label: tagCategoryLabel(t.category), items: [] };
+        groups.push(group);
+      }
+      group.items.push(t);
+    }
+    groups.sort((a, b) => a.label.localeCompare(b.label, "pt"));
+    return groups;
+  }, [tags, tagQuery]);
+
+  const selectedTagName = useMemo(() => tags.find((t) => t.slug === tagSlug)?.name ?? "", [tags, tagSlug]);
 
   // Fecha painéis ao clicar fora ou com Escape
   useEffect(() => {
@@ -144,6 +190,7 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
       province: province || undefined,
       city: city.trim() || undefined,
       badgeSlug: badgeSlug || undefined,
+      tagSlug: tagSlug || undefined,
       companySize: companySize || undefined,
       maxYear: experience ? String(experienceToMaxYear(experience)) : undefined,
       verificationStatus: verificationStatus || undefined,
@@ -212,6 +259,8 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
     setProvince("");
     setCity("");
     setBadgeSlug("");
+    setTagSlug("");
+    setTagQuery("");
     setCompanySize("");
     setExperience("");
     setVerificationStatus("");
@@ -234,6 +283,7 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
     province,
     city.trim(),
     badgeSlug,
+    tagSlug,
     companySize,
     experience,
     verificationStatus,
@@ -387,6 +437,11 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
             {badgeSlug && (
               <span className="inline-flex rounded-full bg-[#0B5E56] px-2.5 py-1 text-xs font-semibold text-white">
                 {BADGES.find((b) => b.slug === badgeSlug)?.label ?? badgeSlug}
+              </span>
+            )}
+            {tagSlug && (
+              <span className="inline-flex rounded-full border border-[#0B5E56]/40 bg-[#EAF4F2] px-2.5 py-1 text-xs font-semibold text-[#0B5E56]">
+                {selectedTagName || tagSlug}
               </span>
             )}
             {companySize && (
@@ -609,6 +664,60 @@ export function CompaniesFilters({ categories, initialParams }: Props) {
                     </button>
                   ))}
                 </div>
+              </section>
+
+              {/* Competências */}
+              <section>
+                <p className="mb-2 text-[11px] font-bold tracking-[0.14em] text-[#0F1A2E]/50">COMPETÊNCIAS</p>
+                <label className="mb-2.5 flex items-center gap-2 rounded-[10px] border border-[#D9D2C2] bg-white px-3 py-2.5">
+                  <span className="shrink-0 text-[#0F1A2E]/35" aria-hidden>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="M20 20l-3.5-3.5" />
+                    </svg>
+                  </span>
+                  <input
+                    value={tagQuery}
+                    onChange={(e) => setTagQuery(e.target.value)}
+                    placeholder="Filtrar competência… ex: energia solar"
+                    aria-label="Filtrar competência"
+                    className="w-full bg-transparent text-sm placeholder:text-[#0F1A2E]/35 focus:outline-none"
+                  />
+                  {tagQuery && (
+                    <button type="button" onClick={() => setTagQuery("")} aria-label="Limpar pesquisa de competência" className="shrink-0 rounded-full p-1 text-[#0F1A2E]/30 hover:bg-[#0F1A2E]/5">
+                      ✕
+                    </button>
+                  )}
+                </label>
+                {filteredTagGroups.length === 0 ? (
+                  <div className="rounded-[10px] border border-dashed border-[#D9D2C2] px-3 py-6 text-center text-sm text-[#0F1A2E]/40">
+                    Nenhuma competência encontrada
+                  </div>
+                ) : (
+                  <div className="max-h-[300px] space-y-3 overflow-y-auto pr-1">
+                    {filteredTagGroups.map((group) => (
+                      <div key={group.id}>
+                        <p className="mb-1.5 text-[10px] font-bold tracking-[0.14em] text-[#0F1A2E]/35">{group.label.toUpperCase()}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {group.items.map((t) => {
+                            const active = tagSlug === t.slug;
+                            return (
+                              <button
+                                key={t.slug}
+                                type="button"
+                                onClick={() => setTagSlug(active ? "" : t.slug)}
+                                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-[#0B5E56] bg-[#0B5E56] text-white" : "border-[#D9D2C2] bg-white text-[#0F1A2E]/70 hover:bg-[#F6F3EE]"}`}
+                              >
+                                {active ? "✓ " : ""}{t.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-1.5 text-[11px] text-[#0F1A2E]/40">Empresas que declaram essa competência no perfil.</p>
               </section>
 
               {/* Selos de qualidade */}

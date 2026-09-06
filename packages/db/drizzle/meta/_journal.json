@@ -225,6 +225,13 @@
       "when": 1790000000000,
       "tag": "0031_add_pre_register",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790000000001,
+      "tag": "0032_search_tag_text",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,29 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { env } from "@workdeal/shared/lib/env";
 import * as schema from "./schema.js";
+import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Bootstrap de env para scripts que correm fora da API (seed, jobs, tooling):
+// a API carrega via apps/api/src/load-env.ts, mas `pnpm --filter @workdeal/db db:seed`
+// corre com CWD = packages/db e sem env injectada. Carrega .env candidatos com
+// prioridade de projecto, SEM sobrescrever vars já definidas (ex: prod/Coolify injecta).
+const _dirname = path.dirname(fileURLToPath(import.meta.url));
+function loadDbEnv() {
+  if (process.env.NODE_ENV === "production") return;
+  const root = path.resolve(_dirname, "../../..");
+  for (const p of [
+    path.resolve(_dirname, "../.env"), // packages/db/.env
+    path.resolve(root, "apps/api/.env"),
+    path.resolve(root, "apps/api/.env.local"),
+    path.resolve(root, ".env"), // raiz do monorepo
+    path.resolve(root, ".env.local"),
+  ]) {
+    dotenv.config({ path: p, override: false, quiet: true });
+  }
+}
+loadDbEnv();
 
 // Lazy — evita throw no import/build quando Root Directory = apps/api e env ainda não foi validado
 let _pool: Pool | null = null;

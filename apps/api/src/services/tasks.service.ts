@@ -67,18 +67,29 @@ export const tasksService = {
     });
   },
 
-  async listTasks(query: TaskListQuery) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
-    const { items, total } = await tasksRepository.list({
-      status: query.status ?? "open",
-      categoryId: query.categoryId,
-      province: query.province,
-      near: query.near,
-      radiusKm: query.radiusKm,
-      page,
-      limit,
-    });
+async listTasks(query: TaskListQuery) {
+      const page = query.page ?? 1;
+      const limit = query.limit ?? 20;
+      const categoryIds = query.categories
+        ? query.categories
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined;
+      const { items, total } = await tasksRepository.list({
+        status: query.status ?? "open",
+        title: query.q,
+        categoryIds,
+        district: query.district,
+        priceMin: query.priceMin,
+        priceMax: query.priceMax,
+        categoryId: query.categoryId,
+        province: query.province,
+        near: query.near,
+        radiusKm: query.radiusKm,
+        page,
+        limit,
+      });
     return { items, total, page, limit };
   },
 

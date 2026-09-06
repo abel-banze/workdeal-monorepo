@@ -35,6 +35,11 @@ tasksRoute.get("/", zValidator("query", taskListQuerySchema), async (c) => {
   const q = c.req.valid("query");
   const { body, status } = await tasksController.list({
     status: q.status,
+    q: q.q,
+    categories: q.categories,
+    district: q.district,
+    priceMin: q.priceMin,
+    priceMax: q.priceMax,
     categoryId: q.categoryId,
     province: q.province,
     page: q.page,

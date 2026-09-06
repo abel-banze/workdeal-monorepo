@@ -40,6 +40,30 @@ type Profile = {
   website: string | null
   categories: { id: string; slug: string; name: string; isPrimary: boolean }[]
 }
+export type TagOption = { id: string; slug: string; name: string; category: string | null }
+
+const TAG_CATEGORY_LABELS: Record<string, string> = {
+  servico: "Atributos de serviço",
+  construcao: "Construção",
+  energia: "Energia e Água",
+  avac: "Climatização",
+  tecnologia: "Tecnologia",
+  marketing: "Marketing e Design",
+  eventos: "Eventos",
+  transporte: "Transporte e Logística",
+  limpeza: "Limpeza e Higiene",
+  seguranca: "Segurança",
+  agro: "Agronegócio",
+  empresariais: "Serviços Empresariais",
+  saude: "Saúde",
+  automovel: "Automóvel",
+}
+
+function tagCategoryLabel(category: string | null): string {
+  if (category && TAG_CATEGORY_LABELS[category]) return TAG_CATEGORY_LABELS[category]
+  if (category) return category.slice(0, 1).toUpperCase() + category.slice(1)
+  return "Outros"
+}
 
 type StepDef = {
   key: string
@@ -55,12 +79,16 @@ export function EditProfileForm({
   isCompany = false,
   initialQualification = null,
   organizationId = null,
+  tags = [],
+  initialTagSlugs = [],
 }: {
   initialProfile: Profile
   categories: Category[]
   isCompany?: boolean
   initialQualification?: { workers: number; turnoverMzn: number | null; foundedYear: number | null; legalForm: string | null; nuit: string | null; alvara: string | null; capitalSocialMzn: number | null; licenses: string[] | null } | null
   organizationId?: string | null
+  tags?: TagOption[]
+  initialTagSlugs?: string[]
 }) {
   const router = useRouter()
   const [name, setName] = useState(initialProfile.name)
@@ -74,6 +102,8 @@ export function EditProfileForm({
   const [email, setEmail] = useState(initialProfile.email ?? "")
   const [website, setWebsite] = useState(initialProfile.website ?? "")
   const [selectedCats, setSelectedCats] = useState<string[]>(() => initialProfile.categories.map((c) => c.id))
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => initialTagSlugs.slice(0, 10))
+  const [tagQuery, setTagQuery] = useState("")
   const [workers, setWorkers] = useState(initialQualification?.workers?.toString() ?? "")
   const [turnover, setTurnover] = useState(initialQualification?.turnoverMzn?.toString() ?? "")
   const [foundedYear, setFoundedYear] = useState(initialQualification?.foundedYear?.toString() ?? "")
@@ -109,6 +139,23 @@ export function EditProfileForm({
   const [timerNow, setTimerNow] = useState(Date.now())
   const catAnchor = useComboboxAnchor()
   const [catQuery, setCatQuery] = useState("")
+
+  const tagGroups = useMemo(() => {
+    const ql = tagQuery.trim().toLowerCase()
+    const list = !ql ? tags : tags.filter((t) => t.name.toLowerCase().includes(ql) || t.slug.toLowerCase().includes(ql))
+    const groups: { id: string; label: string; items: TagOption[] }[] = []
+    for (const t of list) {
+      const key = t.category || "outros"
+      let group = groups.find((g) => g.id === key)
+      if (!group) {
+        group = { id: key, label: tagCategoryLabel(t.category), items: [] }
+        groups.push(group)
+      }
+      group.items.push(t)
+    }
+    groups.sort((a, b) => a.label.localeCompare(b.label, "pt"))
+    return groups
+  }, [tags, tagQuery])
   const labelCls = "text-xs font-bold tracking-[0.07em] text-[#0F1A2E]/70 uppercase"
   const inputCls = "w-full rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] leading-none text-[#0F1A2E] placeholder:text-[#0F1A2E]/35 outline-none transition focus:border-[#0B5E56] focus:bg-white focus:ring-2 focus:ring-[#0B5E56]/15"
   const fieldErrCls = "text-xs font-medium text-[#7A1A0A]"
@@ -202,6 +249,14 @@ export function EditProfileForm({
       if (prev.includes(id)) return prev.filter((x) => x !== id)
       if (prev.length >= 5) return prev
       return [...prev, id]
+    })
+  }
+
+  function toggleTag(slug: string) {
+    setSelectedTags((prev) => {
+      if (prev.includes(slug)) return prev.filter((x) => x !== slug)
+      if (prev.length >= 10) return prev
+      return [...prev, slug]
     })
   }
 
@@ -386,6 +441,7 @@ export function EditProfileForm({
       if (changed) payload.categoryIds = selectedCats
 
       const hasProfileChanges = Object.keys(payload).length > 0
+      const tagChanged = selectedTags.slice(0, 10).join(",") !== initialTagSlugs.slice(0, 10).join(",")
       let hasQualChanges = false
       if (isCompany && organizationId) {
         const w = workers.trim() ? parseInt(workers.replace(/\D/g, ""), 10) : null
@@ -404,7 +460,7 @@ export function EditProfileForm({
           JSON.stringify(lic) !== JSON.stringify(initialQualification?.licenses ?? null)
       }
 
-      if (!hasProfileChanges && !hasQualChanges) {
+      if (!hasProfileChanges && !hasQualChanges && !tagChanged) {
         setSuccess("Nenhuma alteração para guardar.")
         setLoading(false)
         return
@@ -433,6 +489,11 @@ export function EditProfileForm({
           capitalSocialMzn: capital.trim() ? parseInt(capital.replace(/\D/g, ""), 10) : null,
           licenses: licenses.trim() ? licenses.split(",").map((s) => s.trim()).filter(Boolean) : null,
         })
+      }
+
+      if (tagChanged) {
+        const { setProfileTags } = await import("@/app/actions/locations-tags")
+        await setProfileTags({ profileId: initialProfile.id, tagSlugs: selectedTags.slice(0, 10), organizationId })
       }
 
       setSuccess("Perfil actualizado com sucesso.")
@@ -694,6 +755,75 @@ export function EditProfileForm({
                     })}
                   </div>
                 )}
+              </div>
+
+              {/* Competências — tags que alimentam a pesquisa e o filtro do directório */}
+              <div className="space-y-3">
+                <div>
+                  <Label>Competências ({selectedTags.length}/10)</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">Escolhe até 10 especialidades. Ajudam os clientes a encontrar-te por aquilo que fazes.</p>
+                </div>
+                <label className="flex h-10 items-center gap-2 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 text-[13px] transition focus-within:border-[#0B5E56] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#0B5E56]/15">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="shrink-0 text-[#0F1A2E]/35" aria-hidden>
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M20 20l-3.5-3.5" />
+                  </svg>
+                  <input
+                    value={tagQuery}
+                    onChange={(e) => setTagQuery(e.target.value)}
+                    placeholder="Filtrar competência… ex: energia solar"
+                    aria-label="Filtrar competências"
+                    className="w-full bg-transparent text-[13px] placeholder:text-[#0F1A2E]/35 focus:outline-none"
+                  />
+                  {tagQuery && (
+                    <button type="button" onClick={() => setTagQuery("")} aria-label="Limpar pesquisa de competência" className="shrink-0 rounded-full p-1 text-[#0F1A2E]/30 hover:bg-[#0F1A2E]/5">
+                      ✕
+                    </button>
+                  )}
+                </label>
+                {tags.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-[#D9D2C2] px-3 py-6 text-center text-xs text-[#0F1A2E]/40">Sem competências disponíveis de momento.</p>
+                ) : tagGroups.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-[#D9D2C2] px-3 py-6 text-center text-xs text-[#0F1A2E]/40">Nenhuma competência encontrada.</p>
+                ) : (
+                  <div className="max-h-64 space-y-3 overflow-y-auto rounded-lg border border-[#D9D2C2]/70 bg-white p-3">
+                    {tagGroups.map((group) => (
+                      <div key={group.id}>
+                        <p className="mb-1.5 text-[9px] font-bold tracking-[0.14em] text-[#0F1A2E]/40">{group.label.toUpperCase()}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {group.items.map((t) => {
+                            const active = selectedTags.includes(t.slug)
+                            return (
+                              <button
+                                key={t.slug}
+                                type="button"
+                                onClick={() => toggleTag(t.slug)}
+                                aria-pressed={active}
+                                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active ? "border-[#0B5E56] bg-[#0B5E56] text-white" : "border-[#D9D2C2] bg-white text-[#0F1A2E]/70 hover:bg-[#F6F3EE]"}`}
+                              >
+                                {active ? "✓ " : ""}{t.name}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {selectedTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedTags.map((slug) => {
+                      const tag = tags.find((t) => t.slug === slug)
+                      return (
+                        <span key={slug} className="inline-flex items-center gap-1 rounded-full border border-[#0B5E56]/15 bg-[#0B5E56]/10 px-2.5 py-1 text-xs font-medium text-[#0B5E56]">
+                          {tag?.name ?? slug}
+                          <button type="button" onClick={() => toggleTag(slug)} className="ml-1 rounded-full p-0.5 hover:bg-[#0B5E56]/20" aria-label={`Remover ${tag?.name ?? slug}`}>×</button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+                <p className="text-xs text-[#0F1A2E]/50">{selectedTags.length}/10 seleccionadas{selectedTags.length === 10 ? " • limite atingido" : ""} — contam para a pesquisa e o filtro por competência do directório.</p>
               </div>
             </div>
           )}

@@ -67,7 +67,12 @@ export const updateTaskSchema = taskFormFields.partial().extend({
 
 export const taskListQuerySchema = z.object({
   status: taskStatusSchema.optional(),
+  q: z.string().trim().max(100).optional(),
   categoryId: z.string().min(1).optional(),
+  categories: z.string().optional(),
+  district: z.string().trim().max(80).optional(),
+  priceMin: z.coerce.number().int().min(0).optional(),
+  priceMax: z.coerce.number().int().min(0).optional(),
   province: z.string().min(1).optional(),
   near: z
     .string()

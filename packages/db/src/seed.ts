@@ -74,26 +74,97 @@ const badges = [
 ];
 
 const tags = [
-  { id: "tag-orcamento-gratis", slug: "orcamento-gratis", name: "Orçamento Grátis" },
-  { id: "tag-disponivel-fds", slug: "disponivel-fds", name: "Disponível Fim-de-Semana" },
-  { id: "tag-24h", slug: "24h", name: "Atendimento 24h" },
-  { id: "tag-deslocacao-incluida", slug: "deslocacao-incluida", name: "Deslocação Incluída" },
-  { id: "tag-garantia", slug: "garantia", name: "Garantia" },
-  { id: "tag-certificado", slug: "certificado", name: "Certificado" },
-  { id: "tag-urgencia", slug: "urgencia", name: "Urgência" },
-  { id: "tag-sustentavel", slug: "sustentavel", name: "Sustentável" },
-  { id: "tag-energia-solar", slug: "tag-energia-solar", name: "Energia Solar" },
-  { id: "tag-manutencao-predial", slug: "manutencao-predial", name: "Manutenção Predial" },
-  { id: "tag-construcao-sustentavel", slug: "construcao-sustentavel", name: "Construção Sustentável" },
-  { id: "tag-avac", slug: "tag-avac", name: "AVAC" },
-  { id: "tag-seguranca", slug: "tag-seguranca", name: "Segurança" },
-  { id: "tag-limpeza-industrial", slug: "tag-limpeza-industrial", name: "Limpeza Industrial" },
-  { id: "tag-fiscalidade", slug: "tag-fiscalidade", name: "Fiscalidade" },
-  { id: "tag-formacao", slug: "tag-formacao", name: "Formação" },
-  { id: "tag-transporte", slug: "tag-transporte", name: "Transporte" },
-  { id: "tag-agro", slug: "tag-agro", name: "Agronegócio" },
-  { id: "tag-telecom", slug: "tag-telecom", name: "Telecom" },
-  { id: "tag-juridico", slug: "tag-juridico", name: "Jurídico" },
+  // --- Atributos de serviço (como a empresa atende) ---
+  { id: "tag-orcamento-gratis", slug: "orcamento-gratis", name: "Orçamento Grátis", category: "servico" },
+  { id: "tag-disponivel-fds", slug: "disponivel-fds", name: "Disponível Fim-de-Semana", category: "servico" },
+  { id: "tag-24h", slug: "24h", name: "Atendimento 24h", category: "servico" },
+  { id: "tag-deslocacao-incluida", slug: "deslocacao-incluida", name: "Deslocação Incluída", category: "servico" },
+  { id: "tag-garantia", slug: "garantia", name: "Garantia", category: "servico" },
+  { id: "tag-certificado", slug: "certificado", name: "Certificado", category: "servico" },
+  { id: "tag-urgencia", slug: "urgencia", name: "Urgência", category: "servico" },
+  { id: "tag-sustentavel", slug: "sustentavel", name: "Sustentável", category: "servico" },
+
+  // --- Construção e Obras ---
+  { id: "tag-estruturas-metalicas", slug: "estruturas-metalicas", name: "Estruturas Metálicas", category: "construcao" },
+  { id: "tag-tectos-falsos", slug: "tectos-falsos", name: "Tectos Falsos", category: "construcao" },
+  { id: "tag-estuque", slug: "estuque", name: "Estuque", category: "construcao" },
+  { id: "tag-impermeabilizacao", slug: "impermeabilizacao", name: "Impermeabilização", category: "construcao" },
+  { id: "tag-manutencao-predial", slug: "manutencao-predial", name: "Manutenção Predial", category: "construcao" },
+  { id: "tag-pintura-decorativa", slug: "pintura-decorativa", name: "Pintura Decorativa", category: "construcao" },
+
+  // --- Energia e Água ---
+  { id: "tag-energia-solar", slug: "tag-energia-solar", name: "Energia Solar", category: "energia" },
+  { id: "tag-paineis-solares", slug: "paineis-solares", name: "Painéis Solares", category: "energia" },
+  { id: "tag-inversores", slug: "inversores", name: "Inversores e Baterias", category: "energia" },
+  { id: "tag-manutencao-geradores", slug: "manutencao-geradores", name: "Manutenção de Geradores", category: "energia" },
+  { id: "tag-bombas-agua", slug: "bombas-agua", name: "Bombas de Água", category: "energia" },
+  { id: "tag-furos-agua", slug: "furos-agua", name: "Furos de Água", category: "energia" },
+
+  // --- Frio e Climatização ---
+  { id: "tag-avac", slug: "tag-avac", name: "AVAC", category: "avac" },
+  { id: "tag-ar-condicionado", slug: "ar-condicionado", name: "Ar Condicionado", category: "avac" },
+  { id: "tag-frio-industrial", slug: "frio-industrial", name: "Frio Industrial", category: "avac" },
+  { id: "tag-ventilacao", slug: "ventilacao", name: "Ventilação", category: "avac" },
+
+  // --- Tecnologia e Telecom ---
+  { id: "tag-desenvolvimento-software", slug: "desenvolvimento-software", name: "Desenvolvimento de Software", category: "tecnologia" },
+  { id: "tag-redes-informaticas", slug: "redes-informaticas", name: "Redes Informáticas", category: "tecnologia" },
+  { id: "tag-ciberseguranca", slug: "ciberseguranca", name: "Cibersegurança", category: "tecnologia" },
+  { id: "tag-suporte-tecnico", slug: "suporte-tecnico", name: "Suporte Técnico", category: "tecnologia" },
+  { id: "tag-fibra-optica", slug: "fibra-optica", name: "Fibra Óptica", category: "tecnologia" },
+  { id: "tag-cctv", slug: "cctv", name: "CCTV e Videovigilância", category: "tecnologia" },
+
+  // --- Marketing, Design e Eventos ---
+  { id: "tag-design-grafico", slug: "design-grafico", name: "Design Gráfico", category: "marketing" },
+  { id: "tag-marketing-digital", slug: "marketing-digital", name: "Marketing Digital", category: "marketing" },
+  { id: "tag-gestao-redes-sociais", slug: "gestao-redes-sociais", name: "Gestão de Redes Sociais", category: "marketing" },
+  { id: "tag-branding", slug: "branding", name: "Branding e Identidade", category: "marketing" },
+  { id: "tag-fotografia-video", slug: "fotografia-video", name: "Fotografia e Vídeo", category: "marketing" },
+  { id: "tag-organizacao-eventos", slug: "organizacao-eventos", name: "Organização de Eventos", category: "eventos" },
+  { id: "tag-catering", slug: "catering", name: "Catering", category: "eventos" },
+  { id: "tag-som-luz", slug: "som-luz", name: "Som e Iluminação", category: "eventos" },
+  { id: "tag-decoracao", slug: "decoracao", name: "Decoração", category: "eventos" },
+  { id: "tag-aluguer-material", slug: "aluguer-material", name: "Aluguer de Material", category: "eventos" },
+
+  // --- Transporte e Logística ---
+  { id: "tag-transporte-carga", slug: "transporte-carga", name: "Transporte de Carga", category: "transporte" },
+  { id: "tag-mudancas", slug: "mudancas", name: "Mudanças", category: "transporte" },
+  { id: "tag-distribuicao", slug: "distribuicao", name: "Distribuição", category: "transporte" },
+  { id: "tag-estiva", slug: "estiva", name: "Estiva e Descarregamento", category: "transporte" },
+
+  // --- Limpeza e Higiene ---
+  { id: "tag-limpeza-empresarial", slug: "limpeza-empresarial", name: "Limpeza Empresarial", category: "limpeza" },
+  { id: "tag-limpeza-industrial", slug: "tag-limpeza-industrial", name: "Limpeza Industrial", category: "limpeza" },
+  { id: "tag-higiene-saneamento", slug: "higiene-saneamento", name: "Higiene e Saneamento", category: "limpeza" },
+  { id: "tag-controlo-pragas", slug: "controlo-pragas", name: "Controlo de Pragas", category: "limpeza" },
+
+  // --- Segurança ---
+  { id: "tag-vigilancia", slug: "vigilancia", name: "Vigilância Privada", category: "seguranca" },
+  { id: "tag-alarmes", slug: "alarmes", name: "Alarmes e Sensores", category: "seguranca" },
+  { id: "tag-seguranca-eletronica", slug: "seguranca-eletronica", name: "Segurança Electrónica", category: "seguranca" },
+
+  // --- Agronegócio ---
+  { id: "tag-agro-processamento", slug: "agro-processamento", name: "Agro-processamento", category: "agro" },
+  { id: "tag-irrigacao", slug: "irrigacao", name: "Sistemas de Irrigação", category: "agro" },
+  { id: "tag-mecanizacao-agricola", slug: "mecanizacao-agricola", name: "Mecanização Agrícola", category: "agro" },
+  { id: "tag-insumos-agricolas", slug: "insumos-agricolas", name: "Insumos Agrícolas", category: "agro" },
+
+  // --- Serviços Empresariais ---
+  { id: "tag-contabilidade", slug: "contabilidade", name: "Contabilidade", category: "empresariais" },
+  { id: "tag-fiscalidade", slug: "tag-fiscalidade", name: "Fiscalidade e IVA", category: "empresariais" },
+  { id: "tag-recursos-humanos", slug: "recursos-humanos", name: "Recursos Humanos", category: "empresariais" },
+  { id: "tag-recrutamento", slug: "recrutamento", name: "Recrutamento e Selecção", category: "empresariais" },
+  { id: "tag-formacao", slug: "tag-formacao", name: "Formação Profissional", category: "empresariais" },
+  { id: "tag-juridico", slug: "tag-juridico", name: "Consultoria Jurídica", category: "empresariais" },
+
+  // --- Saúde ---
+  { id: "tag-cuidados-clinicos", slug: "cuidados-clinicos", name: "Cuidados Clínicos", category: "saude" },
+  { id: "tag-analises-clinicas", slug: "analises-clinicas", name: "Análises Clínicas", category: "saude" },
+
+  // --- Automóvel e Máquinas ---
+  { id: "tag-mecanica-auto", slug: "mecanica-auto", name: "Mecânica Automóvel", category: "automovel" },
+  { id: "tag-eletricidade-auto", slug: "eletricidade-auto", name: "Electricidade Automóvel", category: "automovel" },
+  { id: "tag-bate-chapa-pintura", slug: "bate-chapa-pintura", name: "Bate-Chapa e Pintura Auto", category: "automovel" },
 ];
 
 export async function seed() {
@@ -134,7 +205,7 @@ export async function seed() {
   for (const t of tags) {
     await db
       .insert(tag)
-      .values({ id: t.id, slug: t.slug, name: t.name })
+      .values({ id: t.id, slug: t.slug, name: t.name, category: t.category ?? null })
       .onConflictDoNothing();
   }
   console.log(`  ${tags.length} tags seeded`);

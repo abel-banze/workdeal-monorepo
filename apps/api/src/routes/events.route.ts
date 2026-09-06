@@ -32,15 +32,16 @@ export const eventsRoute = new Hono<Env>();
 // ── Listagens (estáticas antes de /:id) ───────────────────────────
 eventsRoute.get("/", zValidator("query", eventListQuerySchema), async (c) => {
   const q = c.req.valid("query");
-  const { body, status } = await eventsController.list({
-    status: q.status,
-    upcoming: q.upcoming,
-    categoryId: q.categoryId,
-    province: q.province,
-    organizerSlug: q.organizerSlug,
-    page: q.page,
-    limit: q.limit,
-  });
+const { body, status } = await eventsController.list({
+      status: q.status,
+      upcoming: q.upcoming,
+      q: q.q,
+      categoryId: q.categoryId,
+      province: q.province,
+      organizerSlug: q.organizerSlug,
+      page: q.page,
+      limit: q.limit,
+    });
   c.header("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   return c.json(body, status);
 });

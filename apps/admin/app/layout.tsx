@@ -1,5 +1,10 @@
+import { Inter, Sora } from "next/font/google";
 import type { Metadata } from "next";
 import "@workspace/ui/globals.css";
+import { cn } from "@/lib/utils";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const sora = Sora({ subsets: ["latin"], variable: "--font-display", weight: ["400", "600", "700", "800"] });
 
 export const metadata: Metadata = {
   title: "Workdeal Admin",
@@ -12,8 +17,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-MZ">
-      <body className="min-h-screen bg-background font-sans antialiased">
+    <html lang="pt-MZ" className={cn("antialiased", sora.variable, inter.variable)}>
+      <body className="min-h-screen bg-background font-sans">
         {children}
       </body>
     </html>

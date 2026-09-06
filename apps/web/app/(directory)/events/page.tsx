@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { getCategories } from "@/lib/profiles";
 import { getPublicEvents, PROVINCES, type PublicEventView } from "@/lib/directory";
 import { EventCard } from "@/components/features/event-card";
+import { DirectoryCommandBar } from "@/components/features/directory-command-bar";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
 
 export const revalidate = 300;
@@ -168,75 +169,53 @@ export default async function EventsPage({ searchParams }: Props) {
             </span>
           </div>
 
-          <div className="mt-2.5 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-            <div>
-              <h1 className="font-black leading-[1.05] tracking-[-0.04em] text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(19px, 2.4vw, 27px)" }}>
-                Agendas de negócios.{" "}
-                <span className="font-normal text-[#0B5E56]">Feiras, lançamentos e networking.</span>
-              </h1>
-              <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-[#0F1A2E]/60">
-                Siga os próximos eventos do ecossistema Workdeal e inscreva-se em segundos. Presença confirmada, networking real.
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-1.5">
-                <Link
-                  href="/events"
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${scope === "upcoming" ? "border-[#0F1A2E] bg-[#0F1A2E] text-white" : "border-[#0F1A2E]/10 bg-white text-[#0F1A2E]/70 hover:bg-[#0F1A2E] hover:text-white"}`}
-                >
-                  Próximos
-                </Link>
-                <Link
-                  href={`/events?${new URLSearchParams({ scope: "all" }).toString()}`}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${scope === "all" ? "border-[#0F1A2E] bg-[#0F1A2E] text-white" : "border-[#0F1A2E]/10 bg-white text-[#0F1A2E]/70 hover:bg-[#0F1A2E] hover:text-white"}`}
-                >
-                  Todos
-                </Link>
-                <Link href="/signup" className="rounded-full bg-[#FF3B1F] px-3 py-1 text-xs font-bold text-white hover:bg-[#E8350F]">
-                  Organizar um evento
-                </Link>
-              </div>
+          <div className="mt-2.5">
+            <h1 className="font-black leading-[1.05] tracking-[-0.04em] text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(19px, 2.4vw, 27px)" }}>
+              Agendas de negócios.{" "}
+              <span className="font-normal text-[#0B5E56]">Feiras, lançamentos e networking.</span>
+            </h1>
+            <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-[#0F1A2E]/60">
+              Siga os próximos eventos do ecossistema Workdeal e inscreva-se em segundos. Presença confirmada, networking real.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-1.5">
+              <Link
+                href="/events"
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${scope === "upcoming" ? "border-[#0F1A2E] bg-[#0F1A2E] text-white" : "border-[#0F1A2E]/10 bg-white text-[#0F1A2E]/70 hover:bg-[#0F1A2E] hover:text-white"}`}
+              >
+                Próximos
+              </Link>
+              <Link
+                href={`/events?${new URLSearchParams({ scope: "all" }).toString()}`}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${scope === "all" ? "border-[#0F1A2E] bg-[#0F1A2E] text-white" : "border-[#0F1A2E]/10 bg-white text-[#0F1A2E]/70 hover:bg-[#0F1A2E] hover:text-white"}`}
+              >
+                Todos
+              </Link>
+              <Link href="/signup" className="rounded-full bg-[#FF3B1F] px-3 py-1 text-xs font-bold text-white hover:bg-[#E8350F]">
+                Organizar um evento
+              </Link>
             </div>
 
-            <div className="rounded-[20px] border border-[#D9D2C2] bg-[#F6F3EE] p-5">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#0B5E56]">FILTRAR</p>
-              <p className="mt-2 text-sm font-black text-[#0F1A2E]">Categoria</p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <Link
-                  href={`/events${params.scope === "all" ? "?scope=all" : ""}`}
-                  className={`rounded-full border border-[#D9D2C2] bg-white px-3 py-1 text-xs font-medium ${!params.categoryId ? "bg-[#0F1A2E] !border-[#0F1A2E] text-white" : "text-[#0F1A2E]/70 hover:bg-[#F6F3EE]"}`}
-                >
-                  Todas
-                </Link>
-                {categories.map((c) => (
-                  <Link
-                    key={c.id}
-                    href={`/events?${new URLSearchParams({ categoryId: c.id, ...(params.scope === "all" ? { scope: "all" } : {}) }).toString()}`}
-                    className={`rounded-full border border-[#D9D2C2] bg-white px-3 py-1 text-xs font-medium ${
-                      params.categoryId === c.id ? "bg-[#0F1A2E] !border-[#0F1A2E] text-white" : "text-[#0F1A2E]/70 hover:bg-[#F6F3EE]"
-                    }`}
-                  >
-                    {c.name}
-                  </Link>
-                ))}
-              </div>
-              <p className="mt-5 text-sm font-black text-[#0F1A2E]">Província</p>
-              <form method="get" className="mt-3 flex items-center gap-2">
-                {scope === "all" ? <input type="hidden" name="scope" value="all" /> : null}
-                <select
-                  name="province"
-                  defaultValue={params.province ?? ""}
-                  className="flex-1 rounded-xl border border-[#D9D2C2] bg-white px-3 py-2 text-sm outline-none focus:border-[#0B5E56]"
-                >
-                  <option value="">Todas as províncias</option>
-                  {PROVINCES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-                <button type="submit" className="inline-flex h-9 items-center rounded-full bg-[#0B5E56] px-4 text-xs font-bold text-white hover:bg-[#094d46]">
-                  Aplicar
-                </button>
-              </form>
+            {/* command bar — pesquisa + categoria + filtros */}
+            <div className="mt-5 max-w-[860px]">
+              <DirectoryCommandBar
+                basePath="/events"
+                placeholder="Pesquisar por evento…"
+                searchLabel="Pesquisar evento"
+                drawerEyebrow="EVENTOS"
+                drawerTitle="Filtros de eventos"
+                categories={categories as { id: string; name: string; slug: string }[]}
+                initialParams={params}
+                preserveParams={["scope"]}
+                sections={[
+                  {
+                    kind: "radio",
+                    label: "LOCALIZAÇÃO",
+                    param: "province",
+                    allLabel: "Todas as províncias",
+                    options: PROVINCES.map((p) => ({ value: p, label: p })),
+                  },
+                ]}
+              />
             </div>
           </div>
         </div>

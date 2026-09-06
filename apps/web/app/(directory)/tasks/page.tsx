@@ -6,6 +6,7 @@ import type { TaskView } from "@workdeal/shared";
 import { getCategories } from "@/lib/profiles";
 import { getPublicTasks, PROVINCES } from "@/lib/directory";
 import { TaskCard } from "@/components/features/task-card";
+import { DirectoryCommandBar } from "@/components/features/directory-command-bar";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
 
 export const revalidate = 0;
@@ -16,12 +17,6 @@ export const metadata: Metadata = {
 };
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
-
-const STATUS_TABS = [
-  { key: "", label: "A aceitar propostas" },
-  { key: "in_progress", label: "Em execução" },
-  { key: "completed", label: "Concluídas" },
-] as const;
 
 function Pagination({ page, total, baseQs }: { page: number; total: number; baseQs: URLSearchParams }) {
   const limit = 12;
@@ -140,7 +135,6 @@ async function TasksList({ searchParams }: { searchParams: Record<string, string
 export default async function TasksPage({ searchParams }: Props) {
   const params = await searchParams;
   const locationParams = applyDefaultLocation(params, parseLocationCookies(await cookies()));
-  const activeStatus = STATUS_TABS.find((t) => t.key === (params.status ?? ""));
   const categoriesRes = await getCategories().catch(() => ({ data: [] as { id: string; name: string }[] }));
   const categories = (categoriesRes as { data: { id: string; name: string }[] }).data;
 
@@ -170,7 +164,7 @@ export default async function TasksPage({ searchParams }: Props) {
             </span>
           </div>
 
-          <div className="mt-2.5 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+          <div className="mt-2.5 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:gap-10">
             <div>
               <h1 className="font-black leading-[1.05] tracking-[-0.04em] text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(19px, 2.4vw, 27px)" }}>
                 Pedidos de serviço.{" "}
@@ -179,69 +173,72 @@ export default async function TasksPage({ searchParams }: Props) {
               <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-[#0F1A2E]/60">
                 Empresas públicas e privadas publicam aqui o que precisam — obras, manutenção, tecnologia, logística. Veja os detalhes e envie a sua proposta.
               </p>
-              <div className="mt-4 flex flex-wrap items-center gap-1.5">
-                {STATUS_TABS.map((t) => (
-                  <Link
-                    key={t.key}
-                    href={t.key ? `/tasks?status=${t.key}` : "/tasks"}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                      activeStatus?.key === t.key
-                        ? "border-[#0F1A2E] bg-[#0F1A2E] text-white"
-                        : "border-[#0F1A2E]/10 bg-white text-[#0F1A2E]/70 hover:bg-[#0F1A2E] hover:text-white"
-                    }`}
-                  >
-                    {t.key === "completed" ? <span aria-hidden>✓</span> : null}
-                    {t.label}
-                  </Link>
-                ))}
-                <Link href="/signup" className="rounded-full bg-[#FF3B1F] px-3 py-1 text-xs font-bold text-white hover:bg-[#E8350F]">
-                  Publicar um pedido
-                </Link>
-              </div>
             </div>
 
-            <div className="rounded-[20px] border border-[#D9D2C2] bg-[#F6F3EE] p-5">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#0B5E56]">FILTRAR</p>
-              <p className="mt-2 text-sm font-black text-[#0F1A2E]">Categoria</p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <Link
-                  href={`/tasks${params.province ? `?province=${encodeURIComponent(params.province)}` : ""}`}
-                  className={`rounded-full border border-[#D9D2C2] bg-white px-3 py-1 text-xs font-medium ${!params.categoryId ? "bg-[#0F1A2E] !border-[#0F1A2E] text-white" : "text-[#0F1A2E]/70 hover:bg-[#F6F3EE]"}`}
-                >
-                  Todas
-                </Link>
-                {categories.map((c) => (
-                  <Link
-                    key={c.id}
-                    href={`/tasks?${new URLSearchParams({ categoryId: c.id, ...(params.province ? { province: params.province } : {}) }).toString()}`}
-                    className={`rounded-full border border-[#D9D2C2] bg-white px-3 py-1 text-xs font-medium ${
-                      params.categoryId === c.id ? "bg-[#0F1A2E] !border-[#0F1A2E] text-white" : "text-[#0F1A2E]/70 hover:bg-[#F6F3EE]"
-                    }`}
-                  >
-                    {c.name}
-                  </Link>
-                ))}
-              </div>
-              <p className="mt-5 text-sm font-black text-[#0F1A2E]">Província</p>
-              <form method="get" className="mt-3 flex items-center gap-2">
-                <select
-                  name="province"
-                  defaultValue={params.province ?? ""}
-                  className="flex-1 rounded-xl border border-[#D9D2C2] bg-white px-3 py-2 text-sm outline-none focus:border-[#0B5E56]"
-                >
-                  <option value="">Todas as províncias</option>
-                  {PROVINCES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-                <button type="submit" className="inline-flex h-9 items-center rounded-full bg-[#0B5E56] px-4 text-xs font-bold text-white hover:bg-[#094d46]">
-                  Aplicar
-                </button>
-              </form>
+            {/* acção principal — quem tem trabalho publica */}
+            <div className="flex flex-col items-start gap-2.5 lg:items-end lg:text-right">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#0B5E56]">PRECISA DE UM SERVIÇO?</p>
+              <Link
+                href="/signup"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-[#FF3B1F] px-6 text-[13px] font-bold text-white transition-colors hover:bg-[#E8350F]"
+              >
+                Publicar um pedido
+              </Link>
+              <p className="max-w-[280px] text-[12px] leading-relaxed text-[#0F1A2E]/50">
+                Sem custo e publicado em minutos — os fornecedores respondem directamente.
+              </p>
             </div>
           </div>
+
+            {/* command bar — pesquisa + categoria + filtros */}
+            <div className="mt-5 max-w-[860px]">
+              <DirectoryCommandBar
+                basePath="/tasks"
+                placeholder="Pesquisar por pedido de serviço…"
+                searchLabel="Pesquisar requisição"
+                drawerEyebrow="REQUISIÇÕES"
+                drawerTitle="Filtros de requisições"
+                categories={categories as { id: string; name: string; slug: string }[]}
+                initialParams={params}
+                showCategoryQuickSelect={false}
+                sections={[
+                  {
+                    kind: "radio",
+                    label: "ESTADO",
+                    param: "status",
+                    allLabel: "Todas as requisições",
+                    options: [
+                      { value: "open", label: "A aceitar propostas" },
+                      { value: "in_progress", label: "Em execução" },
+                      { value: "completed", label: "Concluídas" },
+                    ],
+                  },
+                  {
+                    kind: "radio",
+                    label: "LOCALIZAÇÃO",
+                    param: "province",
+                    allLabel: "Todas as províncias",
+                    options: PROVINCES.map((p) => ({ value: p, label: p })),
+                  },
+                  {
+                    kind: "range",
+                    label: "ORÇAMENTO (MT)",
+                    minParam: "priceMin",
+                    maxParam: "priceMax",
+                    minLabel: "Mínimo",
+                    maxLabel: "Máximo",
+                    unit: "MT",
+                  },
+                  {
+                    kind: "multi",
+                    label: "CATEGORIAS",
+                    param: "categories",
+                    allLabel: "Todas as categorias",
+                    options: categories.map((c) => ({ value: c.id, label: c.name })),
+                  },
+                ]}
+              />
+            </div>
         </div>
       </section>
 

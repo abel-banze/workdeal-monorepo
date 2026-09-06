@@ -115,6 +115,8 @@ export const listProfilesQuerySchema = z.object({
   city: z.string().trim().max(80).optional(),
   // Selo de qualidade (slug do badge, ex: "verified", "msme")
   badgeSlug: z.string().trim().max(64).optional(),
+  // Competência/tag (slug da tag, ex: "energia-solar", "cctv")
+  tagSlug: z.string().trim().max(64).optional(),
   // Dimensão da empresa (companyQualification.company_size)
   companySize: z.string().trim().max(16).optional(),
   // Tempo no mercado (companyQualification.founded_year) — faixa de anos de fundação

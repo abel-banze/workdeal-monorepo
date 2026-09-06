@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { EditProfileForm } from "@/components/features/edit-profile-form"
+import { getTags, getProfileTags } from "@/lib/profiles"
 
 type ProfileData = {
   id: string
@@ -18,12 +19,15 @@ type ProfileData = {
 }
 
 type CategoryRaw = { id: string; slug: string; name: string }
+type TagOption = { id: string; slug: string; name: string; category: string | null }
 
 export default async function EditPersonalProfilePage() {
   await requireAuth()
 
   let profile: ProfileData | null = null
   let categories: CategoryRaw[] = []
+  let tags: TagOption[] = []
+  let initialTagSlugs: string[] = []
 
   try {
     const { apiFetch } = await import("@/lib/api")
@@ -34,6 +38,15 @@ export default async function EditPersonalProfilePage() {
 
     profile = profileRes
     categories = catsRes.map((c) => ({ id: c.id, slug: c.slug, name: c.name }))
+
+    if (profile) {
+      const [tagsRes, profileTagsRes] = await Promise.all([
+        getTags().catch(() => ({ data: [] as TagOption[] })),
+        getProfileTags(profile.id).catch(() => ({ data: [] as TagOption[] })),
+      ])
+      tags = (tagsRes.data ?? []).map((t) => ({ id: t.id, slug: t.slug, name: t.name, category: t.category ?? null }))
+      initialTagSlugs = (profileTagsRes.data ?? []).map((t) => t.slug)
+    }
   } catch {
     // fallthrough
   }
@@ -119,7 +132,7 @@ export default async function EditPersonalProfilePage() {
           </a>
         </p>
       </div>
-      <EditProfileForm initialProfile={profile} categories={categories} />
+      <EditProfileForm initialProfile={profile} categories={categories} tags={tags} initialTagSlugs={initialTagSlugs} />
     </section>
   )
 }
