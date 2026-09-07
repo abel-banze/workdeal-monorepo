@@ -1,10 +1,45 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-function Stub({ title, desc }: { title: string; desc: string }) {
+import Link from "next/link";
+import { listAdminInvites } from "@/app/actions/admin";
+import { requireSystemRole } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { InvitesList, type InviteRow } from "./invites-list";
+
+export const metadata = {
+  title: "Convites | Workdeal Admin",
+};
+
+export default async function InvitesPage() {
+  const session = await requireSystemRole("moderator", "admin");
+  const isAdmin = session.user.systemRole === "admin";
+
+  const res = await listAdminInvites({ limit: 500 });
+  const invites = (res.data as InviteRow[] | null) ?? [];
+  const total = (res.meta?.total as number | undefined) ?? invites.length;
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{title}</h1>
-      <Card><CardHeader><CardTitle className="text-sm">{title}</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">{desc}</CardContent></Card>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#0B5E56]">
+            Utilizadores · Acesso à equipa
+          </p>
+          <h1
+            className="mt-2 text-2xl font-black leading-tight tracking-[-0.04em] text-[#0F1A2E] sm:text-[26px]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Convites
+          </h1>
+          <p className="mt-1 max-w-xl text-sm text-[#0F1A2E]/50">
+            Convidar pessoas para a equipa de moderação. Cada convite tem um link com validade, pode ser revogado e um
+            novo link gerado a qualquer momento.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/dashboard/users">Ver utilizadores</Link>
+        </Button>
+      </div>
+
+      <InvitesList invites={invites} isAdmin={isAdmin} total={total} />
     </div>
   );
 }
-export default function Page(){ return <Stub title="Convites" desc="Gestão de convites de utilizadores — lista + Server Action para reenviar/revogar." />; }

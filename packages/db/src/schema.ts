@@ -19,6 +19,7 @@ export const systemRoleEnum = pgEnum("system_role", ["user", "moderator", "admin
 export const orgRoleEnum = pgEnum("org_role", ["owner", "admin", "editor", "member"]);
 export const verificationStatusEnum = pgEnum("verification_status", ["pre_registered", "pending", "in_review", "verified", "suspended"]);
 export const invitationStatusEnum = pgEnum("invitation_status", ["pending", "accepted", "rejected", "canceled"]);
+export const adminInviteStatusEnum = pgEnum("admin_invite_status", ["pending", "accepted", "revoked", "expired"]);
 
 // PostGIS geography(Point,4326). O drizzle-kit (v0.31) não sabe emitir tipos
 // parametrizados: `dataType()` com "geography(Point, 4326)" gera SQL inválido
@@ -180,6 +181,31 @@ export const invitation = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => [index("invitation_organization_id_idx").on(table.organizationId)],
+);
+
+// Convites para a equipa do painel administrativo (moderador/admin).
+// O convidado aceita com a conta Workdeal existente (o email tem de bater).
+export const adminInvite = pgTable(
+  "admin_invite",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    role: systemRoleEnum("role").notNull().default("moderator"),
+    status: adminInviteStatusEnum("status").notNull().default("pending"),
+    token: text("token").notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    acceptedAt: timestamp("accepted_at"),
+    revokedAt: timestamp("revoked_at"),
+    invitedBy: text("invited_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("admin_invite_email_idx").on(table.email),
+    index("admin_invite_status_idx").on(table.status),
+  ],
 );
 
 export const jwks = pgTable("jwks", {

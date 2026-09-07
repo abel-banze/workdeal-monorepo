@@ -1,8 +1,18 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
-import type { AdminUserListQuery, AdminOrgListQuery, PreRegisterCompanyInput, PreRegisterUpdateInput, CategoryListQuery, CategoryCreateInput, CategoryUpdateInput } from "@workdeal/shared";
+import type {
+  AdminUserListQuery,
+  AdminOrgListQuery,
+  PreRegisterCompanyInput,
+  PreRegisterUpdateInput,
+  CategoryListQuery,
+  CategoryCreateInput,
+  CategoryUpdateInput,
+  AdminInviteListQuery,
+  AdminInviteCreateInput,
+} from "@workdeal/shared";
 import { apiFetch, apiFetchWithAuth, apiUpload } from "@/lib/api";
 import { requireSystemRole } from "@/lib/auth";
 
@@ -124,6 +134,80 @@ export async function deletePreRegister(id: string) {
 export async function getPreRegisterById(id: string) {
   await requireSystemRole("moderator", "admin");
   return apiFetch<unknown>(`/api/v1/admin/organizations/pre-register/${id}`);
+}
+
+// --- Convites para a equipa do painel ---
+
+interface AdminInviteRecord {
+  id: string;
+  email: string;
+  role: "user" | "moderator" | "admin";
+  status: "pending" | "accepted" | "revoked" | "expired";
+  token: string;
+  expiresAt: string | null;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  invitedByEmail: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function listAdminInvites(query: AdminInviteListQuery) {
+  await requireSystemRole("moderator", "admin");
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.search) params.set("search", query.search);
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  return apiFetch<AdminInviteRecord[]>(`/api/v1/admin/invites${qs ? `?${qs}` : ""}`);
+}
+
+async function buildInviteLink(token: string): Promise<string> {
+  const store = await headers();
+  const host = store.get("x-forwarded-host") ?? store.get("host") ?? "localhost:3001";
+  const proto = store.get("x-forwarded-proto") ?? "http";
+  return `${proto}://${host}/invite/${token}`;
+}
+
+export async function createAdminInvite(input: AdminInviteCreateInput) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem criar convites");
+  const token = await getAuthToken();
+  const res = await apiFetchWithAuth<AdminInviteRecord>(`/api/v1/admin/invites`, token, {
+    method: "POST",
+    body: JSON.stringify({ ...input, email: input.email.toLowerCase() }),
+  });
+  if (res.success) {
+    const record = res.data;
+    return { success: true as const, data: { ...record, link: await buildInviteLink(record.token) } };
+  }
+  return res as { success: false; error?: { code: string; message: string; details?: unknown } };
+}
+
+export async function revokeAdminInvite(id: string) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem revogar convites");
+  const token = await getAuthToken();
+  return apiFetchWithAuth<AdminInviteRecord>(`/api/v1/admin/invites/${id}/revoke`, token, {
+    method: "POST",
+  });
+}
+
+export async function regenerateAdminInvite(id: string) {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem gerar novos links");
+  const token = await getAuthToken();
+  return apiFetchWithAuth<AdminInviteRecord>(`/api/v1/admin/invites/${id}/regenerate`, token, {
+    method: "POST",
+  });
+}
+
+export async function acceptAdminInvite(token: string) {
+  return apiFetchWithAuth<AdminInviteRecord>(`/api/v1/admin/invites/accept`, null, {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
 }
 
 export async function listCategories() {
