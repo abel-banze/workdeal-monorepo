@@ -51,9 +51,17 @@ class OnboardingRepository {
       let created: boolean;
 
       if (existing) {
+        const data: Partial<typeof profile.$inferInsert> = {
+          ...params.profileData,
+          id: undefined,
+          updatedAt: new Date(),
+          deletedAt: null,
+        };
+        // Guarda defensiva: slug vazio nunca sobrescreve o slug público existente
+        if (!data.slug) delete data.slug;
         const [updated] = await tx
           .update(profile)
-          .set({ ...params.profileData, id: undefined, updatedAt: new Date(), deletedAt: null })
+          .set(data)
           .where(eq(profile.id, existing.id))
           .returning({ id: profile.id });
         if (!updated) throw new Error("Falha ao actualizar perfil no onboarding");
@@ -136,13 +144,13 @@ class OnboardingRepository {
     });
   }
 
-  async findOrganizationProfileId(organizationId: string): Promise<string | null> {
+  async findOrganizationProfile(organizationId: string): Promise<{ id: string; slug: string | null } | null> {
     const [row] = await db
-      .select({ id: profile.id })
+      .select({ id: profile.id, slug: profile.slug })
       .from(profile)
       .where(and(eq(profile.organizationId, organizationId)))
       .limit(1);
-    return row?.id ?? null;
+    return row ?? null;
   }
 
   async slugExists(slug: string): Promise<boolean> {

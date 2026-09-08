@@ -1,40 +1,15 @@
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { sendContactEmail, sendOtpEmail } from "../services/email.service.js";
 import { ok, fail } from "../lib/api-response.js";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
-import { env } from "../env.js";
 
+// NOTA: verificação de INTERNAL_API_SECRET removida por agora — endpoints de
+// email acessíveis por quem chamar a API. Retomar assim que houver segredo
+// partilhado configurado entre web e api.
 const emailLimiter = createRateLimiter({ windowMs: 60_000, max: 5 });
 const contactLimiter = createRateLimiter({ windowMs: 60_000, max: 5 });
-
-// Estes endpoints só são chamados pelo servidor Next (Server Actions) — exigem
-// segredo partilhado. Sem segredo configurado: falha em produção, permitido em
-// dev com aviso.
-let warnedNoSecret = false;
-async function requireInternalSecret(c: Context, next: () => Promise<void>) {
-  const expected = env.INTERNAL_API_SECRET;
-  if (!expected) {
-    if (env.NODE_ENV === "production") {
-      return c.json(
-        fail("INTERNAL_AUTH_REQUIRED", "INTERNAL_API_SECRET não configurado no servidor"),
-        503,
-      );
-    }
-    if (!warnedNoSecret) {
-      warnedNoSecret = true;
-      console.warn("[email] INTERNAL_API_SECRET não configurado — endpoint aberto apenas em desenvolvimento");
-    }
-    await next();
-    return;
-  }
-  const provided = c.req.header("x-internal-secret");
-  if (!provided || provided !== expected) {
-    return c.json(fail("FORBIDDEN", "Pedido interno inválido"), 403);
-  }
-  await next();
-}
 
 const sendOtpSchema = z.object({
   to: z.string().email("Email inválido"),
@@ -44,7 +19,7 @@ const sendOtpSchema = z.object({
 
 export const emailRoute = new Hono();
 
-emailRoute.post("/otp", requireInternalSecret, async (c, next) => {
+emailRoute.post("/otp", async (c, next) => {
   const key = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "anonymous";
   const result = await emailLimiter.check(key);
   if (!result.allowed) {
@@ -72,7 +47,7 @@ const contactSchema = z.object({
   profileName: z.string().max(120).optional(),
 });
 
-emailRoute.post("/contact", requireInternalSecret, async (c, next) => {
+emailRoute.post("/contact", async (c, next) => {
   const key = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "anonymous";
   const result = await contactLimiter.check(key);
   if (!result.allowed) {

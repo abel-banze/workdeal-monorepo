@@ -33,6 +33,7 @@
     "./schemas/company": "./dist/schemas/company.js",
     "./schemas/tag": "./dist/schemas/tag.js",
     "./schemas/pre-register": "./dist/schemas/pre-register.js",
+    "./schemas/subscription": "./dist/schemas/subscription.js",
     "./lib/parse-search-query": "./dist/lib/parse-search-query.js"
   }
 }

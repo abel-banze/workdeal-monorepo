@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { getPublicProfile, getPortfolioItems } from "@/lib/profiles";
 import Link from "next/link";
 import { FaWhatsapp } from "react-icons/fa";
@@ -12,6 +13,7 @@ import { QuoteDialog } from "@/components/features/profile-quote-dialog";
 import { ShareProfileDialog } from "@/components/features/profile-share-dialog";
 import { BookmarkButton } from "@/components/features/profile-bookmark-button";
 import { Analytics } from "@/components/features/analytics";
+import { ProfileAssociations } from "@/components/features/profile-associations";
 import type { PublicProfileView } from "@workdeal/shared";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
@@ -430,6 +432,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
             </section>
 
             <ProfileServices services={p.services} targetProfileId={p.id} profileName={p.name} profileEmail={p.email} />
+
+            {p.type === "company" ? (
+              <Suspense fallback={null}>
+                <ProfileAssociations companyProfileId={p.id} />
+              </Suspense>
+            ) : null}
 
             <ProfilePortfolio targetProfileId={p.id} profileName={p.name} profileEmail={p.email} items={portfolioItems} />
           </div>

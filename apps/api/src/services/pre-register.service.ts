@@ -4,8 +4,6 @@ import { AppError } from "../lib/errors.js";
 import { preRegisterRepository, buildPreRegisterMetadata, parsePreRegisterMetadata } from "../repositories/pre-register.repository.js";
 import { preRegisterNotificationService } from "./pre-register-notifications.service.js";
 
-const COMPLETION_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
-
 class PreRegisterService {
   async create(actorUserId: string, input: PreRegisterCompanyInput) {
     if (await preRegisterRepository.findBySlug(input.slug)) {
@@ -13,7 +11,6 @@ class PreRegisterService {
     }
 
     const completionToken = randomUUID();
-    const completionTokenExpiresAt = new Date(Date.now() + COMPLETION_TOKEN_TTL_MS);
 
     // metadata (JSON) guarda os dados do Google Places, localização, logo e categorias para o promoter
     const metadata = buildPreRegisterMetadata({
@@ -38,7 +35,6 @@ class PreRegisterService {
       metadata,
       preRegisteredBy: actorUserId,
       completionToken,
-      completionTokenExpiresAt,
     });
 
     // Notifica a empresa (fire-and-forget, nunca bloqueia o request)
@@ -89,9 +85,6 @@ class PreRegisterService {
     if (!org) {
       throw new AppError(404, "TOKEN_INVALID", "Link de registo inválido ou já utilizado");
     }
-    if (org.completionTokenExpiresAt && org.completionTokenExpiresAt.getTime() < Date.now()) {
-      throw new AppError(410, "TOKEN_EXPIRED", "Este link de registo expirou. Contacta a equipa Workdeal.");
-    }
     const meta = parsePreRegisterMetadata(org.metadata);
     return {
       id: org.id,
@@ -118,7 +111,7 @@ class PreRegisterService {
     if (!org) {
       const existing = await preRegisterRepository.findByToken(token);
       if (!existing) throw new AppError(404, "TOKEN_INVALID", "Link de registo inválido ou já utilizado");
-      throw new AppError(410, "TOKEN_EXPIRED", "Este link de registo expirou ou já foi utilizado");
+      throw new AppError(409, "TOKEN_USED", "Este link de registo já foi utilizado");
     }
     const result = await preRegisterRepository.claim(token, userId);
     return result;
@@ -228,8 +221,7 @@ class PreRegisterService {
       throw new AppError(409, "ALREADY_COMPLETED", "Esta empresa já iniciou o registo");
     }
     const token = randomUUID();
-    const expiresAt = new Date(Date.now() + COMPLETION_TOKEN_TTL_MS);
-    await preRegisterRepository.updateToken(id, token, expiresAt);
+    await preRegisterRepository.updateToken(id, token);
     const meta = parsePreRegisterMetadata(org.metadata);
     void preRegisterNotificationService
       .notifyCompanyPreRegister({
@@ -241,7 +233,7 @@ class PreRegisterService {
         channels: meta.notifyChannels,
       })
       .catch((e) => console.error("[pre-register] falha ao notificar:", e instanceof Error ? e.message : String(e)));
-    return { completionToken: token, completionTokenExpiresAt: expiresAt.toISOString() };
+    return { completionToken: token, completionTokenExpiresAt: null };
   }
 
   async resendNotification(id: string, actorSystemRole: string) {

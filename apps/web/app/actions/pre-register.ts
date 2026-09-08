@@ -30,8 +30,8 @@ export async function claimPreRegister(token: string): Promise<ClaimPreRegisterR
     return { ok: true, organizationId: res.data.organizationId };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (/TOKEN_EXPIRED|expirou/i.test(msg)) return { ok: false, error: "Este link de registo expirou. Contacta a equipa Workdeal." };
-    if (/TOKEN_INVALID|inválido|já utilizado/i.test(msg)) return { ok: false, error: "Este link de registo é inválido ou já foi utilizado." };
+    if (/TOKEN_USED|já foi utilizado/i.test(msg)) return { ok: false, error: "Este link de registo já foi utilizado. A empresa já pode entrar na área da organização." };
+    if (/TOKEN_INVALID|inválido/i.test(msg)) return { ok: false, error: "Este link de registo é inválido. Contacta a equipa Workdeal." };
     return { ok: false, error: msg.slice(0, 300) || "Falha ao concluir o registo — tenta novamente." };
   }
 }

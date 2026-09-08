@@ -10,7 +10,7 @@ class AdminOrganizationsService {
     return { items, total, page, limit };
   }
 
-  async updateStatus(actorRole: string, id: string, verificationStatus: "pending" | "in_review" | "verified" | "suspended") {
+  async updateStatus(actorRole: string, id: string, verificationStatus: "pending" | "in_review" | "verified" | "suspended" | "expired") {
     if (actorRole !== "admin") {
       throw new AppError(403, "FORBIDDEN", "Só administradores podem alterar o estado de verificação");
     }

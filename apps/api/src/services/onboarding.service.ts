@@ -29,11 +29,11 @@ class OnboardingService {
     this.assertVerifiedContact(input.profile.whatsapp ?? null, input.profile.phone ?? null, input.profile.email ?? null, verifiedContacts);
 
     // 3. Slug único e estável (idempotente em retry: mantém o do perfil existente)
-    const existingProfileId = await onboardingRepository.findOrganizationProfileId(input.organizationId);
-    let slug = input.profile.slug ?? "";
-    if (!existingProfileId && !slug) {
-      slug = await this.uniqueSlug(input.profile.name);
-    }
+    const existingProfile = await onboardingRepository.findOrganizationProfile(input.organizationId);
+    const slug =
+      existingProfile?.slug?.trim() ||
+      input.profile.slug?.trim() ||
+      (await this.uniqueSlug(input.profile.name));
 
     // 4. Horários → formato canónico; qualificação com tamanho calculado server-side
     const qualification = input.qualification

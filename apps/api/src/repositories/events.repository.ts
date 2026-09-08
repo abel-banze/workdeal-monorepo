@@ -79,6 +79,7 @@ export const eventColumns = {
   longitude: event.longitude,
   coverImage: event.coverImage,
   capacity: event.capacity,
+  visibility: event.visibility,
   status: event.status,
   createdAt: event.createdAt,
   updatedAt: event.updatedAt,

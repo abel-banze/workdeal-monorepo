@@ -17,7 +17,7 @@ import {
 
 export const systemRoleEnum = pgEnum("system_role", ["user", "moderator", "admin"]);
 export const orgRoleEnum = pgEnum("org_role", ["owner", "admin", "editor", "member"]);
-export const verificationStatusEnum = pgEnum("verification_status", ["pre_registered", "pending", "in_review", "verified", "suspended"]);
+export const verificationStatusEnum = pgEnum("verification_status", ["pre_registered", "pending", "in_review", "verified", "suspended", "expired"]);
 export const invitationStatusEnum = pgEnum("invitation_status", ["pending", "accepted", "rejected", "canceled"]);
 export const adminInviteStatusEnum = pgEnum("admin_invite_status", ["pending", "accepted", "revoked", "expired"]);
 
@@ -216,7 +216,7 @@ export const jwks = pgTable("jwks", {
   expiresAt: timestamp("expires_at"),
 });
 
-export const profileTypeEnum = pgEnum("profile_type", ["individual", "company"]);
+export const profileTypeEnum = pgEnum("profile_type", ["individual", "company", "institution"]);
 export const profileStatusEnum = pgEnum("profile_status", ["draft", "active", "suspended"]);
 export const badgeTypeEnum = pgEnum("badge_type", [
   "trust",
@@ -239,6 +239,27 @@ export const reportTargetTypeEnum = pgEnum("report_target_type", ["profile", "re
 export const reportStatusEnum = pgEnum("report_status", ["pending", "resolved", "dismissed"]);
 export const companySizeEnum = pgEnum("company_size", ["micro", "pequena", "media", "grande"]);
 export const legalFormEnum = pgEnum("legal_form", ["lda", "su", "unipessoal", "cooperativa", "outro"]);
+
+// ── Instituições / Organizações (associações, câmaras, ONGs, ...) ────────
+// Domínio distinto de `organization` (melhor-auth/equipas de empresa).
+// Cada instituição tem um `profile` ligado (type='institution', 1:1) que
+// carrega identidade pública (slug, nome, logo, geo, categorias, busca).
+export const institutionTypeEnum = pgEnum("institution_type", [
+  "association",
+  "chamber_of_commerce",
+  "ngo",
+  "foundation",
+  "cooperative",
+  "union",
+  "professional_body",
+  "educational",
+  "religious",
+  "public_body",
+  "other",
+]);
+export const membershipTypeEnum = pgEnum("membership_type", ["member", "partner", "associate", "affiliate", "other"]);
+export const membershipStatusEnum = pgEnum("membership_status", ["pending", "approved", "rejected", "revoked", "verified", "expired"]);
+export const institutionOperatingScopeEnum = pgEnum("institution_operating_scope", ["national", "provincial", "district", "local"]);
 
 export const category = pgTable(
   "category",
@@ -301,6 +322,116 @@ export const profile = pgTable(
     index("profile_geo_idx").on(table.latitude, table.longitude),
     index("profile_geom_gist_idx").using("gist", table.geom),
     index("profile_slug_idx").on(table.slug),
+  ],
+);
+
+// Perfil institucional ligado 1:1 à instituição. O `profile` é a identidade
+// pública (slug, nome, logo, geo, categorias/tags, busca, badges) — a tabela
+// `institution` guarda apenas dados específicos do domínio.
+export const institution = pgTable(
+  "institution",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    profileId: text("profile_id")
+      .notNull()
+      .unique()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    legalName: text("legal_name"),
+    organizationType: institutionTypeEnum("organization_type").notNull(),
+    foundedAt: timestamp("founded_at"),
+    website: text("website"),
+    email: text("email"),
+    phone: text("phone"),
+    whatsapp: text("whatsapp"),
+    province: text("province"),
+    district: text("district"),
+    city: text("city"),
+    address: text("address"),
+    // Campos de domínio institucional (Etapa 1)
+    acronym: text("acronym"),
+    taxId: text("tax_id").unique(),
+    mission: text("mission"),
+    vision: text("vision"),
+    operatingScope: institutionOperatingScopeEnum("operating_scope"),
+    socialLinks: jsonb("social_links"),
+    primaryContact: jsonb("primary_contact"),
+    verificationDocuments: jsonb("verification_documents"),
+    status: profileStatusEnum("status").notNull().default("draft"),
+    verificationStatus: verificationStatusEnum("verification_status").notNull().default("pending"),
+    verifiedAt: timestamp("verified_at"),
+    createdById: text("created_by_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("institution_slug_idx").on(table.slug),
+    index("institution_type_idx").on(table.organizationType),
+    index("institution_status_idx").on(table.status),
+    index("institution_verification_idx").on(table.verificationStatus),
+    index("institution_operating_scope_idx").on(table.operatingScope),
+  ],
+);
+
+// Empresa (profile type='company') → instituição. Membership com verificação:
+// `approved` = "declara ser membro"; `verified` = "membro verificado" (Workdeal).
+export const institutionMembership = pgTable(
+  "institution_membership",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    institutionId: text("institution_id")
+      .notNull()
+      .references(() => institution.id, { onDelete: "cascade" }),
+    companyProfileId: text("company_profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    membershipType: membershipTypeEnum("membership_type").notNull().default("member"),
+    status: membershipStatusEnum("status").notNull().default("pending"),
+    requestedById: text("requested_by_id").references(() => user.id, { onDelete: "set null" }),
+    approvedById: text("approved_by_id").references(() => user.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at"),
+    verifiedById: text("verified_by_id").references(() => user.id, { onDelete: "set null" }),
+    verifiedAt: timestamp("verified_at"),
+    joinedAt: timestamp("joined_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("institution_membership_inst_company_idx").on(table.institutionId, table.companyProfileId),
+    index("institution_membership_institution_status_idx").on(table.institutionId, table.status),
+    index("institution_membership_company_status_idx").on(table.companyProfileId, table.status),
+    index("institution_membership_requested_by_idx").on(table.requestedById),
+  ],
+);
+
+// Equipa de gestão da instituição (autosserviço). Ao contrário do `member` do
+// better-auth (que pertence a organizações), aqui o papel é por instituição e
+// reutiliza os papéis org_role (owner/admin/editor/member) para a matriz de
+// permissões INSTITUTION_MANAGER_PERMISSIONS em packages/shared.
+export const institutionManager = pgTable(
+  "institution_manager",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    institutionId: text("institution_id")
+      .notNull()
+      .references(() => institution.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: orgRoleEnum("role").notNull().default("editor"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("institution_manager_institution_user_idx").on(table.institutionId, table.userId),
+    index("institution_manager_user_idx").on(table.userId),
   ],
 );
 
@@ -826,6 +957,7 @@ export const taskBid = pgTable(
 
 export const eventStatusEnum = pgEnum("event_status", ["draft", "published", "cancelled", "ended"]);
 export const eventRegistrationStatusEnum = pgEnum("event_registration_status", ["registered", "cancelled", "checked_in"]);
+export const eventVisibilityEnum = pgEnum("event_visibility", ["public", "members_only", "private"]);
 
 export const event = pgTable(
   "event",
@@ -854,6 +986,7 @@ export const event = pgTable(
     geom: geographyPoint("geom"),
     coverImage: text("cover_image"),
     capacity: integer("capacity"),
+    visibility: eventVisibilityEnum("visibility").notNull().default("public"),
     status: eventStatusEnum("status").notNull().default("draft"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -888,5 +1021,335 @@ export const eventRegistration = pgTable(
     uniqueIndex("event_registration_event_user_idx").on(table.eventId, table.userId),
     index("event_registration_user_idx").on(table.userId),
     index("event_registration_status_idx").on(table.status),
+  ],
+);
+
+// ── Subscriptions / Pagamentos ────────────────────────────────
+// Ecossistema de billing: planos, subscrições, facturas, pagamentos,
+// recibos, cupons de desconto, créditos (wallet) e log de webhooks.
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "past_due", "trialing", "cancelled", "paused", "expired"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["pending", "processing", "succeeded", "failed", "refunded", "partially_refunded", "cancelled"]);
+export const couponTypeEnum = pgEnum("coupon_type", ["percent", "fixed"]);
+export const planIntervalEnum = pgEnum("plan_interval", ["monthly", "quarterly", "yearly"]);
+
+// ── Planos ────────────────────────────────────────────────────
+export const plan = pgTable(
+  "plan",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    description: text("description"),
+    // Herança de features: plano inclui tudo do plano apontado (Enterprise → Premium → Trust → Free)
+    inheritFromPlanId: text("inherit_from_plan_id").references((): AnyPgColumn => plan.id, { onDelete: "set null" }),
+    priceMzn: integer("price_mzn").notNull().default(0),
+    interval: planIntervalEnum("interval").notNull().default("monthly"),
+    trialDays: integer("trial_days").notNull().default(0),
+    maxProfiles: integer("max_profiles"),
+    maxTeamMembers: integer("max_team_members"),
+    maxListings: integer("max_listings"),
+    maxBranches: integer("max_branches"),
+    apiAccess: boolean("api_access").notNull().default(false),
+    maxApiCallsPerMonth: integer("max_api_calls_per_month"),
+    isPublic: boolean("is_public").notNull().default(true),
+    isActive: boolean("is_active").notNull().default(true),
+    metadata: jsonb("metadata"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("plan_slug_idx").on(table.slug),
+    index("plan_is_active_idx").on(table.isActive, table.sortOrder),
+    index("plan_inherit_idx").on(table.inheritFromPlanId),
+  ],
+);
+
+export const planFeature = pgTable(
+  "plan_feature",
+  {
+    planId: text("plan_id")
+      .notNull()
+      .references(() => plan.id, { onDelete: "cascade" }),
+    featureKey: text("feature_key").notNull(),
+    featureValue: text("feature_value"),
+    label: text("label"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.planId, table.featureKey] }),
+    index("plan_feature_key_idx").on(table.featureKey),
+  ],
+);
+
+// ── Cupons / promoções ────────────────────────────────────────
+export const coupon = pgTable(
+  "coupon",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    code: text("code").notNull().unique(),
+    description: text("description"),
+    type: couponTypeEnum("type").notNull(),
+    value: integer("value").notNull(),
+    maxTotalUses: integer("max_total_uses"),
+    usedCount: integer("used_count").notNull().default(0),
+    maxUsesPerUser: integer("max_uses_per_user").notNull().default(1),
+    minAmountMzn: integer("min_amount_mzn"),
+    validFrom: timestamp("valid_from"),
+    validUntil: timestamp("valid_until"),
+    isActive: boolean("is_active").notNull().default(true),
+    appliesTo: text("applies_to"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("coupon_code_idx").on(table.code),
+    index("coupon_validity_idx").on(table.isActive, table.validFrom, table.validUntil),
+  ],
+);
+
+// ── Subscrições ───────────────────────────────────────────────
+// `userId` obrigatório; `organizationId` opcional (null = subscrição pessoal).
+export const subscription = pgTable(
+  "subscription",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "set null" }),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => plan.id, { onDelete: "restrict" }),
+    status: subscriptionStatusEnum("status").notNull().default("active"),
+    trialStartsAt: timestamp("trial_starts_at"),
+    trialEndsAt: timestamp("trial_ends_at"),
+    currentPeriodStart: timestamp("current_period_start").notNull(),
+    currentPeriodEnd: timestamp("current_period_end").notNull(),
+    cancelAt: timestamp("cancel_at"),
+    cancelledAt: timestamp("cancelled_at"),
+    cancelReason: text("cancel_reason"),
+    pausedAt: timestamp("paused_at"),
+    resumeAt: timestamp("resume_at"),
+    couponId: text("coupon_id").references(() => coupon.id, { onDelete: "set null" }),
+    discountMzn: integer("discount_mzn").notNull().default(0),
+    provider: text("provider"),
+    providerSubscriptionId: text("provider_subscription_id"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("subscription_user_status_idx").on(table.userId, table.status),
+    index("subscription_org_status_idx").on(table.organizationId, table.status),
+    index("subscription_plan_idx").on(table.planId),
+    index("subscription_provider_idx").on(table.provider, table.providerSubscriptionId),
+  ],
+);
+
+export const subscriptionCoupon = pgTable(
+  "subscription_coupon",
+  {
+    subscriptionId: text("subscription_id")
+      .notNull()
+      .references(() => subscription.id, { onDelete: "cascade" }),
+    couponId: text("coupon_id")
+      .notNull()
+      .references(() => coupon.id, { onDelete: "cascade" }),
+    appliedAt: timestamp("applied_at").notNull().defaultNow(),
+    discountMzn: integer("discount_mzn").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subscriptionId, table.couponId] }),
+    index("subscription_coupon_coupon_idx").on(table.couponId),
+  ],
+);
+
+// ── Facturas (uma por ciclo de billing) ───────────────────────
+export const invoice = pgTable(
+  "invoice",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    subscriptionId: text("subscription_id").references(() => subscription.id, { onDelete: "set null" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "set null" }),
+    invoiceNumber: text("invoice_number").notNull().unique(),
+    status: paymentStatusEnum("status").notNull().default("pending"),
+    subtotalMzn: integer("subtotal_mzn").notNull().default(0),
+    discountMzn: integer("discount_mzn").notNull().default(0),
+    taxMzn: integer("tax_mzn").notNull().default(0),
+    totalMzn: integer("total_mzn").notNull().default(0),
+    currency: text("currency").notNull().default("MZN"),
+    periodStart: timestamp("period_start").notNull(),
+    periodEnd: timestamp("period_end").notNull(),
+    dueDate: timestamp("due_date"),
+    paidAt: timestamp("paid_at"),
+    provider: text("provider"),
+    providerInvoiceId: text("provider_invoice_id"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("invoice_number_idx").on(table.invoiceNumber),
+    index("invoice_user_status_idx").on(table.userId, table.status),
+    index("invoice_subscription_idx").on(table.subscriptionId),
+    index("invoice_org_idx").on(table.organizationId),
+    index("invoice_period_idx").on(table.periodStart, table.periodEnd),
+  ],
+);
+
+export const invoiceLineItem = pgTable(
+  "invoice_line_item",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => invoice.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    unitPriceMzn: integer("unit_price_mzn").notNull().default(0),
+    totalMzn: integer("total_mzn").notNull().default(0),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("invoice_line_item_invoice_idx").on(table.invoiceId)],
+);
+
+// ── Pagamentos / transacções ──────────────────────────────────
+export const payment = pgTable(
+  "payment",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    invoiceId: text("invoice_id").references(() => invoice.id, { onDelete: "set null" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    amountMzn: integer("amount_mzn").notNull(),
+    currency: text("currency").notNull().default("MZN"),
+    status: paymentStatusEnum("status").notNull().default("pending"),
+    method: text("method"),
+    provider: text("provider"),
+    providerPaymentId: text("provider_payment_id"),
+    providerMetadata: jsonb("provider_metadata"),
+    paidAt: timestamp("paid_at"),
+    refundedAt: timestamp("refunded_at"),
+    refundAmountMzn: integer("refund_amount_mzn"),
+    failureReason: text("failure_reason"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("payment_user_status_idx").on(table.userId, table.status),
+    index("payment_invoice_idx").on(table.invoiceId),
+    index("payment_provider_idx").on(table.provider, table.providerPaymentId),
+    index("payment_paid_at_idx").on(table.paidAt),
+  ],
+);
+
+// ── Recibos / comprovativos ───────────────────────────────────
+export const receipt = pgTable(
+  "receipt",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    paymentId: text("payment_id")
+      .notNull()
+      .references(() => payment.id, { onDelete: "cascade" }),
+    receiptNumber: text("receipt_number").notNull().unique(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    amountMzn: integer("amount_mzn").notNull(),
+    currency: text("currency").notNull().default("MZN"),
+    issuedAt: timestamp("issued_at").notNull().defaultNow(),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("receipt_number_idx").on(table.receiptNumber),
+    index("receipt_user_idx").on(table.userId),
+    index("receipt_payment_idx").on(table.paymentId),
+  ],
+);
+
+// ── Créditos / wallet ─────────────────────────────────────────
+export const creditAccount = pgTable(
+  "credit_account",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .unique()
+      .references(() => user.id, { onDelete: "cascade" }),
+    balanceMzn: integer("balance_mzn").notNull().default(0),
+    currency: text("currency").notNull().default("MZN"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("credit_account_user_idx").on(table.userId)],
+);
+
+export const creditTransaction = pgTable(
+  "credit_transaction",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => creditAccount.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    amountMzn: integer("amount_mzn").notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    description: text("description"),
+    referenceType: text("reference_type"),
+    referenceId: text("reference_id"),
+    createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("credit_transaction_account_idx").on(table.accountId, table.createdAt),
+    index("credit_transaction_reference_idx").on(table.referenceType, table.referenceId),
+  ],
+);
+
+// ── Webhook events (idempotência) ─────────────────────────────
+export const webhookEvent = pgTable(
+  "webhook_event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    provider: text("provider").notNull(),
+    externalId: text("external_id").notNull(),
+    eventType: text("event_type").notNull(),
+    payload: jsonb("payload").notNull(),
+    status: text("status").notNull().default("received"),
+    processedAt: timestamp("processed_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("webhook_event_provider_external_id_idx").on(table.provider, table.externalId),
+    index("webhook_event_status_idx").on(table.provider, table.status),
   ],
 );

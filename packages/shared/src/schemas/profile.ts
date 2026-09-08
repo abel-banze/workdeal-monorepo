@@ -2,7 +2,7 @@ import { z } from "zod";
 import { emailSchema } from "./auth.js";
 import { businessHoursSchema } from "./business-hours.js";
 
-export const profileTypeSchema = z.enum(["individual", "company"]);
+export const profileTypeSchema = z.enum(["individual", "company", "institution"]);
 export const profileStatusSchema = z.enum(["draft", "active", "suspended"]);
 
 export const profileSlugSchema = z
@@ -122,8 +122,8 @@ export const listProfilesQuerySchema = z.object({
   // Tempo no mercado (companyQualification.founded_year) — faixa de anos de fundação
   minYear: z.coerce.number().int().min(1900).max(3000).optional(),
   maxYear: z.coerce.number().int().min(1900).max(3000).optional(),
-  // Identidade/registo (organization.verification_status): "verified" | "in_review" | "pending" | "pre_registered"
-  verificationStatus: z.enum(["verified", "in_review", "pending", "pre_registered", "suspended"]).optional(),
+  // Identidade/registo (organization.verification_status): "verified" | "in_review" | "pending" | "pre_registered" | "expired"
+  verificationStatus: z.enum(["verified", "in_review", "pending", "pre_registered", "suspended", "expired"]).optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20).optional(),
   sort: z.enum(["recent", "name", "distance"]).default("recent").optional(),

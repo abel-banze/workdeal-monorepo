@@ -66,6 +66,14 @@ export const envSchema = z.object({
   PLACES_BIAS_LAT: z.coerce.number().min(-90).max(90).optional(), // centro do bias (default: Maputo -25.9692,32.5732)
   PLACES_BIAS_LNG: z.coerce.number().min(-180).max(180).optional(),
   PLACES_BIAS_RADIUS_KM: z.coerce.number().min(1).max(50000).optional(), // default 50
+  // Payment provider (Integrate/M-Pesa/E-mola para Moçambique, Stripe, ...)
+  // `manual` = sem integração externa (pagamentos registados pelo administrador)
+  PAYMENT_PROVIDER: z.enum(["integrate", "stripe", "manual"]).default("manual"),
+  PAYMENT_PROVIDER_PUBLIC_KEY: z.string().optional(),
+  PAYMENT_PROVIDER_SECRET_KEY: z.string().optional(),
+  PAYMENT_PROVIDER_WEBHOOK_SECRET: z.string().optional(),
+  // Moeda funcional dos valores monetários guardados em integer nos serviços
+  PAYMENT_CURRENCY: z.string().min(3).max(3).default("MZN"),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -15,12 +15,14 @@ import {
   UsersIcon,
   Building2Icon,
   UserSquareIcon,
+  LandmarkIcon,
   ListChecksIcon,
   TagsIcon,
   CalendarDaysIcon,
   BriefcaseIcon,
   ShieldCheckIcon,
   FlagIcon,
+  CreditCardIcon,
   SettingsIcon,
 } from "lucide-react"
 import { NavMain, type NavMainItem } from "@/components/nav-main"
@@ -63,6 +65,15 @@ const groups: { label: string; items: NavMainItem[] }[] = [
           { title: "Pendentes", url: "/dashboard/profiles/pending" },
           { title: "Suspensos", url: "/dashboard/profiles/suspended" },
           { title: "Selos", url: "/dashboard/profiles/badges" },
+        ],
+      },
+      {
+        title: "Instituições",
+        icon: <LandmarkIcon />,
+        items: [
+          { title: "Todas", url: "/dashboard/institutions" },
+          { title: "Pendentes", url: "/dashboard/institutions/pending" },
+          { title: "Membresias", url: "/dashboard/institutions/memberships" },
         ],
       },
     ],
@@ -108,6 +119,20 @@ const groups: { label: string; items: NavMainItem[] }[] = [
           { title: "Alertas", url: "/dashboard/tenders/alerts" },
         ],
       },
+    ],
+  },
+  {
+    label: "Subscrições",
+    items: [
+      {
+        title: "Planos",
+        icon: <CreditCardIcon />,
+        items: [
+          { title: "Todos os planos", url: "/dashboard/plans" },
+          { title: "Novo plano", url: "/dashboard/plans/new" },
+        ],
+      },
+      { title: "Subscrições", url: "/dashboard/subscriptions", icon: <CreditCardIcon /> },
     ],
   },
   {
