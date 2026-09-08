@@ -73,6 +73,10 @@ export const paymentMethodSchema = z.enum(PAYMENT_METHODS);
 
 // ── Planos ─────────────────────────────────────────────────────
 
+// Plano atribuído por defeito a novas empresas (onboarding). Slug estável do
+// catálogo seed (packages/db/src/seed-plans.ts — id "plan-free").
+export const DEFAULT_FREE_PLAN_SLUG = "free" as const;
+
 export const planSchema = z.object({
   id: z.string(),
   slug: z.string(),

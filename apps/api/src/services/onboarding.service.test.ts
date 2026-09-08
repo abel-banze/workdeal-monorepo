@@ -9,12 +9,16 @@ const mocks = vi.hoisted(() => ({
     findOrganizationProfile: vi.fn(),
     slugExists: vi.fn(),
   },
+  billing: {
+    ensureDefaultSubscription: vi.fn(),
+  },
   sendWelcomeCompanyEmail: vi.fn(),
   dbExecute: vi.fn(),
 }));
 
 vi.mock("@workdeal/auth", () => ({ getOrgRole: mocks.getOrgRole }));
 vi.mock("../repositories/onboarding.repository.js", () => ({ onboardingRepository: mocks.repo }));
+vi.mock("../repositories/billing.repository.js", () => ({ billingRepository: mocks.billing }));
 vi.mock("../services/email.service.js", () => ({ sendWelcomeCompanyEmail: mocks.sendWelcomeCompanyEmail }));
 vi.mock("@workdeal/db", () => ({ db: { execute: mocks.dbExecute } }));
 
@@ -44,6 +48,7 @@ beforeEach(() => {
   mocks.repo.findOrganizationProfile.mockResolvedValue(null);
   mocks.repo.slugExists.mockResolvedValue(false);
   mocks.repo.complete.mockResolvedValue({ profileId: "p1", created: true });
+  mocks.billing.ensureDefaultSubscription.mockResolvedValue({ created: true, subscriptionId: "sub-1" });
   mocks.sendWelcomeCompanyEmail.mockResolvedValue(undefined);
   mocks.dbExecute.mockResolvedValue(undefined);
 });
@@ -146,6 +151,25 @@ describe("onboardingService.complete — qualificação e welcome", () => {
     mocks.repo.complete.mockResolvedValue({ profileId: "p1", created: false });
     await onboardingService.complete(user, baseInput() as never, [WA_VERIFIED]);
     expect(mocks.sendWelcomeCompanyEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("onboardingService.complete — plano free por defeito", () => {
+  it("atribui o plano free à empresa no activação", async () => {
+    await onboardingService.complete(user, baseInput() as never, [WA_VERIFIED]);
+    expect(mocks.billing.ensureDefaultSubscription).toHaveBeenCalledTimes(1);
+    expect(mocks.billing.ensureDefaultSubscription).toHaveBeenCalledWith({
+      userId: "u1",
+      organizationId: "org-1",
+      planSlug: "free",
+    });
+  });
+
+  it("garante o plano free também em re-edits (idempotente no repository)", async () => {
+    mocks.repo.findOrganizationProfile.mockResolvedValue({ id: "p1", slug: "construcoes-xyz" });
+    mocks.repo.complete.mockResolvedValue({ profileId: "p1", created: false });
+    await onboardingService.complete(user, baseInput() as never, [WA_VERIFIED]);
+    expect(mocks.billing.ensureDefaultSubscription).toHaveBeenCalledTimes(1);
   });
 });
 

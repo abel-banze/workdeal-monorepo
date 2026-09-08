@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { TaskView } from "@workdeal/shared";
 import { TASK_STATUS_LABELS_PT } from "@workdeal/shared";
 import { formatDeadline, formatMzn } from "@/lib/dates";
@@ -18,7 +17,6 @@ export function TaskCard({ task, categoryName }: { task: TaskView; categoryName?
   const locationLine = [task.province, task.district].filter(Boolean).join(" · ");
   const hasDistance = typeof task.distanceKm === "number" && Number.isFinite(task.distanceKm);
   const locationText = locationLine || (hasDistance ? "Perto de si" : "Pedido de serviço");
-  const hasRequesterProfile = Boolean(task.requesterProfileSlug);
 
   return (
     <Link
@@ -62,24 +60,6 @@ export function TaskCard({ task, categoryName }: { task: TaskView; categoryName?
           Ver pedido <span aria-hidden>→</span>
         </span>
       </div>
-
-      {task.requesterProfileName ? (
-        <div className="flex items-center gap-2 border-t border-[#D9D2C2]/60 px-5 py-3">
-          <div className="relative flex size-6 items-center justify-center overflow-hidden rounded-full border border-[#D9D2C2] bg-white text-[9px] font-black text-[#0F1A2E]">
-            {task.requesterProfileLogo ? (
-              <Image src={task.requesterProfileLogo} alt="" fill sizes="24px" className="object-cover" />
-            ) : (
-              task.requesterProfileName.slice(0, 2).toUpperCase()
-            )}
-          </div>
-          <span className="truncate text-xs font-semibold text-[#0F1A2E]/70">
-            Pedido por <span className="font-bold text-[#0F1A2E]">{task.requesterProfileName}</span>
-          </span>
-          {hasRequesterProfile ? (
-            <span className="ml-auto shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[#0B5E56]">Ver ⇱</span>
-          ) : null}
-        </div>
-      ) : null}
     </Link>
   );
 }

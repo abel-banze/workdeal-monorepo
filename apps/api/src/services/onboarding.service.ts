@@ -1,6 +1,7 @@
 import { getOrgRole } from "@workdeal/auth";
 import {
   classifyCompanySize,
+  DEFAULT_FREE_PLAN_SLUG,
   hasOrgPermission,
   normalizeBusinessHours,
 } from "@workdeal/shared";
@@ -11,6 +12,7 @@ import type { AuthUser, OnboardingCompleteInput } from "@workdeal/shared";
 import type { ContactVerificationPayload } from "@workdeal/shared/lib/contact-verification";
 import { AppError } from "../lib/errors.js";
 import { onboardingRepository } from "../repositories/onboarding.repository.js";
+import { billingRepository } from "../repositories/billing.repository.js";
 
 class OnboardingService {
   async complete(
@@ -95,6 +97,14 @@ class OnboardingService {
           }
         : null,
       tagSlugs: input.tagSlugs ?? [],
+    });
+
+    // Plano por defeito: toda a empresa activa começa com o plano free.
+    // Idempotente — se já houver subscrição (ou plano paid), não altera nada.
+    await billingRepository.ensureDefaultSubscription({
+      userId: user.id,
+      organizationId: input.organizationId,
+      planSlug: DEFAULT_FREE_PLAN_SLUG,
     });
 
     // Boas-vindas da empresa — só no primeiro publish (created), não em re-edits

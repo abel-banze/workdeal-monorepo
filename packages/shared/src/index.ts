@@ -1,5 +1,6 @@
 export * from "./types.js";
 export * from "./permissions.js";
+export * from "./entitlements.js";
 export * from "./schemas/auth.js";
 export * from "./schemas/profile.js";
 export * from "./schemas/review.js";
