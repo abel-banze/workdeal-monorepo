@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { TaskView } from "@workdeal/shared";
-import { TASK_STATUS_LABELS_PT } from "@workdeal/shared";
+import { TASK_STATUS_LABELS_PT, TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared";
 import { formatDeadline, formatMzn } from "@/lib/dates";
 
 const STATUS_STYLE: Record<string, string> = {
@@ -42,18 +42,31 @@ export function TaskCard({ task, categoryName }: { task: TaskView; categoryName?
         </h3>
         <p className="mt-2 line-clamp-3 min-h-[3.2rem] text-[13px] leading-relaxed text-[#0F1A2E]/65">{task.description}</p>
 
-        {categoryName ? (
-          <span className="mt-3 inline-flex w-fit rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 text-[11px] font-medium text-[#0F1A2E]/75">
-            {categoryName}
-          </span>
-        ) : null}
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {task.contractType && (
+            <span className="inline-flex rounded-full border border-[#0B5E56]/25 bg-[#0B5E56]/5 px-2.5 py-1 text-[11px] font-semibold text-[#0B5E56]">
+              {TASK_CONTRACT_TYPE_LABELS_PT[task.contractType] ?? task.contractType}
+            </span>
+          )}
+          {categoryName ? (
+            <span className="inline-flex rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 text-[11px] font-medium text-[#0F1A2E]/75">
+              {categoryName}
+            </span>
+          ) : null}
+          {task.tags.length > 0 &&
+            task.tags.slice(0, 3).map((t) => (
+              <span key={t.id} className="inline-flex rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[11px] font-medium text-[#0F1A2E]/65">
+                {t.name}
+              </span>
+            ))}
+        </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3 bg-[#F6F3EE]/70 px-5 py-3">
         <div className="min-w-0">
           <p className="text-[13px] font-bold text-[#0F1A2E]">{priceRange}</p>
           <p className="mt-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0F1A2E]/45">
-            {task.dueAt ? formatDeadline(task.dueAt) : "Sem prazo definido"}
+            {task.proposalDeadlineAt ? `Propostas até ${formatShort(task.proposalDeadlineAt)}` : task.dueAt ? formatDeadline(task.dueAt) : "Sem prazo definido"}
           </p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[#FF3B1F] opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
@@ -62,6 +75,11 @@ export function TaskCard({ task, categoryName }: { task: TaskView; categoryName?
       </div>
     </Link>
   );
+}
+
+function formatShort(d: Date | string): string {
+  const date = typeof d === "string" ? new Date(d) : d;
+  return date.toLocaleString("pt-MZ", { dateStyle: "short", timeStyle: "short" });
 }
 
 function formatBudget(min: number | null, max: number | null) {

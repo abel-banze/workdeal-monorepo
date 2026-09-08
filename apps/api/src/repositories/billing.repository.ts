@@ -170,6 +170,16 @@ export const billingRepository = {
     return (row as PlanRow) ?? null;
   },
 
+  // Catálogo público (sem auth) — só planos activos e visíveis no site/dashboard.
+  async listPublicPlans(): Promise<PlanRow[]> {
+    const rows = await db
+      .select(planColumns)
+      .from(plan)
+      .where(and(eq(plan.isActive, true), eq(plan.isPublic, true)))
+      .orderBy(asc(plan.sortOrder), asc(plan.createdAt));
+    return rows as PlanRow[];
+  },
+
   async createPlan(data: Omit<PlanRow, "id" | "createdAt" | "updatedAt">): Promise<PlanRow> {
     const [row] = await db.insert(plan).values({ ...data, id: crypto.randomUUID() }).returning();
     return row as PlanRow;
@@ -252,6 +262,16 @@ export const billingRepository = {
 
   async findSubscriptionById(id: string): Promise<SubscriptionAdminRow | null> {
     const [row] = await this._selectSubscriptionRows().where(eq(subscription.id, id)).limit(1);
+    return (row as SubscriptionAdminRow | undefined) ?? null;
+  },
+
+  // Subscrição "actual" de um utilizador: da organização (se scope org) ou a
+  // pessoal (userId + organizationId nulo). Uma organização só tem uma subscrição.
+  async findSubscriptionForScope(userId: string, organizationId: string | null): Promise<SubscriptionAdminRow | null> {
+    const where = organizationId
+      ? eq(subscription.organizationId, organizationId)
+      : and(sql`${subscription.organizationId} is null`, eq(subscription.userId, userId));
+    const [row] = await this._selectSubscriptionRows().where(where).orderBy(desc(subscription.createdAt)).limit(1);
     return (row as SubscriptionAdminRow | undefined) ?? null;
   },
 

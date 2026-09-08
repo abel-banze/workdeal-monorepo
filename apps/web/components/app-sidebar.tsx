@@ -18,10 +18,12 @@ import { GalleryVerticalEndIcon, Settings2Icon, LayoutDashboardIcon, Building2Ic
 
 function buildNavGroups(activeId: string | null) {
   const base = activeId ? `/dashboard/${activeId}` : "/dashboard"
+  // Sem org activa (páginas pessoais), o destino base do menu é o dashboard pessoal — não /dashboard (que redirecciona para a org)
+  const home = activeId ? base : "/dashboard/personal"
   const menu: NavMainItem[] = [
     {
       title: "Painel",
-      url: base,
+      url: home,
       icon: <LayoutDashboardIcon />,
     },
     {
@@ -29,7 +31,7 @@ function buildNavGroups(activeId: string | null) {
       url: `${base}/profile`,
       icon: <Building2Icon />,
       items: [
-        { title: "Visão geral", url: base },
+        { title: "Visão geral", url: home },
         { title: "Editar perfil", url: `${base}/profile/edit` },
         { title: "Portfólio", url: `${base}/portfolio` },
         { title: "Serviços", url: `${base}/services` },
@@ -54,6 +56,7 @@ function buildNavGroups(activeId: string | null) {
         { title: "Conta", url: `${base}/settings` },
         { title: "Equipa", url: `${base}/team` },
         { title: "Verificação", url: `${base}/verification` },
+        { title: "Subscrição", url: `${base}/subscription` },
       ],
     },
   ]

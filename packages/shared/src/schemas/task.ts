@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { tagSchema } from "./tag.js";
 
 // ── Tasks / Pedidos de serviço ─────────────────────────────────────
 
 export const taskStatusSchema = z.enum(["open", "in_review", "in_progress", "completed", "cancelled", "withdrawn"]);
+export const taskContractTypeSchema = z.enum(["service", "recurring", "consulting", "emergency", "project", "public_tender"]);
 export const proposalStatusSchema = z.enum(["submitted", "shortlisted", "rejected", "withdrawn", "accepted"]);
 export const bidStatusSchema = z.enum(["awarded", "in_progress", "completed", "cancelled", "disputed"]);
 
@@ -13,6 +15,15 @@ export const TASK_STATUS_LABELS_PT: Record<z.infer<typeof taskStatusSchema>, str
   completed: "Concluída",
   cancelled: "Cancelada",
   withdrawn: "Retirada",
+};
+
+export const TASK_CONTRACT_TYPE_LABELS_PT: Record<z.infer<typeof taskContractTypeSchema>, string> = {
+  service: "Serviço pontual",
+  recurring: "Recorrente",
+  consulting: "Consultoria",
+  emergency: "Emergência",
+  project: "Projecto / Obra",
+  public_tender: "Concurso público",
 };
 
 export const PROPOSAL_STATUS_LABELS_PT: Record<z.infer<typeof proposalStatusSchema>, string> = {
@@ -50,6 +61,9 @@ const taskFormFields = z.object({
   latitude: z.number().min(-90).max(90).nullable().optional(),
   longitude: z.number().min(-180).max(180).nullable().optional(),
   dueAt: z.coerce.date().nullable().optional(),
+  proposalDeadlineAt: z.coerce.date().nullable().optional(),
+  contractType: taskContractTypeSchema.nullable().optional(),
+  tagSlugs: z.array(z.string().trim().min(1).max(64)).max(10).optional(),
   attachments: z.array(taskAttachmentSchema).max(5).default([]),
 });
 
@@ -74,6 +88,8 @@ export const taskListQuerySchema = z.object({
   priceMin: z.coerce.number().int().min(0).optional(),
   priceMax: z.coerce.number().int().min(0).optional(),
   province: z.string().min(1).optional(),
+  contractType: taskContractTypeSchema.optional(),
+  tag: z.string().trim().min(1).max(64).optional(),
   near: z
     .string()
     .regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/, "near deve ser 'lat,lng'")
@@ -142,6 +158,9 @@ export const taskViewSchema = z.object({
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
   dueAt: z.date().nullable(),
+  proposalDeadlineAt: z.date().nullable(),
+  contractType: taskContractTypeSchema.nullable(),
+  tags: z.array(tagSchema).default([]),
   attachments: z.array(taskAttachmentSchema).default([]),
   status: taskStatusSchema,
   proposalCount: z.number().optional().default(0),
@@ -195,6 +214,7 @@ export const bidViewSchema = z.object({
 });
 
 export type TaskStatus = z.infer<typeof taskStatusSchema>;
+export type TaskContractType = z.infer<typeof taskContractTypeSchema>;
 export type ProposalStatus = z.infer<typeof proposalStatusSchema>;
 export type BidStatus = z.infer<typeof bidStatusSchema>;
 export type TaskAttachment = z.infer<typeof taskAttachmentSchema>;

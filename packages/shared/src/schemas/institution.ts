@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ORG_ROLES } from "../types.js";
+import { websiteSchema } from "../lib/website.js";
 
 // ── Enums de domínio ───────────────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ export const institutionEnums = {
 
 const institutionContactFields = {
   legalName: z.string().trim().max(200).nullable().optional(),
-  website: z.string().trim().url().max(255).nullable().optional(),
+  website: websiteSchema,
   email: z.string().trim().email().max(255).nullable().optional(),
   phone: z.string().trim().max(32).nullable().optional(),
   whatsapp: z.string().trim().max(32).nullable().optional(),

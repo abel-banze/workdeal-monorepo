@@ -6,12 +6,14 @@ import type {
   CreateProposalInput,
   CreateTaskInput,
   ProposalStatus,
+  TaskContractType,
   TaskListQuery,
   TaskStatus,
   UpdateTaskInput,
 } from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 import { tasksRepository } from "../repositories/tasks.repository.js";
+import { tagsRepository } from "../repositories/tags.repository.js";
 
 type ProposalListQuery = { status?: ProposalStatus; page?: number; limit?: number };
 
@@ -49,22 +51,38 @@ export const tasksService = {
       if (!isMember) throw new AppError(403, "FORBIDDEN", "Não pertence à organização solicitante");
       requesterOrganizationId = input.requesterOrganizationId;
     }
-    return tasksRepository.create({
-      requesterUserId: user.id,
-      requesterOrganizationId,
-      categoryId: input.categoryId ?? null,
-      title: input.title,
-      description: input.description,
-      priceMinMzn: input.priceMinMzn ?? null,
-      priceMaxMzn: input.priceMaxMzn ?? null,
-      province: input.province ?? null,
-      district: input.district ?? null,
-      address: input.address ?? null,
-      latitude: input.latitude ?? null,
-      longitude: input.longitude ?? null,
-      dueAt: input.dueAt ?? null,
-      attachments: (input.attachments ?? []) as never,
-    });
+    if (input.contractType === "public_tender") {
+      throw new AppError(400, "INVALID_CONTRACT_TYPE", "Concursos públicos são criados pelo Workdeal — escolhe outro tipo de contrato");
+    }
+    let tagIds: string[] = [];
+    let tags: Awaited<ReturnType<typeof tagsRepository.ensureTagsBySlugs>> = [];
+    if (input.tagSlugs && input.tagSlugs.length > 0) {
+      tags = await tagsRepository.ensureTagsBySlugs(input.tagSlugs);
+      tagIds = tags.map((t) => t.id);
+    }
+    return tasksRepository
+      .create(
+        {
+          requesterUserId: user.id,
+          requesterOrganizationId,
+          categoryId: input.categoryId ?? null,
+          title: input.title,
+          description: input.description,
+          priceMinMzn: input.priceMinMzn ?? null,
+          priceMaxMzn: input.priceMaxMzn ?? null,
+          province: input.province ?? null,
+          district: input.district ?? null,
+          address: input.address ?? null,
+          latitude: input.latitude ?? null,
+          longitude: input.longitude ?? null,
+          dueAt: input.dueAt ?? null,
+          proposalDeadlineAt: input.proposalDeadlineAt ?? null,
+          contractType: input.contractType ?? null,
+          attachments: (input.attachments ?? []) as never,
+        },
+        tagIds,
+      )
+      .then((row) => ({ ...row, tags: tags.map((t) => ({ id: t.id, slug: t.slug, name: t.name })) }));
   },
 
 async listTasks(query: TaskListQuery) {
@@ -85,6 +103,8 @@ async listTasks(query: TaskListQuery) {
         priceMax: query.priceMax,
         categoryId: query.categoryId,
         province: query.province,
+        contractType: query.contractType,
+        tag: query.tag,
         near: query.near,
         radiusKm: query.radiusKm,
         page,
@@ -112,7 +132,7 @@ async listTasks(query: TaskListQuery) {
     if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Tarefa não encontrada");
     if (existing.requesterUserId !== user.id) throw new AppError(403, "FORBIDDEN", "Sem permissão para editar esta tarefa");
 
-    const patch: Partial<{ id: string; requesterUserId: string; requesterOrganizationId: string | null; categoryId: string | null; title: string; description: string; priceMinMzn: number | null; priceMaxMzn: number | null; province: string | null; district: string | null; address: string | null; latitude: number | null; longitude: number | null; dueAt: Date | null; attachments: never; status: TaskStatus; createdAt: Date; updatedAt: Date }> = {};
+    const patch: Partial<{ id: string; requesterUserId: string; requesterOrganizationId: string | null; categoryId: string | null; title: string; description: string; priceMinMzn: number | null; priceMaxMzn: number | null; province: string | null; district: string | null; address: string | null; latitude: number | null; longitude: number | null; dueAt: Date | null; proposalDeadlineAt: Date | null; contractType: TaskContractType | null; attachments: never; status: TaskStatus; createdAt: Date; updatedAt: Date }> = {};
 
     if (input.categoryId !== undefined) patch.categoryId = input.categoryId ?? null;
     if (input.title !== undefined) patch.title = input.title;
@@ -125,13 +145,20 @@ async listTasks(query: TaskListQuery) {
     if (input.latitude !== undefined) patch.latitude = input.latitude ?? null;
     if (input.longitude !== undefined) patch.longitude = input.longitude ?? null;
     if (input.dueAt !== undefined) patch.dueAt = input.dueAt ?? null;
+    if (input.proposalDeadlineAt !== undefined) patch.proposalDeadlineAt = input.proposalDeadlineAt ?? null;
+    if (input.contractType !== undefined) patch.contractType = input.contractType ?? null;
     if (input.attachments !== undefined) patch.attachments = input.attachments as never;
 
     if (input.status !== undefined && input.status !== existing.status) {
       assertTransition(existing.status, input.status, TASK_TRANSITIONS, "tarefa");
       patch.status = input.status;
     }
-    return tasksRepository.update(id, patch);
+    const updated = await tasksRepository.update(id, patch);
+    if (updated && input.tagSlugs) {
+      const tags = await tagsRepository.ensureTagsBySlugs(input.tagSlugs);
+      await tagsRepository.setTaskTags(id, tags.map((t) => t.id));
+    }
+    return updated;
   },
 
   // ── Propostas ────────────────────────────────────────────────────
@@ -141,6 +168,9 @@ async listTasks(query: TaskListQuery) {
     if (taskRow.requesterUserId === user.id) throw new AppError(403, "OWN_TASK", "Não podes propor na tua própria tarefa");
     if (taskRow.status !== "open" && taskRow.status !== "in_review") {
       throw new AppError(409, "TASK_CLOSED", "Tarefa não está a aceitar propostas");
+    }
+    if (taskRow.proposalDeadlineAt && new Date(taskRow.proposalDeadlineAt).getTime() < Date.now()) {
+      throw new AppError(409, "PROPOSALS_CLOSED", "O prazo para propostas desta tarefa já terminou");
     }
     const profileIds = await tasksRepository.getUserProfileIds(user.id);
     if (!profileIds.includes(input.providerProfileId)) {

@@ -1,5 +1,6 @@
 import { billingRepository, type PlanRow } from "../repositories/billing.repository.js";
 import { AppError } from "../lib/errors.js";
+import { getOrgRole } from "@workdeal/auth";
 import type { CancelSubscriptionInput, ChangeSubscriptionPlanInput, AdminUpdateSubscriptionStatusInput, PlanCreateInput, PlanFeatureUpsertInput, PlanUpdateInput } from "@workdeal/shared";
 
 class BillingService {
@@ -224,6 +225,81 @@ class BillingService {
       pausedAt: null,
       resumeAt: null,
     });
+  }
+
+  // ── Portais tenant (dashboard web/mobile) ──────────────────────────────
+  // O ownership é verificado sempre: só membros (org) ou o próprio utilizador
+  // (pessoal) podem ler/alterar a subscrição.
+
+  // Catálogo público de planos — activos e isPublic, com features resolvidas
+  // (próprias + herança). Sem auth; usado pela página de planos e checkout.
+  async listPublicPlans() {
+    const plans = await billingRepository.listPublicPlans();
+    return Promise.all(
+      plans.map(async (p) => ({
+        ...p,
+        features: await this.resolveOwnAndInheritedFeatureKeys(p.id),
+      })),
+    );
+  }
+
+  /**
+   * Subscrição actual de um utilizador num âmbito (org ou pessoal), com o
+   * plano e as features resolvidas. Lança 403 se o utilizador não for membro
+   * da organização; 404 se não existir subscrição.
+   */
+  async getMySubscription(userId: string, organizationId: string | null) {
+    const sub = await this.requireOwnedSubscription(userId, organizationId);
+    const plan = await billingRepository.findPlanById(sub.planId);
+    return {
+      subscription: sub,
+      plan: plan ?? null,
+      features: plan ? await this.resolveOwnAndInheritedFeatureKeys(plan.id) : [],
+    };
+  }
+
+  async changeMySubscriptionPlan(userId: string, organizationId: string | null, input: ChangeSubscriptionPlanInput) {
+    const sub = await this.requireOwnedSubscription(userId, organizationId);
+    if (["cancelled", "expired"].includes(sub.status)) {
+      throw new AppError(409, "ALREADY_CANCELLED", "Subscrição cancelada ou expirada — renove para mudar de plano");
+    }
+    if (sub.planId === input.planId) return sub;
+
+    const plan = await billingRepository.findPlanById(input.planId);
+    if (!plan || !plan.isActive || !plan.isPublic) {
+      throw new AppError(404, "NOT_FOUND", "Plano não disponível");
+    }
+    return billingRepository.updateSubscription(sub.id, { planId: input.planId });
+  }
+
+  async cancelMySubscription(userId: string, organizationId: string | null, input: CancelSubscriptionInput) {
+    const sub = await this.requireOwnedSubscription(userId, organizationId);
+    return this.cancelSubscription(sub.id, { atPeriodEnd: input.atPeriodEnd, reason: input.reason });
+  }
+
+  async pauseMySubscription(userId: string, organizationId: string | null, input: { resumeAt?: Date | null }) {
+    const sub = await this.requireOwnedSubscription(userId, organizationId);
+    return this.pauseSubscription(sub.id, input.resumeAt ?? null);
+  }
+
+  async resumeMySubscription(userId: string, organizationId: string | null) {
+    const sub = await this.requireOwnedSubscription(userId, organizationId);
+    return this.resumeSubscription(sub.id);
+  }
+
+  /** Busca a subscrição do âmbito e confirma que o utilizador a pode gerir. */
+  private async requireOwnedSubscription(userId: string, organizationId: string | null) {
+    if (organizationId) {
+      const role = await getOrgRole(userId, organizationId);
+      if (!role) {
+        throw new AppError(403, "FORBIDDEN", "Sem acesso à subscrição desta organização");
+      }
+    }
+    const sub = await billingRepository.findSubscriptionForScope(userId, organizationId);
+    if (!sub) {
+      throw new AppError(404, "NOT_FOUND", "Subscrição não encontrada para este âmbito");
+    }
+    return sub;
   }
 }
 

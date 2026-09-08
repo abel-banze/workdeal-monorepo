@@ -12,7 +12,7 @@ export default async function OrgDashboardPage({
   params: Promise<{ organizationId: string }>
 }) {
   const { organizationId } = await params
-  if (organizationId === "personal") redirect("/dashboard")
+  if (organizationId === "personal") redirect("/dashboard/personal")
 
   const session = await requireAuth()
   const role = await getOrgRole(session.user.id, organizationId)
@@ -22,7 +22,9 @@ export default async function OrgDashboardPage({
   let orgSlug: string | undefined
   let orgVerified = false
   let profileName: string | undefined
+  let profileSlug: string | undefined
   let profileId: string | null = null
+  let isProfilePublished = false
   type QualificationView = {
     companySize: string
     workers: number
@@ -42,29 +44,19 @@ export default async function OrgDashboardPage({
     orgVerified = org?.verificationStatus === "verified"
   } catch {}
 
+  // Resolução directa por organização — o slug do perfil pode divergir do
+  // slug da organização (rename, pré-registo, sufixo de unicidade).
   try {
-    if (orgSlug) {
-      const { apiFetch } = await import("@/lib/api")
-      const pRes = await apiFetch<{ id: string; name: string; slug: string } | null>(`/api/v1/profiles/${orgSlug}`, { cache: "no-store" })
-      const pData = pRes.data
-      if (pData?.id) {
-        profileName = pData.name
-        profileId = pData.id
-      }
+    const { apiFetch } = await import("@/lib/api")
+    const pRes = await apiFetch<{ id: string; name: string; slug: string; status: string } | null>(`/api/v1/profiles/by-organization/${organizationId}`, { cache: "no-store" })
+    const pData = pRes.data
+    if (pData?.id) {
+      profileName = pData.name
+      profileSlug = pData.slug
+      profileId = pData.id
+      isProfilePublished = pData.status === "active"
     }
   } catch {}
-  if (!profileId && orgSlug) {
-    try {
-      const { apiFetch } = await import("@/lib/api")
-      const listRes = await apiFetch<{ items: { id: string; name: string; slug: string }[] }>("/api/v1/profiles?limit=50", { cache: "no-store" })
-      const items = listRes.data?.items ?? []
-      const found = items.find((it) => it.slug === orgSlug)
-      if (found) {
-        profileName = found.name
-        profileId = found.id
-      }
-    } catch {}
-  }
 
   try {
     const { apiFetch } = await import("@/lib/api")
@@ -205,7 +197,7 @@ export default async function OrgDashboardPage({
                     Editar perfil da empresa
                   </Link>
                   <Link
-                    href={orgSlug ? `/profiles/${orgSlug}` : "/companies"}
+                    href={profileSlug ? `/profiles/${profileSlug}` : orgSlug ? `/profiles/${orgSlug}` : "/companies"}
                     className="inline-flex h-8 items-center justify-center rounded-full border border-[#D9D2C2] bg-white px-4 text-xs font-semibold text-[#0F1A2E] hover:border-[#0F1A2E]"
                   >
                     Ver no directório
@@ -257,10 +249,10 @@ export default async function OrgDashboardPage({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-[18px] border border-[#D9D2C2] bg-white p-4">
           <p className="text-[11px] font-bold tracking-[0.1em] text-[#0F1A2E]/50">VISIBILIDADE</p>
-          <p className="mt-2 text-sm font-bold text-[#0F1A2E]">{profileName ? "Publicada no directório" : "Rascunho — não listada"}</p>
-          <p className="mt-1 text-xs text-[#0F1A2E]/55">{profileName ? "Aparece em pesquisas e mapa." : "Completa perfil para ser encontrada."}</p>
+          <p className="mt-2 text-sm font-bold text-[#0F1A2E]">{isProfilePublished ? "Publicada no directório" : "Rascunho — não listada"}</p>
+          <p className="mt-1 text-xs text-[#0F1A2E]/55">{isProfilePublished ? "Aparece em pesquisas e mapa." : "Completa perfil para ser encontrada."}</p>
           <div className="mt-3 h-1.5 rounded-full bg-[#F6F3EE] overflow-hidden flex">
-            <div className="bg-[#0B5E56]" style={{ width: profileName ? "92%" : "18%" }} />
+            <div className="bg-[#0B5E56]" style={{ width: isProfilePublished ? "92%" : "18%" }} />
           </div>
         </div>
         <div className="rounded-[18px] border border-[#D9D2C2] bg-[#0F1A2E] p-4 text-white">

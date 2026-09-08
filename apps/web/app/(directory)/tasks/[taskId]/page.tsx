@@ -5,7 +5,7 @@ import { getPublicTask } from "@/lib/directory";
 import { getCategories } from "@/lib/profiles";
 import { getServerSession } from "@/lib/auth";
 import { formatMzn, formatDeadline, formatFull } from "@/lib/dates";
-import { TASK_STATUS_LABELS_PT } from "@workdeal/shared";
+import { TASK_STATUS_LABELS_PT, TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared";
 import { TaskProposalForm } from "@/components/features/task-proposal-form";
 
 export const revalidate = 0;
@@ -43,7 +43,8 @@ export default async function PublicTaskPage({ params }: Props) {
   const cats = (catsRes as { data: { id: string; name: string }[] }).data;
   const categoryName = task.categoryId ? cats.find((c) => c.id === task.categoryId)?.name ?? null : null;
 
-  const proposable = task.status === "open" || task.status === "in_review";
+  const deadlinePassed = task.proposalDeadlineAt ? new Date(task.proposalDeadlineAt).getTime() < Date.now() : false;
+  const proposable = (task.status === "open" || task.status === "in_review") && !deadlinePassed;
 
   return (
     <div className="bg-[#F6F3EE]">
@@ -62,16 +63,26 @@ export default async function PublicTaskPage({ params }: Props) {
 
         <div className="mt-6 grid gap-8 lg:grid-cols-[1.6fr_1fr] lg:items-start">
           <article className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#0F1A2E] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
-                {TASK_STATUS_LABELS_PT[task.status]}
-              </span>
-              {categoryName ? (
-                <span className="rounded-full border border-[#D9D2C2] bg-white px-3 py-1 text-[11px] font-medium text-[#0F1A2E]/70">
-                  {categoryName}
+<div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-[#0F1A2E] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
+                  {TASK_STATUS_LABELS_PT[task.status]}
                 </span>
-              ) : null}
-            </div>
+                {categoryName ? (
+                  <span className="rounded-full border border-[#D9D2C2] bg-white px-3 py-1 text-[11px] font-medium text-[#0F1A2E]/70">
+                    {categoryName}
+                  </span>
+                ) : null}
+                {task.contractType ? (
+                  <span className="rounded-full border border-[#0B5E56]/25 bg-[#0B5E56]/5 px-3 py-1 text-[11px] font-semibold text-[#0B5E56]">
+                    {TASK_CONTRACT_TYPE_LABELS_PT[task.contractType]}
+                  </span>
+                ) : null}
+                {task.tags.map((t) => (
+                  <span key={t.id} className="rounded-full border border-[#D9D2C2] bg-white px-3 py-1 text-[11px] font-medium text-[#0F1A2E]/65">
+                    {t.name}
+                  </span>
+                ))}
+              </div>
 
             <h1
               className="mt-4 text-[34px] font-black leading-[0.95] tracking-[-0.04em] text-[#0F1A2E] sm:text-[44px]"
@@ -112,13 +123,20 @@ export default async function PublicTaskPage({ params }: Props) {
               <p className="mt-1 text-[13px] leading-relaxed text-[#0F1A2E]/60">
                 {proposable
                   ? "Envie a sua proposta directamente ao solicitante — sem intermediários."
-                  : `Esta tarefa está com o estado "${TASK_STATUS_LABELS_PT[task.status]}".`}
+                  : deadlinePassed
+                    ? `O prazo para propostas terminou em ${task.proposalDeadlineAt ? formatDeadline(task.proposalDeadlineAt) : ""}.`
+                    : `Esta tarefa está com o estado "${TASK_STATUS_LABELS_PT[task.status]}".`}
               </p>
+              {task.proposalDeadlineAt && proposable && (
+                <p className="mt-2 text-[11px] font-semibold text-[#0B5E56]">
+                  Propostas até {formatDeadline(task.proposalDeadlineAt)}
+                </p>
+              )}
 
               <div className="mt-4">
                 {!proposable ? (
                   <div className="rounded-2xl border border-[#D9D2C2] bg-[#F6F3EE] px-5 py-4 text-center text-sm font-bold text-[#0F1A2E]/50">
-                    Requisição {TASK_STATUS_LABELS_PT[task.status].toLowerCase()}
+                    {deadlinePassed ? "Propostas encerradas" : `Requisição ${TASK_STATUS_LABELS_PT[task.status].toLowerCase()}`}
                   </div>
                 ) : !session ? (
                   <div className="space-y-2">

@@ -55,4 +55,9 @@ export const profilesController = {
     const profile = await profilesService.getMyProfile(user);
     return { body: ok(profile), status: 200 as const };
   },
+
+  async getByOrganization(user: AuthUser, organizationId: string) {
+    const profile = await profilesService.getOrganizationProfile(user, organizationId);
+    return { body: ok(profile), status: 200 as const };
+  },
 };

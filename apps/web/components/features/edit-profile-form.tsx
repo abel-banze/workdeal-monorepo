@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { toast } from "sonner"
 import { Briefcase, Phone, FileText, Building2, Image as ImageIcon, Check, ChevronLeft, ChevronRight, Clock } from "lucide-react"
 import type { UpdateProfileInput } from "@workdeal/shared"
 import { updateProfile } from "@/app/actions/profiles"
@@ -117,8 +118,6 @@ export function EditProfileForm({
   const [coverUploading, setCoverUploading] = useState(false)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [step, setStep] = useState(0)
 
   // Verificação de contactos (igual ao onboarding)
@@ -134,7 +133,6 @@ export function EditProfileForm({
   const [emailOtp, setEmailOtp] = useState<string | null>(null)
   const [emailVerifiedAt, setEmailVerifiedAt] = useState<Date | null>(null)
   const [emailSending, setEmailSending] = useState(false)
-  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [timers, setTimers] = useState<Record<"whatsapp" | "phone" | "email", number | null>>({ whatsapp: null, phone: null, email: null })
   const [timerNow, setTimerNow] = useState(Date.now())
   const catAnchor = useComboboxAnchor()
@@ -216,11 +214,11 @@ export function EditProfileForm({
 
   async function handleFile(file: File, purpose: "logo" | "generic", onUrl: (url: string) => void, setPreview: (v: string | null) => void, setUploading: (v: boolean) => void) {
     if (!file.type.startsWith("image/")) {
-      setError("Apenas imagens são permitidas para logo/capa.")
+      toast.error("Apenas imagens são permitidas para logo/capa.")
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      setError("Imagem muito grande — máximo 5 MB.")
+      toast.error("Imagem muito grande — máximo 5 MB.")
       return
     }
     const local = URL.createObjectURL(file)
@@ -234,11 +232,11 @@ export function EditProfileForm({
       const res = await uploadFilesAction(fd)
       if (!res.ok) throw new Error(res.error)
       onUrl(res.file.url)
-      setSuccess(purpose === "logo" ? "Logótipo carregado." : "Capa carregada.")
+      toast.success(purpose === "logo" ? "Logótipo carregado." : "Capa carregada.")
     } catch (e) {
       setPreview(null)
       URL.revokeObjectURL(local)
-      setError(e instanceof Error ? e.message : "Falha ao carregar ficheiro")
+      toast.error(e instanceof Error ? e.message : "Falha ao carregar ficheiro")
     } finally {
       setUploading(false)
     }
@@ -261,69 +259,67 @@ export function EditProfileForm({
   }
 
   async function sendOtp(type: "whatsapp" | "phone" | "email") {
-    setMsg(null)
     if (type === "whatsapp") {
-      if (!whatsapp.trim()) { setError("Preencha o WhatsApp antes de enviar o código."); return }
-      setWhatsappSending(true); setError(null)
+      if (!whatsapp.trim()) { toast.error("Preencha o WhatsApp antes de enviar o código."); return }
+      setWhatsappSending(true)
       try {
         const { sendWhatsappOtp } = await import("@/app/actions/otp")
         const res = await sendWhatsappOtp({ whatsapp: whatsapp.trim() })
-        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar código." }); return }
-        setWhatsappOtp("sent"); setWhatsappInput(""); setMsg({ type: "success", text: "Código enviado! Verifica o teu WhatsApp." }); setTimers((p) => ({ ...p, whatsapp: Date.now() + 60_000 }))
-      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar WhatsApp" }) }
+        if (!res.ok) { toast.error(res.error ?? "Falha ao enviar código."); return }
+        setWhatsappOtp("sent"); setWhatsappInput(""); toast.success(res.dev ? "Modo dev: código WhatsApp na consola do servidor." : "Código enviado! Verifica o teu WhatsApp."); setTimers((p) => ({ ...p, whatsapp: Date.now() + 60_000 }))
+      } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao enviar WhatsApp") }
       finally { setWhatsappSending(false) }
       return
     }
     if (type === "phone") {
-      if (!phone.trim()) { setError("Preencha o telefone antes de enviar o código."); return }
-      setPhoneSending(true); setError(null)
+      if (!phone.trim()) { toast.error("Preencha o telefone antes de enviar o código."); return }
+      setPhoneSending(true)
       try {
         const { sendPhoneOtp } = await import("@/app/actions/otp")
         const res = await sendPhoneOtp({ phone: phone.trim() })
-        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar SMS." }); return }
-        setPhoneOtp("sent"); setPhoneInput(""); setMsg({ type: "success", text: "Código enviado! Verifica o teu SMS." }); setTimers((p) => ({ ...p, phone: Date.now() + 60_000 }))
-      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar SMS" }) }
+        if (!res.ok) { toast.error(res.error ?? "Falha ao enviar SMS."); return }
+        setPhoneOtp("sent"); setPhoneInput(""); toast.success(res.dev ? "Modo dev: código SMS na consola do servidor." : "Código enviado! Verifica o teu SMS."); setTimers((p) => ({ ...p, phone: Date.now() + 60_000 }))
+      } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao enviar SMS") }
       finally { setPhoneSending(false) }
       return
     }
-    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("Email inválido para enviar código."); return }
-    setEmailSending(true); setError(null)
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error("Email inválido para enviar código."); return }
+    setEmailSending(true)
     try {
       const { sendEmailOtp } = await import("@/app/actions/otp")
       const res = await sendEmailOtp({ email: email.trim() })
-      if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar email." }); return }
-      setEmailOtp("sent"); setEmailInput(""); setMsg({ type: "success", text: "Código enviado! Verifica o teu email." }); setTimers((p) => ({ ...p, email: Date.now() + 60_000 }))
-    } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar email" }) }
+      if (!res.ok) { toast.error(res.error ?? "Falha ao enviar email."); return }
+      setEmailOtp("sent"); setEmailInput(""); toast.success(res.dev ? "Modo dev: código de email na consola do servidor." : "Código enviado! Verifica o teu email."); setTimers((p) => ({ ...p, email: Date.now() + 60_000 }))
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao enviar email") }
     finally { setEmailSending(false) }
   }
 
   async function verifyOtp(type: "whatsapp" | "phone" | "email") {
-    setMsg(null)
     if (type === "whatsapp") {
       try {
         const { verifyWhatsappOtp } = await import("@/app/actions/otp")
         const res = await verifyWhatsappOtp({ whatsapp: whatsapp.trim(), code: whatsappInput.trim() })
-        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Código incorreto." }); return }
-        setWhatsappVerifiedAt(new Date()); setWhatsappOtp(null); setTimers((p) => ({ ...p, whatsapp: null })); setMsg({ type: "success", text: "WhatsApp verificado!" })
-      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar" }) }
+        if (!res.ok) { toast.error(res.error ?? "Código incorreto."); return }
+        setWhatsappVerifiedAt(new Date()); setWhatsappOtp(null); setTimers((p) => ({ ...p, whatsapp: null })); toast.success("WhatsApp verificado!")
+      } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao verificar") }
       return
     }
     if (type === "phone") {
-      if (!phoneInput || phoneInput.length < 6) { setMsg({ type: "error", text: "Introduz os 6 dígitos." }); return }
+      if (!phoneInput || phoneInput.length < 6) { toast.error("Introduz os 6 dígitos."); return }
       try {
         const { verifyPhoneOtp } = await import("@/app/actions/otp")
         const res = await verifyPhoneOtp({ phone: phone.trim(), code: phoneInput.trim() })
-        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Código incorreto." }); return }
-        setPhoneVerifiedAt(new Date()); setPhoneOtp(null); setTimers((p) => ({ ...p, phone: null })); setMsg({ type: "success", text: "Telefone verificado!" })
-      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar" }) }
+        if (!res.ok) { toast.error(res.error ?? "Código incorreto."); return }
+        setPhoneVerifiedAt(new Date()); setPhoneOtp(null); setTimers((p) => ({ ...p, phone: null })); toast.success("Telefone verificado!")
+      } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao verificar") }
       return
     }
     try {
       const { verifyEmailOtp } = await import("@/app/actions/otp")
       const res = await verifyEmailOtp({ email: email.trim(), code: emailInput.trim() })
-      if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Código incorreto." }); return }
-      setEmailVerifiedAt(new Date()); setEmailOtp(null); setTimers((p) => ({ ...p, email: null })); setMsg({ type: "success", text: "Email verificado!" })
-    } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar" }) }
+      if (!res.ok) { toast.error(res.error ?? "Código incorreto."); return }
+      setEmailVerifiedAt(new Date()); setEmailOtp(null); setTimers((p) => ({ ...p, email: null })); toast.success("Email verificado!")
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao verificar") }
   }
 
   // Valida o passo actual; devolve mensagem de erro ou null se válido.
@@ -357,10 +353,9 @@ export function EditProfileForm({
   }
 
   function goNext() {
-    setError(null)
     const invalid = validateStep(step)
     if (invalid) {
-      setError(invalid)
+      toast.error(invalid)
       return
     }
     setStep((s) => Math.min(s + 1, totalSteps - 1))
@@ -368,14 +363,12 @@ export function EditProfileForm({
   }
 
   function goBack() {
-    setError(null)
     setStep((s) => Math.max(s - 1, 0))
   }
 
   function goTo(target: number) {
     // Só deixa saltar para passos já visitados (≤ actual) — os futuros exigem validação em ordem.
     if (target < step) {
-      setError(null)
       setStep(target)
       return
     }
@@ -383,21 +376,19 @@ export function EditProfileForm({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null)
-    setSuccess(null)
 
     const invalid = validateStep(step)
     if (invalid) {
-      setError(invalid)
+      toast.error(invalid)
       return
     }
 
     if (!name.trim() || name.trim().length < 2) {
-      setError("Nome deve ter pelo menos 2 caracteres")
+      toast.error("Nome deve ter pelo menos 2 caracteres")
       return
     }
     if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug.trim())) {
-      setError("Slug inválido: apenas minúsculas, números e hífens")
+      toast.error("Slug inválido: apenas minúsculas, números e hífens")
       return
     }
 
@@ -461,7 +452,7 @@ export function EditProfileForm({
       }
 
       if (!hasProfileChanges && !hasQualChanges && !tagChanged) {
-        setSuccess("Nenhuma alteração para guardar.")
+        toast.success("Nenhuma alteração para guardar.")
         setLoading(false)
         return
       }
@@ -496,13 +487,13 @@ export function EditProfileForm({
         await setProfileTags({ profileId: initialProfile.id, tagSlugs: selectedTags.slice(0, 10), organizationId })
       }
 
-      setSuccess("Perfil actualizado com sucesso.")
+      toast.success("Perfil actualizado com sucesso.")
       if (updatedSlug) {
         router.push(`/profiles/${updatedSlug}`)
       }
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao actualizar perfil")
+      toast.error(err instanceof Error ? err.message : "Falha ao actualizar perfil")
     } finally {
       setLoading(false)
     }
@@ -598,11 +589,6 @@ export function EditProfileForm({
           {/* PASSO 2 — Contactos (com verificação OTP igual ao onboarding) */}
           {step === 1 && (
             <div className="space-y-5">
-              {msg && (
-                <div className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium ${msg.type === "success" ? "border border-[#0B5E56]/20 bg-[#0B5E56]/10 text-[#0B5E56]" : "border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 text-[#7A1A0A]"}`}>
-                  {msg.text}
-                </div>
-              )}
               {/* WhatsApp */}
               <div className="rounded-2xl border border-[#D9D2C2] bg-white p-4">
                 <label htmlFor="edit-whatsapp" className={labelCls}>WhatsApp</label>
@@ -689,7 +675,6 @@ export function EditProfileForm({
                 <Input id="website" type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." maxLength={255} />
               </div>
               {fieldErrors.contacts && (<p role="alert" className="rounded-xl border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 px-3.5 py-2.5 text-sm font-medium text-[#7A1A0A]">{fieldErrors.contacts}</p>)}
-              {msg && (<div className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium ${msg.type === "success" ? "border border-[#0B5E56]/20 bg-[#0B5E56]/10 text-[#0B5E56]" : "border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 text-[#7A1A0A]"}`}>{msg.text}</div>)}
             </div>
           )}
 
@@ -929,13 +914,6 @@ export function EditProfileForm({
                 <Input id="coverUrl" type="url" value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://... (ou carrega acima)" maxLength={512} />
               </div>
             </div>
-          )}
-
-          {error && <p className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
-          {success && (
-            <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-300">
-              {success}
-            </p>
           )}
 
           {/* Navegação */}

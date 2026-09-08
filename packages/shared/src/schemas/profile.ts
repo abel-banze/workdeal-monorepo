@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { emailSchema } from "./auth.js";
 import { businessHoursSchema } from "./business-hours.js";
+import { websiteSchema } from "../lib/website.js";
 
 export const profileTypeSchema = z.enum(["individual", "company", "institution"]);
 export const profileStatusSchema = z.enum(["draft", "active", "suspended"]);
@@ -21,7 +22,7 @@ export const contactFieldsSchema = {
   whatsapp: z.string().trim().max(32).nullable().optional(),
   phone: z.string().trim().max(32).nullable().optional(),
   email: emailSchema.nullable().optional(),
-  website: z.string().trim().url().max(255).nullable().optional(),
+  website: websiteSchema,
   googlePlaceId: z.string().trim().min(1).max(512).nullable().optional(),
   formattedAddress: z.string().trim().max(500).nullable().optional(),
   businessHours: z.union([businessHoursSchema, z.record(z.string(), z.unknown())]).nullable().optional(),

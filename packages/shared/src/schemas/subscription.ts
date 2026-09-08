@@ -231,6 +231,37 @@ export const subscriptionListQuerySchema = z.object({
 });
 export type SubscriptionListQuery = z.infer<typeof subscriptionListQuerySchema>;
 
+// ── Subscrição do utilizador (portais tenant: dashboard web/mobile) ─────
+// Pessoa ou empresa gerem a sua própria subscrição. `organizationId` opcional:
+// se ausente, o âmbito é pessoal (subscrição do utilizador sem organização).
+
+export const subscriptionScopeSchema = z.object({
+  organizationId: z.string().min(1).optional(),
+});
+export type SubscriptionScope = z.infer<typeof subscriptionScopeSchema>;
+
+export const changeMySubscriptionPlanSchema = z.object({
+  organizationId: z.string().min(1).optional(),
+  planId: z.string().min(1, "Plano obrigatório"),
+  prorate: z.boolean().default(true),
+});
+export type ChangeMySubscriptionPlanInput = z.infer<typeof changeMySubscriptionPlanSchema>;
+
+export const cancelMySubscriptionSchema = cancelSubscriptionSchema.extend({
+  organizationId: z.string().min(1).optional(),
+});
+export type CancelMySubscriptionInput = z.infer<typeof cancelMySubscriptionSchema>;
+
+export const pauseMySubscriptionSchema = pauseSubscriptionSchema.extend({
+  organizationId: z.string().min(1).optional(),
+});
+export type PauseMySubscriptionInput = z.infer<typeof pauseMySubscriptionSchema>;
+
+export const resumeMySubscriptionSchema = z.object({
+  organizationId: z.string().min(1).optional(),
+});
+export type ResumeMySubscriptionInput = z.infer<typeof resumeMySubscriptionSchema>;
+
 // Override administrativo do estado de uma subscrição (ex: extensão de trial,
 // reactivação de subscrição cancelada). Não altera o provider externo.
 export const adminUpdateSubscriptionStatusSchema = z.object({

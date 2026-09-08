@@ -307,6 +307,18 @@ export async function uploadPreRegisterLogo(file: File) {
   return res;
 }
 
+export async function uploadInstitutionImage(file: File, purpose: "logo" | "generic") {
+  const session = await requireSystemRole("moderator", "admin");
+  if (session.user.systemRole !== "admin") throw new Error("Só administradores podem carregar imagens");
+  if (!file) throw new Error("Selecciona um ficheiro de imagem");
+  const token = await getAuthToken();
+  const formData = new FormData();
+  formData.set("file", file);
+  formData.set("purpose", purpose);
+  const res = await apiUpload<UploadedFile>(`/api/v1/files/upload`, token, formData);
+  return res;
+}
+
 // --- Instituições / Organizações ---
 
 export async function listAdminInstitutions(query: {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { companySizeEnum, legalFormEnum } from "../lib/company-size.js";
+import { websiteSchema } from "../lib/website.js";
 
 export const companyQualificationSchema = z.object({
   workers: z.coerce.number().int().min(1).max(100000),
@@ -24,7 +25,7 @@ export const createCompanyProfileSchema = z.object({
     whatsapp: z.string().trim().min(6).max(32),
     phone: z.string().trim().max(32).nullable().optional(),
     email: z.string().trim().email().max(255).nullable().optional(),
-    website: z.string().trim().url().max(255).nullable().optional(),
+    website: websiteSchema,
     description: z.string().trim().max(5000).nullable().optional(),
     tagline: z.string().trim().max(160).nullable().optional(),
     province: z.string().trim().max(64).nullable().optional(),

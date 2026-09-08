@@ -42,6 +42,8 @@ tasksRoute.get("/", zValidator("query", taskListQuerySchema), async (c) => {
     priceMax: q.priceMax,
     categoryId: q.categoryId,
     province: q.province,
+    contractType: q.contractType,
+    tag: q.tag,
     page: q.page,
     limit: q.limit,
   });

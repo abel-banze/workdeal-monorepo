@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { createAdminInstitution, updateAdminInstitution } from "@/app/actions/admin";
+import { createAdminInstitution, updateAdminInstitution, uploadInstitutionImage } from "@/app/actions/admin";
+import { ImagePlusIcon, TrashIcon, LoaderCircleIcon } from "lucide-react";
 import {
   INSTITUTION_TYPES,
   institutionTypeLabels,
@@ -13,6 +15,14 @@ import {
   type InstitutionOperatingScope,
   type InstitutionType,
 } from "@workdeal/shared";
+
+interface PlaceSuggestion {
+  placeId: string;
+  mainText: string;
+  secondaryText: string;
+}
+
+const MAX_IMAGE_MB = 5;
 
 export interface InstitutionSocialLinks {
   facebook: string;
@@ -111,8 +121,107 @@ export function InstitutionForm({ mode, initial = {} }: InstitutionFormProps) {
     social: { ...EMPTY_SOCIAL, ...(initial.socialLinks ?? {}) },
     primaryContact: { ...EMPTY_CONTACT, ...(initial.primaryContact ?? {}) },
   });
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Logo/Capa — upload com pré-visualização
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+
+  function onDrop(e: React.DragEvent, purpose: "logo" | "generic") {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) void handleImageUpload(file, purpose, purpose === "logo" ? (url) => setState((s) => ({ ...s, logoUrl: url })) : (url) => setState((s) => ({ ...s, coverUrl: url })));
+  }
+
+  // Google Places — pesquisa de endereço
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([]);
+
+  async function handleImageUpload(file: File | undefined, purpose: "logo" | "generic", onUrl: (url: string) => void) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Apenas imagens são permitidas para logo/capa.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+      toast.error(`A imagem excede ${MAX_IMAGE_MB}MB. Comprime e tenta de novo.`);
+      return;
+    }
+    if (purpose === "logo") setLogoUploading(true);
+    else setCoverUploading(true);
+    try {
+      const res = await uploadInstitutionImage(file, purpose);
+      if (!res.success) {
+        toast.error(res.error?.message ?? "Falha ao carregar ficheiro");
+        return;
+      }
+      onUrl(res.data.url);
+      toast.success(purpose === "logo" ? "Logo carregado." : "Capa carregada.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao carregar ficheiro");
+    } finally {
+      setLogoUploading(false);
+      setCoverUploading(false);
+    }
+  }
+
+  async function searchPlaces(query: string) {
+    if (!query.trim() || query.trim().length < 3) {
+      setPlaceSuggestions([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/places/autocomplete?input=${encodeURIComponent(query.trim())}`);
+      const json = await res.json().catch(() => ({ success: false, data: [] }));
+      setPlaceSuggestions(json?.success ? (json.data as PlaceSuggestion[]).slice(0, 5) : []);
+    } catch {
+      setPlaceSuggestions([]);
+    }
+  }
+
+  function matchProvince(googleName: string | null): string {
+    if (!googleName) return "";
+    const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const g = norm(googleName.replace(/ province$/i, ""));
+    return PROVINCES.find((p) => norm(p) === g || g.includes(norm(p)) || norm(p).includes(g)) ?? "";
+  }
+
+  async function pickPlace(s: PlaceSuggestion) {
+    setPlaceSuggestions([]);
+    setPlaceQuery(s.secondaryText ? `${s.mainText} — ${s.secondaryText}` : s.mainText);
+    if (mode === "create") {
+      setState((prev) => ({ ...prev, address: s.secondaryText || s.mainText }));
+    }
+    try {
+      const res = await fetch(`/api/places/details/${encodeURIComponent(s.placeId)}`);
+      const json = await res.json().catch(() => ({ success: false, data: null }));
+      const d = json?.data as
+        | {
+            latitude?: number | null;
+            longitude?: number | null;
+            province?: string | null;
+            district?: string | null;
+            formattedAddress?: string | null;
+          }
+        | null
+        | undefined;
+      if (json?.success && d) {
+        const matchedProvince = matchProvince(d.province ?? null);
+        setState((prev) => ({
+          ...prev,
+          ...(d.latitude != null && Number.isFinite(d.latitude) ? { latitude: String(d.latitude) } : {}),
+          ...(d.longitude != null && Number.isFinite(d.longitude) ? { longitude: String(d.longitude) } : {}),
+          ...(matchedProvince ? { province: matchedProvince } : {}),
+          ...(d.district ? { district: d.district } : {}),
+          ...(d.formattedAddress && mode === "create" ? { address: d.formattedAddress } : {}),
+        }));
+      }
+    } catch {
+      // Sem detalhes (ex: rede) — o admin pode preencher província/cidade manualmente.
+    }
+  }
 
   function generateSlug(value: string) {
     return value
@@ -125,7 +234,6 @@ export function InstitutionForm({ mode, initial = {} }: InstitutionFormProps) {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setLoading(true);
     try {
       const socialLinksEntries = Object.entries(state.social).filter(([, v]) => v.trim());
@@ -170,16 +278,18 @@ export function InstitutionForm({ mode, initial = {} }: InstitutionFormProps) {
         input.slug = state.slug.trim() || generateSlug(state.name.trim());
         const res = await createAdminInstitution(input);
         if (!res.success) throw new Error(res.error?.message ?? "Falha ao criar instituição");
+        toast.success("Instituição criada com sucesso.");
         router.push("/dashboard/institutions");
         router.refresh();
       } else {
         const res = await updateAdminInstitution(initial.id!, input);
         if (!res.success) throw new Error(res.error?.message ?? "Falha ao actualizar instituição");
+        toast.success("Alterações guardadas.");
         router.push("/dashboard/institutions");
         router.refresh();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao guardar instituição");
+      toast.error(err instanceof Error ? err.message : "Falha ao guardar instituição");
     } finally {
       setLoading(false);
     }
@@ -305,12 +415,120 @@ export function InstitutionForm({ mode, initial = {} }: InstitutionFormProps) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <label htmlFor="logoUrl" className="text-sm font-medium">Logo (URL)</label>
-            <input id="logoUrl" value={state.logoUrl} onChange={set("logoUrl")} placeholder="https://…" className={INPUT_CLS} />
+            <span className="text-sm font-medium">Logo</span>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleImageUpload(f, "logo", (url) => setState((s) => ({ ...s, logoUrl: url })));
+                e.target.value = "";
+              }}
+            />
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Carregar logo da instituição"
+              onClick={() => logoInputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  logoInputRef.current?.click();
+                }
+              }}
+              onDrop={(e) => onDrop(e, "logo")}
+              onDragOver={(e) => e.preventDefault()}
+              className="flex min-h-[84px] w-full cursor-pointer items-center gap-3 rounded-md border border-dashed border-input px-3 py-2.5 transition hover:bg-accent/40"
+            >
+              <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[#D9D2C2] bg-[#F6F3EE]">
+                {state.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={state.logoUrl} alt="Pré-visualização do logo" className="size-full object-cover" />
+                ) : logoUploading ? (
+                  <LoaderCircleIcon className="size-5 animate-spin text-[#0F1A2E]/40" />
+                ) : (
+                  <ImagePlusIcon className="size-5 text-[#0F1A2E]/40" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1 text-sm">
+                {state.logoUrl ? (
+                  <p className="font-medium">Logo carregado</p>
+                ) : (
+                  <p className="font-medium">Arrasta o logo ou clica para escolher</p>
+                )}
+                <p className="text-xs text-muted-foreground">Imagem até {MAX_IMAGE_MB}MB · PNG, JPG ou SVG</p>
+              </div>
+              {state.logoUrl && (
+                <button
+                  type="button"
+                  aria-label="Remover logo"
+                  onClick={() => setState((s) => ({ ...s, logoUrl: "" }))}
+                  className="rounded-full border border-destructive/25 px-2.5 py-1 text-center text-xs text-destructive hover:bg-destructive/10"
+                >
+                  <TrashIcon className="size-4" />
+                </button>
+              )}
+            </div>
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="coverUrl" className="text-sm font-medium">Capa (URL)</label>
-            <input id="coverUrl" value={state.coverUrl} onChange={set("coverUrl")} placeholder="https://…" className={INPUT_CLS} />
+            <span className="text-sm font-medium">Capa</span>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleImageUpload(f, "generic", (url) => setState((s) => ({ ...s, coverUrl: url })));
+                e.target.value = "";
+              }}
+            />
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Carregar capa da instituição"
+              onClick={() => coverInputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  coverInputRef.current?.click();
+                }
+              }}
+              onDrop={(e) => onDrop(e, "generic")}
+              onDragOver={(e) => e.preventDefault()}
+              className="flex min-h-[84px] w-full cursor-pointer items-center gap-3 rounded-md border border-dashed border-input px-3 py-2.5 transition hover:bg-accent/40"
+            >
+              <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[#D9D2C2] bg-[#F6F3EE]">
+                {state.coverUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={state.coverUrl} alt="Pré-visualização da capa" className="size-full object-cover" />
+                ) : coverUploading ? (
+                  <LoaderCircleIcon className="size-5 animate-spin text-[#0F1A2E]/40" />
+                ) : (
+                  <ImagePlusIcon className="size-5 text-[#0F1A2E]/40" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1 text-sm">
+                {state.coverUrl ? (
+                  <p className="font-medium">Capa carregada</p>
+                ) : (
+                  <p className="font-medium">Arrasta a capa ou clica para escolher</p>
+                )}
+                <p className="text-xs text-muted-foreground">Imagem até {MAX_IMAGE_MB}MB · PNG, JPG ou SVG</p>
+              </div>
+              {state.coverUrl && (
+                <button
+                  type="button"
+                  aria-label="Remover capa"
+                  onClick={() => setState((s) => ({ ...s, coverUrl: "" }))}
+                  className="rounded-full border border-destructive/25 px-2.5 py-1 text-center text-xs text-destructive hover:bg-destructive/10"
+                >
+                  <TrashIcon className="size-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -384,6 +602,35 @@ export function InstitutionForm({ mode, initial = {} }: InstitutionFormProps) {
       {/* Localização */}
       <section className="space-y-4">
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#0B5E56]">Localização</p>
+        <div className="space-y-1.5">
+          <label htmlFor="placeQuery" className="text-sm font-medium">Pesquisar morada (Google Places)</label>
+          <input
+            id="placeQuery"
+            value={placeQuery}
+            onChange={(e) => {
+              setPlaceQuery(e.target.value);
+              void searchPlaces(e.target.value);
+            }}
+            placeholder="Pesquisa o endereço da instituição — preenche morada e coordenadas"
+            className={INPUT_CLS}
+          />
+          {placeSuggestions.length > 0 && (
+            <ul className="overflow-hidden rounded-md border border-input bg-background shadow-sm">
+              {placeSuggestions.map((s) => (
+                <li key={s.placeId}>
+                  <button
+                    type="button"
+                    onClick={() => pickPlace(s)}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                  >
+                    <span className="block font-medium">{s.mainText}</span>
+                    <span className="block text-xs text-muted-foreground">{s.secondaryText}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <label htmlFor="province" className="text-sm font-medium">Província</label>
@@ -417,11 +664,8 @@ export function InstitutionForm({ mode, initial = {} }: InstitutionFormProps) {
             <input id="longitude" value={state.longitude} onChange={set("longitude")} placeholder="32.5732" className={INPUT_CLS} />
           </div>
         </div>
+        <p className="text-xs text-muted-foreground">Ao escolher uma sugestão do Google Places, morada e coordenadas são preenchidas automaticamente. As coordenadas alimentam a pesquisa por proximidade.</p>
       </section>
-
-      {error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>
-      )}
 
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={loading}>

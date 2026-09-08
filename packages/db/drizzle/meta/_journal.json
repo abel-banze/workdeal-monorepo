@@ -267,6 +267,13 @@
       "when": 1788809498096,
       "tag": "0037_ambitious_nighthawk",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1788874503600,
+      "tag": "0038_omniscient_ravenous",
+      "breakpoints": true
     }
   ]
 }

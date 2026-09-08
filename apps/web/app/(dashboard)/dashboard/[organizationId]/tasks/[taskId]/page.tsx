@@ -2,7 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { getOrgRole } from "@workdeal/auth/repository"
-import { hasOrgPermission } from "@workdeal/shared"
+import { hasOrgPermission, TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared"
 import { ProposalReview } from "./proposal-review"
 
 type ProposalItem = {
@@ -46,6 +46,9 @@ type TaskDetail = {
   district: string | null
   address: string | null
   dueAt: string | null
+  proposalDeadlineAt: string | null
+  contractType: string | null
+  tags: { id: string; slug: string; name: string }[]
   status: string
   createdAt: string
 }
@@ -133,12 +136,27 @@ export default async function TaskDetailPage({
             {task.priceMinMzn != null ? `${task.priceMinMzn.toLocaleString("pt-MZ")} MZN` : "—"} – {task.priceMaxMzn != null ? `${task.priceMaxMzn.toLocaleString("pt-MZ")} MZN` : "—"}
           </span>
           {catName && <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 font-semibold text-[#0B5E56]">{catName}</span>}
+          {task.contractType && <span className="rounded-full border border-[#0B5E56]/25 bg-[#0B5E56]/5 px-2.5 py-1 font-semibold text-[#0B5E56]">{TASK_CONTRACT_TYPE_LABELS_PT[task.contractType as keyof typeof TASK_CONTRACT_TYPE_LABELS_PT] ?? task.contractType}</span>}
           {[task.province, task.district, task.address].filter(Boolean).join(" · ") && (
             <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[#0F1A2E]/70">📍 {[task.province, task.district, task.address].filter(Boolean).join(" · ")}</span>
           )}
           {task.dueAt && <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[#0F1A2E]/70">prazo {new Date(task.dueAt).toLocaleString("pt-MZ", { dateStyle: "short", timeStyle: "short" })}</span>}
+          {task.proposalDeadlineAt && (
+            <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[#0B5E56]/80">
+              propostas até {new Date(task.proposalDeadlineAt).toLocaleString("pt-MZ", { dateStyle: "short", timeStyle: "short" })}
+            </span>
+          )}
           <span className="rounded-full bg-[#0F1A2E] px-2.5 py-1 font-bold text-white">{task.status.replace("_", " ")}</span>
         </div>
+        {task.tags.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {task.tags.map((t) => (
+              <span key={t.id} className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-0.5 text-[11px] font-semibold text-[#0F1A2E]/60">
+                #{t.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && <p className="rounded-lg border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 px-3 py-2 text-xs text-[#7A1A0A]">{error}</p>}
