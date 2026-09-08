@@ -5,7 +5,7 @@ import { requireAuth } from "../middlewares/auth.middleware.js";
 import type { Env } from "../middlewares/auth.middleware.js";
 import { ok } from "../lib/api-response.js";
 import { tagsRepository } from "../repositories/tags.repository.js";
-import { profilesRepository } from "../repositories/profiles.repository.js";
+import { tasksRepository } from "../repositories/tasks.repository.js";
 import { getOrgRole } from "@workdeal/auth";
 import { hasOrgPermission } from "@workdeal/shared";
 
@@ -57,5 +57,35 @@ tagsRoute.post("/profile", requireAuth, zValidator("json", setTagsSchema), async
 tagsRoute.get("/profile/:profileId", async (c) => {
   const profileId = c.req.param("profileId");
   const rows = await tagsRepository.getProfileTags(profileId);
+  return c.json(ok(rows), 200);
+});
+
+const setTaskTagsSchema = z.object({
+  taskId: z.string().min(1),
+  tagSlugs: z.array(z.string().min(1).max(64)).max(20),
+  organizationId: z.string().min(1).nullable().optional(),
+});
+
+tagsRoute.post("/task", requireAuth, zValidator("json", setTaskTagsSchema), async (c) => {
+  const user = c.get("user");
+  const { taskId, tagSlugs, organizationId } = c.req.valid("json");
+  const taskRow = await tasksRepository.findById(taskId);
+  if (!taskRow) return c.json(ok(null), 404);
+  let allowed = taskRow.requesterUserId === user.id;
+  if (!allowed && (organizationId ?? taskRow.requesterOrganizationId)) {
+    const orgId = organizationId ?? taskRow.requesterOrganizationId;
+    const role = await getOrgRole(user.id, orgId!);
+    if (role && hasOrgPermission(role, "tasks:manage")) allowed = true;
+  }
+  if (!allowed) return c.json({ success: false, error: { code: "FORBIDDEN", message: "Sem permissão" } } as never, 403);
+
+  const tags = await tagsRepository.ensureTagsBySlugs(tagSlugs);
+  await tagsRepository.setTaskTags(taskId, tags.map((t) => t.id));
+  return c.json(ok(tags), 200);
+});
+
+tagsRoute.get("/task/:taskId", async (c) => {
+  const taskId = c.req.param("taskId");
+  const rows = await tagsRepository.getTaskTags(taskId);
   return c.json(ok(rows), 200);
 });

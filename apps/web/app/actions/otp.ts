@@ -30,7 +30,7 @@ const CV_COOKIE_NAME = "wd_verified_contacts";
 const CV_SECRET = process.env.BETTER_AUTH_SECRET ?? "";
 const CV_MAX_AGE_S = 24 * 60 * 60;
 
-type SendResult = { ok: boolean; error?: string; code?: string };
+type SendResult = { ok: boolean; error?: string; code?: string; dev?: boolean };
 
 function hashCode(code: string): string {
   return createHash("sha256").update(code).digest("hex");
@@ -60,7 +60,7 @@ async function issueCode(
     const elapsed = Date.now() - last.createdAt.getTime();
     if (elapsed < RESEND_COOLDOWN_MS) {
       const waitS = Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000);
-      return { ok: false, error: `Aguarda ${waitS}s antes de reenviar o código.` };
+      return { ok: false, code: "COOLDOWN", error: `Aguarda ${waitS}s antes de reenviar o código.` };
     }
   }
   // um só código activo por identificador
@@ -149,11 +149,11 @@ async function sendViaZernio(toDigits: string, code: string): Promise<SendResult
   const apiKey = process.env.ZERNIO_API_KEY;
   if (!accountId || !apiKey) {
     if (isProd()) {
-      return { ok: false, error: "Serviço WhatsApp não configurado — contacta o suporte Workdeal." };
+      return { ok: false, code: "UNCONFIGURED", error: "Serviço WhatsApp indisponível de momento — tenta por SMS ou email, ou contacta o suporte Workdeal." };
     }
     console.warn("[Zernio] variáveis em falta — mock dev");
     console.log(`[OTP Zernio mock] ${code} para +${toDigits}`);
-    return { ok: true };
+    return { ok: true, dev: true };
   }
 
   try {
@@ -178,19 +178,25 @@ async function sendViaZernio(toDigits: string, code: string): Promise<SendResult
     console.warn(`[Zernio] falha → ${error}`);
     if (!isProd()) {
       console.log(`[OTP Zernio mock fallback] ${code} para +${toDigits}`);
-      return { ok: true };
+      return { ok: true, dev: true };
     }
-    return { ok: false, error: "Falha ao enviar WhatsApp — tenta novamente em instantes." };
+    if (res.status === 429) {
+      return { ok: false, code: "PROVIDER_RATE_LIMITED", error: `O WhatsApp limitou o envio agora (erro ${res.status}) — aguarda um minuto e tenta de novo.` };
+    }
+    if (res.status >= 400 && res.status < 500) {
+      return { ok: false, code: "PROVIDER_REJECTED", error: `O WhatsApp rejeitou este número (erro ${res.status}) — confirma o número ou tenta por SMS/email.` };
+    }
+    return { ok: false, code: "PROVIDER_ERROR", error: `Falha ao enviar WhatsApp (erro ${res.status} no provider) — tenta novamente em instantes.` };
   } catch (e) {
     console.warn(`[Zernio] erro fetch ${e instanceof Error ? e.message : String(e)}`);
-    if (!isProd()) return { ok: true };
-    return { ok: false, error: "Falha ao enviar WhatsApp — tenta novamente em instantes." };
+    if (!isProd()) return { ok: true, dev: true };
+    return { ok: false, code: "PROVIDER_ERROR", error: "Sem ligação ao serviço WhatsApp — verifica a tua internet e tenta de novo." };
   }
 }
 
 export async function sendWhatsappOtp(input: { whatsapp: string }): Promise<SendResult> {
   const digits = normalizeMzPhone(input.whatsapp);
-  if (!digits) return { ok: false, error: "Número inválido. Use formato +258 82 000 0000 (moçambicano)." };
+  if (!digits) return { ok: false, code: "INVALID_NUMBER", error: "Número inválido. Use formato +258 82 000 0000 (moçambicano)." };
   const r = await issueCode("whatsapp", digits, newCode());
   if (!r.ok || !r.code) return r;
   return sendViaZernio(digits, r.code);
@@ -213,10 +219,10 @@ async function sendViaTurboSms(toE164: string, code: string): Promise<SendResult
   const token = process.env.SMS_USER_TOKEN;
   if (!token) {
     if (isProd()) {
-      return { ok: false, error: "Serviço SMS não configurado — contacta o suporte Workdeal." };
+      return { ok: false, code: "UNCONFIGURED", error: "Serviço SMS indisponível de momento — tenta por WhatsApp ou email, ou contacta o suporte Workdeal." };
     }
     console.warn("[SMS] SMS_USER_TOKEN em falta — mock dev");
-    return { ok: true };
+    return { ok: true, dev: true };
   }
   let url = urlRaw.replace(/\/+$/, "");
   if (!url.endsWith("/submit")) url = `${url}/submit`;
@@ -243,18 +249,21 @@ async function sendViaTurboSms(toE164: string, code: string): Promise<SendResult
       return { ok: true };
     }
     console.warn(`[SMS] falha ${url} → ${res.status} ${(data?.message ?? text).slice(0, 300)}`);
-    if (!isProd()) return { ok: true };
-    return { ok: false, error: "Falha ao enviar SMS — verifica o número ou usa WhatsApp/email." };
+    if (!isProd()) return { ok: true, dev: true };
+    if (res.status === 429) {
+      return { ok: false, code: "PROVIDER_RATE_LIMITED", error: `O SMS limitou o envio agora (erro ${res.status}) — aguarda um minuto e tenta de novo.` };
+    }
+    return { ok: false, code: "PROVIDER_ERROR", error: `Falha ao enviar SMS (erro ${res.status} no provider) — verifica o número ou usa WhatsApp/email.` };
   } catch (e) {
     console.warn(`[SMS] erro fetch ${e instanceof Error ? e.message : String(e)}`);
-    if (!isProd()) return { ok: true };
-    return { ok: false, error: "Falha ao enviar SMS — verifica o número ou usa WhatsApp/email." };
+    if (!isProd()) return { ok: true, dev: true };
+    return { ok: false, code: "PROVIDER_ERROR", error: "Sem ligação ao serviço SMS — verifica a tua internet e tenta de novo." };
   }
 }
 
 export async function sendPhoneOtp(input: { phone: string }): Promise<SendResult> {
   const digits = normalizeMzPhone(input.phone);
-  if (!digits) return { ok: false, error: "Número inválido. Use formato +258 82 000 0000 (moçambicano)." };
+  if (!digits) return { ok: false, code: "INVALID_NUMBER", error: "Número inválido. Use formato +258 82 000 0000 (moçambicano)." };
   const r = await issueCode("phone", digits, newCode());
   if (!r.ok || !r.code) return r;
   return sendViaTurboSms(`+${digits}`, r.code);
@@ -279,11 +288,11 @@ async function sendViaResend(to: string, code: string): Promise<SendResult> {
   const apiKey = rawKey && rawKey.startsWith("re_") ? rawKey : undefined;
   if (!apiKey) {
     if (isProd()) {
-      return { ok: false, error: "Serviço de email não configurado — contacta o suporte Workdeal." };
+      return { ok: false, code: "UNCONFIGURED", error: "Serviço de email indisponível de momento — tenta por WhatsApp ou SMS, ou contacta o suporte Workdeal." };
     }
     console.warn("[Email] RESEND_API_KEY em falta — mock dev");
     console.log(`[Email OTP mock] ${code} para ${to}`);
-    return { ok: true };
+    return { ok: true, dev: true };
   }
 
   try {
@@ -299,28 +308,28 @@ async function sendViaResend(to: string, code: string): Promise<SendResult> {
       const msg = (error as { message?: string })?.message || JSON.stringify(error).slice(0, 500);
       if (!isProd()) {
         console.log(`[Email OTP mock fallback] ${code} para ${to}`);
-        return { ok: true };
+        return { ok: true, dev: true };
       }
-      return { ok: false, error: `Falha ao enviar email: ${msg.slice(0, 150)}` };
+      return { ok: false, code: "PROVIDER_REJECTED", error: `O email foi rejeitado: ${msg.slice(0, 150)}` };
     }
     if (!data?.id) {
       console.error("[Email] Resend resposta sem id:", JSON.stringify(data).slice(0, 800));
-      if (!isProd()) return { ok: true };
-      return { ok: false, error: "Resposta do Resend sem id — verifique domínio verificado e API key" };
+      if (!isProd()) return { ok: true, dev: true };
+      return { ok: false, code: "PROVIDER_ERROR", error: "Resposta inválida do serviço de email — tenta novamente ou usa WhatsApp/SMS." };
     }
     console.log(`[Email] OTP enviado para ${to} (id: ${data.id})`);
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn(`[Email] erro send → ${msg}`);
-    if (!isProd()) return { ok: true };
-    return { ok: false, error: "Falha ao enviar email — tenta novamente ou usa WhatsApp/SMS." };
+    if (!isProd()) return { ok: true, dev: true };
+    return { ok: false, code: "PROVIDER_ERROR", error: "Falha ao enviar email — tenta novamente ou usa WhatsApp/SMS." };
   }
 }
 
 export async function sendEmailOtp(input: { email: string }): Promise<SendResult> {
   const id = contactIdentifier("email", input.email);
-  if (!id) return { ok: false, error: "Email inválido." };
+  if (!id) return { ok: false, code: "INVALID_NUMBER", error: "Email inválido." };
   const r = await issueCode("email", id, newCode());
   if (!r.ok || !r.code) return r;
   return sendViaResend(id, r.code);

@@ -16,6 +16,9 @@ export type TaskListItem = {
   province: string | null
   district: string | null
   dueAt: string | null
+  proposalDeadlineAt: string | null
+  contractType: string | null
+  tags: { id: string; slug: string; name: string }[]
   status: string
   proposalCount: number
   createdAt: string
@@ -53,10 +56,13 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
 
   let tasks: TaskListItem[] = []
   let categories: { id: string; name: string; slug: string }[] = []
+  let tags: { id: string; slug: string; name: string; category?: string | null }[] = []
   try {
     const { apiFetch } = await import("@/lib/api")
     const cats = await apiFetch<{ id: string; name: string; slug: string }[]>("/api/v1/categories", { cache: "no-store" }).catch(() => ({ data: [] } as never))
     categories = (cats.data ?? []) as typeof categories
+    const tagsRes = await apiFetch<{ id: string; slug: string; name: string; category?: string | null }[]>("/api/v1/tags", { cache: "no-store" }).catch(() => ({ data: [] } as never))
+    tags = (tagsRes.data ?? []) as typeof tags
     const params = new URLSearchParams({ limit: "50" })
     if (activeStatus !== "all") params.set("status", activeStatus)
     const tRes = await apiFetch<{ items?: TaskListItem[] }>(`/api/v1/tasks/my?${params.toString()}`, { cache: "no-store" }).catch(() => ({ data: null } as never))
@@ -100,6 +106,7 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
       <TasksManager
         initial={tasks}
         categories={categories}
+        tags={tags}
         canManage={canManage}
         requesterOrganizationId={isPersonal ? null : organizationId}
         organizationId={organizationId}

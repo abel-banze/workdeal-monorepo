@@ -853,6 +853,7 @@ export const analyticsEvent = pgTable(
 // ── Tasks / Pedidos de serviço ─────────────────────────────────────
 
 export const taskStatusEnum = pgEnum("task_status", ["open", "in_review", "in_progress", "completed", "cancelled", "withdrawn"]);
+export const taskContractTypeEnum = pgEnum("task_contract_type", ["service", "recurring", "consulting", "emergency", "project", "public_tender"]);
 export const proposalStatusEnum = pgEnum("proposal_status", ["submitted", "shortlisted", "rejected", "withdrawn", "accepted"]);
 export const bidStatusEnum = pgEnum("bid_status", ["awarded", "in_progress", "completed", "cancelled", "disputed"]);
 
@@ -879,7 +880,9 @@ export const task = pgTable(
     // PostGIS geography(Point,4326) — índice GIST task_geom_gist_idx via migração SQL
     geom: geographyPoint("geom"),
     dueAt: timestamp("due_at"),
+    proposalDeadlineAt: timestamp("proposal_deadline_at"),
     attachments: jsonb("attachments").$type<Array<{ fileId: string; url: string; name?: string }> | null>().default([]),
+    contractType: taskContractTypeEnum("contract_type"),
     status: taskStatusEnum("status").notNull().default("open"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -891,6 +894,20 @@ export const task = pgTable(
     index("task_geo_idx").on(table.latitude, table.longitude),
     index("task_geom_gist_idx").using("gist", table.geom),
   ],
+);
+
+export const taskTag = pgTable(
+  "task_tag",
+  {
+    taskId: text("task_id")
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => tag.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.taskId, table.tagId] }), index("task_tag_tag_idx").on(table.tagId)],
 );
 
 export const taskProposal = pgTable(

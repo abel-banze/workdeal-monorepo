@@ -3,9 +3,16 @@
 import { useState } from "react"
 import Link from "next/link"
 import { createTask, updateTask } from "@/app/actions/tasks"
+import { TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared"
 import type { TaskListItem } from "./page"
 
 const PROVINCES = ["Cidade de Maputo", "Matola", "Gaza", "Inhambane", "Sofala", "Manica", "Tete", "Zambézia", "Nampula", "Niassa", "Cabo Delgado"]
+
+type ContractType = "service" | "recurring" | "consulting" | "emergency" | "project" | "public_tender"
+type TagOption = { id: string; slug: string; name: string; category?: string | null }
+
+// Concursos públicos são criados pela equipa Workdeal, não no dashboard
+const CONTRACT_OPTIONS = (Object.keys(TASK_CONTRACT_TYPE_LABELS_PT) as ContractType[]).filter((k) => k !== "public_tender")
 
 type TaskStatus = "open" | "in_review" | "in_progress" | "completed" | "cancelled" | "withdrawn"
 
@@ -25,6 +32,7 @@ function fmtMzn(v: number | null): string {
 export function TasksManager({
   initial,
   categories,
+  tags,
   canManage,
   requesterOrganizationId,
   organizationId,
@@ -32,6 +40,7 @@ export function TasksManager({
 }: {
   initial: TaskListItem[]
   categories: { id: string; name: string }[]
+  tags: TagOption[]
   canManage: boolean
   requesterOrganizationId: string | null
   organizationId: string
@@ -46,15 +55,32 @@ export function TasksManager({
   type Form = {
     title: string
     categoryId: string
+    contractType: ContractType | ""
     province: string
     district: string
     priceMin: string
     priceMax: string
     dueAt: string
+    proposalDeadlineAt: string
+    tagSlugs: string[]
     description: string
   }
-  const emptyForm: Form = { title: "", categoryId: "", province: "", district: "", priceMin: "", priceMax: "", dueAt: "", description: "" }
+  const emptyForm: Form = { title: "", categoryId: "", contractType: "", province: "", district: "", priceMin: "", priceMax: "", dueAt: "", proposalDeadlineAt: "", tagSlugs: [], description: "" }
   const [form, setForm] = useState<Form>(emptyForm)
+
+  const tagGroups = tags.reduce<Record<string, TagOption[]>>((acc, t) => {
+    const cat = t.category?.trim() || "Outras"
+    ;(acc[cat] ??= []).push(t)
+    return acc
+  }, {})
+
+  function toggleTag(slug: string) {
+    setForm((f) => {
+      const has = f.tagSlugs.includes(slug)
+      const next = has ? f.tagSlugs.filter((s) => s !== slug) : f.tagSlugs.length >= 10 ? f.tagSlugs : [...f.tagSlugs, slug]
+      return { ...f, tagSlugs: next }
+    })
+  }
 
   function catName(id: string | null): string {
     if (!id) return ""
@@ -82,6 +108,11 @@ export function TasksManager({
         setError("Orçamento mínimo deve ser ≤ máximo")
         return
       }
+      const proposalDeadline = form.proposalDeadlineAt ? new Date(form.proposalDeadlineAt) : null
+      if (proposalDeadline && form.dueAt && new Date(form.dueAt) < proposalDeadline) {
+        setError("O prazo para propostas deve ser anterior ao prazo de execução")
+        return
+      }
       const res = (await createTask({
         requesterOrganizationId,
         categoryId: form.categoryId || null,
@@ -92,7 +123,10 @@ export function TasksManager({
         province: form.province || null,
         district: form.district.trim() || null,
         dueAt: form.dueAt ? new Date(form.dueAt) : null,
-      attachments: [],
+        proposalDeadlineAt: proposalDeadline,
+        contractType: form.contractType || null,
+        tagSlugs: form.tagSlugs,
+        attachments: [],
       })) as unknown as { data: TaskListItem }
       const created = res.data
       setTasks((prev) => [created, ...prev])
@@ -141,6 +175,14 @@ export function TasksManager({
                     </option>
                   ))}
                 </select>
+                <select value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value as ContractType })} className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]">
+                  <option value="">Tipo de contrato (opcional)</option>
+                  {CONTRACT_OPTIONS.map((k) => (
+                    <option key={k} value={k}>
+                      {TASK_CONTRACT_TYPE_LABELS_PT[k]}
+                    </option>
+                  ))}
+                </select>
                 <select value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]">
                   <option value="">Província (opcional)</option>
                   {PROVINCES.map((p) => (
@@ -152,8 +194,43 @@ export function TasksManager({
                 <input value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} placeholder="Distrito (opcional)" maxLength={80} className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
                 <input value={form.priceMin} onChange={(e) => setForm({ ...form, priceMin: e.target.value })} type="number" min={0} placeholder="Orçamento mín. (MZN)" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
                 <input value={form.priceMax} onChange={(e) => setForm({ ...form, priceMax: e.target.value })} type="number" min={0} placeholder="Orçamento máx. (MZN)" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
-                <input value={form.dueAt} onChange={(e) => setForm({ ...form, dueAt: e.target.value })} type="datetime-local" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
+                <input value={form.dueAt} onChange={(e) => setForm({ ...form, dueAt: e.target.value })} type="datetime-local" title="Prazo de execução da tarefa" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
+                <input value={form.proposalDeadlineAt} onChange={(e) => setForm({ ...form, proposalDeadlineAt: e.target.value })} type="datetime-local" title="Data limite para receber propostas" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
               </div>
+              {tags.length > 0 && (
+                <div className="rounded-lg border border-[#D9D2C2] bg-white p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-[#0F1A2E]">Área da tarefa / competências ({form.tagSlugs.length}/10)</p>
+                    {form.tagSlugs.length > 0 && (
+                      <button type="button" onClick={() => setForm({ ...form, tagSlugs: [] })} className="text-[11px] font-bold text-[#0B5E56] hover:underline">
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {Object.entries(tagGroups).map(([cat, items]) => (
+                      <div key={cat} className="flex flex-wrap items-center gap-1.5">
+                        <span className="w-24 shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[#0F1A2E]/40">{cat}</span>
+                        {items.map((t) => {
+                          const on = form.tagSlugs.includes(t.slug)
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => toggleTag(t.slug)}
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                                on ? "bg-[#0B5E56] text-white" : "border border-[#D9D2C2] bg-[#F6F3EE] text-[#0F1A2E]/70 hover:border-[#0B5E56] hover:text-[#0B5E56]"
+                              }`}
+                            >
+                              {t.name}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Descrição detalhada * (mín. 20 caracteres)" rows={4} className="w-full rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
               <div className="flex items-center gap-3">
                 <button type="submit" disabled={saving} className="rounded-full bg-[#0F1A2E] px-6 py-2.5 text-sm font-bold text-white hover:bg-black disabled:opacity-50">
@@ -182,9 +259,17 @@ export function TasksManager({
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-[15px] font-black leading-tight text-[#0F1A2E]">{t.title}</h3>
                     <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.label}</span>
+                    {t.contractType && (
+                      <span className="rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-0.5 text-[11px] font-semibold text-[#0F1A2E]/70">
+                        {TASK_CONTRACT_TYPE_LABELS_PT[t.contractType as ContractType] ?? t.contractType}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-[#0F1A2E]/55">
                     {[t.province, t.district].filter(Boolean).join(" · ") || "Local a combinar"} · criada {new Date(t.createdAt).toLocaleDateString("pt-MZ")}
+                    {t.proposalDeadlineAt && (
+                      <> · propostas até {new Date(t.proposalDeadlineAt).toLocaleString("pt-MZ", { dateStyle: "short", timeStyle: "short" })}</>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
@@ -194,6 +279,16 @@ export function TasksManager({
               </div>
 
               {catName(t.categoryId) && <p className="mt-2 text-xs font-semibold text-[#0B5E56]">{catName(t.categoryId)}</p>}
+
+              {canManage && (t.tags ?? []).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(t.tags ?? []).map((tag) => (
+                    <span key={tag.id} className="rounded-full border border-[#D9D2C2] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0F1A2E]/60">
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-[#0F1A2E]/60">{t.description}</p>
 

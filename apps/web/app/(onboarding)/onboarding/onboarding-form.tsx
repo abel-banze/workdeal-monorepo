@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { requestVerification } from "@/app/actions/verifications";
 import { completeOnboardingAction } from "@/app/actions/onboarding";
 import { authClient } from "@/lib/auth-client";
-import { classifyCompanySize, sizeLabel, sizeDescription, normalizeBusinessHours, missingVerificationDocuments, verificationDocumentLabel } from "@workdeal/shared";
+import { classifyCompanySize, sizeLabel, sizeDescription, normalizeBusinessHours, normalizeWebsite, websiteHostname, missingVerificationDocuments, verificationDocumentLabel } from "@workdeal/shared";
 import type { BusinessHours, PlaceSuggestion, VerificationDocumentInput } from "@workdeal/shared";
 import type { LegalForm } from "@workdeal/shared/lib/company-size";
 import type { ContactChannel } from "@workdeal/shared/lib/phone";
@@ -447,7 +447,7 @@ export function OnboardingForm({
         if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar código." }); return; }
         setWhatsappOtp("sent");
         setWhatsappInput("");
-        setMsg({ type: "success", text: "Código enviado! Verifica o teu WhatsApp." });
+        setMsg(res.dev ? { type: "info", text: "Modo dev: WhatsApp não enviado — vê o código na consola do servidor." } : { type: "success", text: "Código enviado! Verifica o teu WhatsApp." });
         setTimers((prev) => ({ ...prev, whatsapp: Date.now() + 60_000 }));
       } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar WhatsApp" }); }
       finally { setWhatsappSending(false); }
@@ -463,7 +463,7 @@ export function OnboardingForm({
         if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar SMS." }); return; }
         setPhoneOtp("sent");
         setPhoneInput("");
-        setMsg({ type: "success", text: "Código enviado! Verifica o teu SMS." });
+        setMsg(res.dev ? { type: "info", text: "Modo dev: SMS não enviado — vê o código na consola do servidor." } : { type: "success", text: "Código enviado! Verifica o teu SMS." });
         setTimers((prev) => ({ ...prev, phone: Date.now() + 60_000 }));
       } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar SMS" }); }
       finally { setPhoneSending(false); }
@@ -478,7 +478,7 @@ export function OnboardingForm({
       if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar email." }); return; }
       setEmailOtp("sent");
       setEmailInput("");
-      setMsg({ type: "success", text: "Código enviado! Verifica o teu email." });
+      setMsg(res.dev ? { type: "info", text: "Modo dev: email não enviado — vê o código na consola do servidor." } : { type: "success", text: "Código enviado! Verifica o teu email." });
       setTimers((prev) => ({ ...prev, email: Date.now() + 60_000 }));
     } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar email" }); }
     finally { setEmailSending(false); }
@@ -488,6 +488,7 @@ export function OnboardingForm({
     setMsg(null);
     if (type === "whatsapp") {
       try {
+        if (!whatsappInput || whatsappInput.length < 6) { setMsg({ type: "error", text: "Introduz os 6 dígitos do código." }); return; }
         const { verifyWhatsappOtp } = await import("@/app/actions/otp");
         const res = await verifyWhatsappOtp({ whatsapp: whatsapp.trim(), code: whatsappInput.trim() });
         if (!res.ok) {
@@ -613,8 +614,8 @@ export function OnboardingForm({
     if (phone.trim() && !phoneVerifiedAt) errs.phone = "Verifica o telefone ou limpa o campo.";
 
     if (!province) errs.province = "Província obrigatória";
-    if (website.trim() && !/^https?:\/\/.+\..+/.test(website.trim())) {
-      errs.website = "Website deve ser um URL completo (ex: https://empresa.co.mz)";
+    if (website.trim() && !(websiteHostname(normalizeWebsite(website) ?? "")?.includes(".") ?? false)) {
+      errs.website = "Website inválido — ex: empresa.co.mz";
     }
     return errs;
   }
@@ -687,7 +688,7 @@ export function OnboardingForm({
           whatsapp: whatsapp.trim() ? whatsapp.trim() : undefined,
           phone: phone.trim() ? phone.trim() : undefined,
           email: email.trim() ? email.trim() : undefined,
-          website: website.trim() ? website.trim() : undefined,
+          website: normalizeWebsite(website) ?? undefined,
           description: description.trim() ? description.trim() : undefined,
           tagline: tagline.trim() ? tagline.trim() : undefined,
           ...(logoUrl ? { logoUrl } : {}),
@@ -1194,7 +1195,7 @@ export function OnboardingForm({
                       +258
                     </InputGroupText>
                   </InputGroupAddon>
-                  <InputGroupInput id="onb-whatsapp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="82 000 0001" aria-invalid={!!fieldErrors.whatsapp} className="h-full px-3 text-[13px] text-[#0F1A2E] placeholder:text-[#0F1A2E]/35" />
+                  <InputGroupInput id="onb-whatsapp" value={whatsapp} onChange={(e) => { setWhatsapp(e.target.value); if (whatsappOtp && !whatsappVerifiedAt) { setWhatsappOtp(null); setWhatsappInput(""); } }} placeholder="82 000 0001" aria-invalid={!!fieldErrors.whatsapp} className="h-full px-3 text-[13px] text-[#0F1A2E] placeholder:text-[#0F1A2E]/35" />
                 </InputGroup>
                 <button type="button" onClick={() => sendOtp("whatsapp")} disabled={whatsappSending || !!whatsappVerifiedAt} className="shrink-0 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-4 text-xs font-bold text-[#0F1A2E] transition hover:bg-white hover:border-[#0B5E56] disabled:opacity-40 disabled:hover:bg-[#F6F3EE] disabled:hover:border-[#D9D2C2]">
                   {whatsappVerifiedAt ? "✓" : whatsappSending ? (
@@ -1247,7 +1248,7 @@ export function OnboardingForm({
                       +258
                     </InputGroupText>
                   </InputGroupAddon>
-                  <InputGroupInput id="onb-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="84 000 0000" aria-invalid={!!fieldErrors.phone} className="h-full px-3 text-[13px] text-[#0F1A2E] placeholder:text-[#0F1A2E]/35" />
+                  <InputGroupInput id="onb-phone" value={phone} onChange={(e) => { setPhone(e.target.value); if (phoneOtp && !phoneVerifiedAt) { setPhoneOtp(null); setPhoneInput(""); } }} placeholder="84 000 0000" aria-invalid={!!fieldErrors.phone} className="h-full px-3 text-[13px] text-[#0F1A2E] placeholder:text-[#0F1A2E]/35" />
                 </InputGroup>
                 <button type="button" onClick={() => sendOtp("phone")} disabled={phoneSending || !!phoneVerifiedAt} className="shrink-0 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-4 text-xs font-bold text-[#0F1A2E] transition hover:bg-white hover:border-[#0B5E56] disabled:opacity-40 disabled:hover:bg-[#F6F3EE] disabled:hover:border-[#D9D2C2]">
                   {phoneVerifiedAt ? "✓" : phoneSending ? (
@@ -1293,7 +1294,7 @@ export function OnboardingForm({
             <div className="rounded-2xl border border-[#D9D2C2] bg-white p-4">
               <label htmlFor="onb-email" className={labelCls}>Email da empresa</label>
               <div className="mt-1.5 flex gap-2">
-                <Input id="onb-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="geral@empresa.co.mz" aria-invalid={!!fieldErrors.email} className="h-11 flex-1 rounded-lg border-[#D9D2C2] bg-[#F6F3EE] px-3 text-[13px] text-[#0F1A2E] placeholder:text-[#0F1A2E]/35 focus:border-[#0B5E56] focus:bg-white focus:ring-2 focus:ring-[#0B5E56]/15" />
+                <Input id="onb-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); if (emailOtp && !emailVerifiedAt) { setEmailOtp(null); setEmailInput(""); } }} placeholder="geral@empresa.co.mz" aria-invalid={!!fieldErrors.email} className="h-11 flex-1 rounded-lg border-[#D9D2C2] bg-[#F6F3EE] px-3 text-[13px] text-[#0F1A2E] placeholder:text-[#0F1A2E]/35 focus:border-[#0B5E56] focus:bg-white focus:ring-2 focus:ring-[#0B5E56]/15" />
                 <button type="button" onClick={() => sendOtp("email")} disabled={emailSending || !!emailVerifiedAt} className="shrink-0 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-4 text-xs font-bold text-[#0F1A2E] transition hover:bg-white hover:border-[#0B5E56] disabled:opacity-40 disabled:hover:bg-[#F6F3EE] disabled:hover:border-[#D9D2C2]">
                   {emailVerifiedAt ? "✓" : emailSending ? (
                     <span className="flex items-center gap-1.5"><span className="size-3 animate-spin rounded-full border-2 border-[#0F1A2E]/20 border-t-[#0F1A2E]" /> Enviar</span>

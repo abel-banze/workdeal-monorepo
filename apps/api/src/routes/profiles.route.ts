@@ -74,6 +74,14 @@ profilesRoute.get("/me", requireAuth, async (c) => {
   return c.json(body, status);
 });
 
+// Antes de /:slug — resolução directa por organização para o dashboard
+// (o slug do perfil pode divergir do slug da organização).
+profilesRoute.get("/by-organization/:organizationId", requireAuth, async (c) => {
+  const byOrg = await profilesController.getByOrganization(c.get("user"), c.req.param("organizationId"));
+  c.header("Cache-Control", "no-store");
+  return c.json(byOrg.body, byOrg.status);
+});
+
 profilesRoute.get("/:slug", rateLimit(publicLimiter), async (c) => {
   const { body, status } = await profilesController.getBySlug(c, c.req.param("slug"));
   c.header("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=600");

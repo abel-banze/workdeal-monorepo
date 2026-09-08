@@ -6,7 +6,7 @@ import { TeamManager } from "./team-manager"
 
 export default async function TeamPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await params
-  if (organizationId === "personal") redirect("/dashboard")
+  if (organizationId === "personal") redirect("/dashboard/personal")
   const session = await requireAuth()
   const role = await getOrgRole(session.user.id, organizationId)
   if (!role) notFound()

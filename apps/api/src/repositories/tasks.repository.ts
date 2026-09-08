@@ -1,6 +1,7 @@
-import { db, task, taskProposal, taskBid, profile, member, user } from "@workdeal/db";
+import { db, task, taskProposal, taskBid, taskTag, tag, profile, member, user } from "@workdeal/db";
 import { and, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { boundingBox } from "@workdeal/shared/lib/geo";
+import { tagsRepository } from "./tags.repository.js";
 
 type TaskStatus = (typeof task.status.enumValues)[number];
 type ProposalStatus = (typeof taskProposal.status.enumValues)[number];
@@ -50,7 +51,6 @@ type RequesterRow = { id: string; requesterUserId: string; requesterOrganization
 
 /** Quem pediu a tarefa: perfil da organização (se existir) → perfil pessoal → nome do utilizador. */
 async function enrichRequesterProfiles(rows: RequesterRow[]): Promise<Map<string, RequesterEnrichment>> {
-  const empty: RequesterEnrichment = { requesterProfileName: null, requesterProfileSlug: null, requesterProfileLogo: null };
   if (rows.length === 0) return new Map();
   const orgIds = [...new Set(rows.map((r) => r.requesterOrganizationId).filter((v): v is string => Boolean(v)))];
   const userIds = [...new Set(rows.map((r) => r.requesterUserId))];
@@ -107,6 +107,8 @@ export const taskColumns = {
   latitude: task.latitude,
   longitude: task.longitude,
   dueAt: task.dueAt,
+  proposalDeadlineAt: task.proposalDeadlineAt,
+  contractType: task.contractType,
   attachments: task.attachments,
   status: task.status,
   createdAt: task.createdAt,
@@ -121,12 +123,15 @@ function setGeomTxn(tx: { execute: (q: SQL) => Promise<unknown> }, table: typeof
 
 export const tasksRepository = {
   // ── Tarefas ──────────────────────────────────────────────────────
-  async create(data: typeof task.$inferInsert): Promise<TaskRow> {
+  async create(data: typeof task.$inferInsert, tagIds: string[] = []): Promise<TaskRow> {
     return db.transaction(async (tx) => {
       const [row] = await tx.insert(task).values(data).returning(taskColumns);
       if (!row) throw new Error("Falha ao criar tarefa");
       if (row.latitude != null && row.longitude != null) {
         await setGeomTxn(tx, task, row.id, row.latitude, row.longitude);
+      }
+      if (tagIds.length > 0) {
+        await tx.insert(taskTag).values(tagIds.map((tagId) => ({ taskId: row.id, tagId })));
       }
       return row;
     });
@@ -136,16 +141,27 @@ export const tasksRepository = {
     const [row] = await db.select(taskColumns).from(task).where(eq(task.id, id)).limit(1);
     if (!row) return null;
     const enriched = await enrichRequesterProfiles([row]);
-    return { ...row, ...enriched.get(row.id) } as TaskRow & RequesterEnrichment;
+    const tagMap = await tagsRepository.getTaskTagsForTasks([id]);
+    return { ...row, ...enriched.get(row.id), tags: tagMap.get(id) ?? [] } as TaskRow & RequesterEnrichment & { tags: { id: string; slug: string; name: string }[] };
   },
 
-  async list(params: { status?: string; title?: string; categoryId?: string; categoryIds?: string[]; district?: string; priceMin?: number; priceMax?: number; province?: string; near?: string; radiusKm?: number; page: number; limit: number }) {
+  async list(params: { status?: string; title?: string; categoryId?: string; categoryIds?: string[]; district?: string; priceMin?: number; priceMax?: number; province?: string; contractType?: string; tag?: string; near?: string; radiusKm?: number; page: number; limit: number }) {
     const conds: SQL[] = [];
     if (params.status) conds.push(eq(task.status, asTaskStatus(params.status)));
     if (params.title) conds.push(ilike(task.title, `%${params.title}%`));
     if (params.categoryId) conds.push(eq(task.categoryId, params.categoryId));
     if (params.categoryIds && params.categoryIds.length > 0) conds.push(inArray(task.categoryId, params.categoryIds));
     if (params.district) conds.push(ilike(task.district, `%${params.district}%`));
+    if (params.contractType) conds.push(eq(task.contractType, params.contractType as (typeof task.contractType.enumValues)[number]));
+    if (params.tag) {
+      conds.push(
+        sql`EXISTS (
+          SELECT 1 FROM ${taskTag} tt
+          INNER JOIN ${tag} t ON t.id = tt.tag_id
+          WHERE tt.task_id = ${task.id} AND t.slug = ${params.tag}
+        )`,
+      );
+    }
     if (params.priceMin != null) {
       const cond = or(and(isNotNull(task.priceMaxMzn), gte(task.priceMaxMzn, params.priceMin)), isNull(task.priceMaxMzn));
       if (cond) conds.push(cond);
@@ -183,11 +199,13 @@ export const tasksRepository = {
     const [cntRow] = await db.select({ cnt: count() }).from(task).where(where);
     const items = await db.select(listColumns).from(task).where(where).orderBy(orderBy).limit(params.limit).offset((params.page - 1) * params.limit);
     const enriched = await enrichRequesterProfiles(items);
+    const tagMap = await tagsRepository.getTaskTagsForTasks(items.map((i) => i.id));
     return {
       items: items.map((i) => ({
         ...i,
         ...(enriched.get(i.id) ?? { requesterProfileName: null, requesterProfileSlug: null, requesterProfileLogo: null }),
-      })) as (TaskRow & { distanceKm?: number | null } & RequesterEnrichment)[],
+        tags: tagMap.get(i.id) ?? [],
+      })) as (TaskRow & { distanceKm?: number | null } & RequesterEnrichment & { tags: { id: string; slug: string; name: string }[] })[],
       total: cntRow?.cnt ?? 0,
     };
   },
@@ -196,7 +214,9 @@ export const tasksRepository = {
     const where = status ? and(eq(task.requesterUserId, requesterUserId), eq(task.status, asTaskStatus(status))) : eq(task.requesterUserId, requesterUserId);
     const [cntRow] = await db.select({ cnt: count() }).from(task).where(where);
     const items = await db.select(taskColumns).from(task).where(where).orderBy(desc(task.createdAt)).limit(limit).offset((page - 1) * limit);
-    return { items, total: cntRow?.cnt ?? 0 };
+    const tagMap = await tagsRepository.getTaskTagsForTasks(items.map((i) => i.id));
+    const enriched = items.map((i) => ({ ...i, tags: tagMap.get(i.id) ?? [] }));
+    return { items: enriched as (TaskRow & { tags: { id: string; slug: string; name: string }[] })[], total: cntRow?.cnt ?? 0 };
   },
 
   async update(id: string, data: Partial<typeof task.$inferInsert>): Promise<TaskRow | null> {

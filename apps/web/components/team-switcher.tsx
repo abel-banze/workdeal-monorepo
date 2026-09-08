@@ -71,7 +71,7 @@ export function TeamSwitcher({
 
   function handleSelect(team: TeamSwitcherTeam) {
     if (team.type === "personal" || team.id === "personal") {
-      router.push("/dashboard")
+      router.push("/dashboard/personal")
     } else if (team.id) {
       router.push(`/dashboard/${team.id}`)
     }

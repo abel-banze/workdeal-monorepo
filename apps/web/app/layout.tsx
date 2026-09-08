@@ -3,6 +3,7 @@ import NextTopLoader from "nextjs-toploader"
 import { Analytics } from "@vercel/analytics/next"
 import "@workspace/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@workspace/ui/components/sonner"
 import { cn } from "@workspace/ui/lib/utils"
 import type { Metadata } from "next"
 
@@ -25,7 +26,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="pt-MZ" suppressHydrationWarning className={cn("antialiased", sora.variable, fontMono.variable, "font-sans", inter.variable)}>
       <body className="bg-[#F6F3EE] text-[#0F1A2E]">
         <NextTopLoader color="#0B5E56" height={3} showSpinner={false} shadow="0 0 10px rgba(11,94,86,0.35)" crawlSpeed={180} />
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <Toaster />
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

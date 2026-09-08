@@ -28,6 +28,7 @@
     "./lib/rate-limit": "./dist/lib/rate-limit.js",
     "./lib/company-size": "./dist/lib/company-size.js",
     "./lib/phone": "./dist/lib/phone.js",
+    "./lib/website": "./dist/lib/website.js",
     "./lib/contact-verification": "./dist/lib/contact-verification.js",
     "./lib/email-templates": "./dist/lib/email-templates.js",
     "./schemas/company": "./dist/schemas/company.js",

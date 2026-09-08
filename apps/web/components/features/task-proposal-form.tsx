@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { submitProposal } from "@/app/actions/tasks";
 
 export function TaskProposalForm({ taskId }: { taskId: string }) {
@@ -9,7 +10,6 @@ export function TaskProposalForm({ taskId }: { taskId: string }) {
   const [price, setPrice] = useState("");
   const [days, setDays] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -17,20 +17,20 @@ export function TaskProposalForm({ taskId }: { taskId: string }) {
     const priceMzn = price.trim() === "" ? null : Number(price);
     const estimatedDays = days.trim() === "" ? null : Number(days);
     if (priceMzn != null && (!Number.isFinite(priceMzn) || priceMzn < 0)) {
-      setError("Indica um valor válido (MZN).");
+      toast.error("Indica um valor válido (MZN).");
       return;
     }
     if (estimatedDays != null && (!Number.isFinite(estimatedDays) || estimatedDays < 1)) {
-      setError("Indica um número válido de dias.");
+      toast.error("Indica um número válido de dias.");
       return;
     }
     setBusy(true);
-    setError(null);
     try {
       await submitProposal({ taskId, message, priceMzn, estimatedDays });
+      toast.success("Proposta enviada com sucesso.");
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar a proposta.");
+      toast.error(err instanceof Error ? err.message : "Falha ao enviar a proposta.");
     } finally {
       setBusy(false);
     }
@@ -102,8 +102,6 @@ export function TaskProposalForm({ taskId }: { taskId: string }) {
           />
         </div>
       </div>
-
-      {error ? <p className="rounded-xl bg-[#FFF1EF] px-3 py-2 text-xs font-semibold text-[#FF3B1F]">{error}</p> : null}
 
       <button
         type="submit"

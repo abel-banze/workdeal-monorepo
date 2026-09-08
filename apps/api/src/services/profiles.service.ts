@@ -172,6 +172,21 @@ class ProfilesService {
     };
   }
 
+  async getOrganizationProfile(user: AuthUser, organizationId: string): Promise<ProfileView | null> {
+    // Resolução directa por organizationId — nunca adivinhar o slug do perfil
+    // a partir do slug da organização (podem divergir: rename, pré-registo,
+    // sufixo de unicidade). Usado pelo dashboard da organização.
+    const role = await getOrgRole(user.id, organizationId);
+    if (!role) {
+      throw new AppError(403, "FORBIDDEN", "Sem acesso a esta organização");
+    }
+    const row = await profilesRepository.findByOrganizationId(organizationId);
+    if (!row || row.deletedAt) return null;
+    const full = await profilesRepository.findBySlug(row.slug, { includeDeleted: false });
+    if (full) return this.toProfileView(full);
+    return this.toProfileView({ ...row, categories: [] } as unknown as ProfileWithCategories);
+  }
+
   async getMyProfile(user: AuthUser): Promise<ProfileView | null> {
     // Estritamente pessoal — tipo individual via userId. Perfis de empresa
     // são resolvidos apenas via organizationId no contexto [organizationId] (P0-1).
