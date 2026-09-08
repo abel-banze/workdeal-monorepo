@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, member, organization, profile, user } from "@workdeal/db";
 import type { AdminOrgListQuery } from "@workdeal/shared";
@@ -153,7 +153,6 @@ export const preRegisterRepository = {
     metadata: string | null;
     preRegisteredBy: string;
     completionToken: string;
-    completionTokenExpiresAt: Date;
   }) {
     const [row] = await db
       .insert(organization)
@@ -169,7 +168,6 @@ export const preRegisterRepository = {
         preRegisteredAt: new Date(),
         verificationStatus: "pre_registered" as never,
         completionToken: input.completionToken,
-        completionTokenExpiresAt: input.completionTokenExpiresAt,
       })
       .returning();
     if (!row) throw new Error("Falha ao criar empresa pré-registada");
@@ -305,10 +303,10 @@ export const preRegisterRepository = {
     return { ok: true, organizationId: org.id };
   },
 
-  async updateToken(id: string, token: string, expiresAt: Date) {
+  async updateToken(id: string, token: string) {
     await db
       .update(organization)
-      .set({ completionToken: token, completionTokenExpiresAt: expiresAt, updatedAt: new Date() })
+      .set({ completionToken: token, updatedAt: new Date() })
       .where(and(eq(organization.id, id), eq(organization.verificationStatus, "pre_registered" as never)));
   },
 
@@ -316,13 +314,7 @@ export const preRegisterRepository = {
     const [row] = await db
       .select()
       .from(organization)
-      .where(
-        and(
-          eq(organization.completionToken, token),
-          eq(organization.verificationStatus, "pre_registered" as never),
-          gt(organization.completionTokenExpiresAt, new Date()),
-        ),
-      )
+      .where(and(eq(organization.completionToken, token), eq(organization.verificationStatus, "pre_registered" as never)))
       .limit(1);
     return row ?? null;
   },

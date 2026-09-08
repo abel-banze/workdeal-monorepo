@@ -74,7 +74,7 @@ export const adminOrganizationsRepository = {
     };
   },
 
-  async updateStatus(id: string, verificationStatus: "pending" | "in_review" | "verified" | "suspended") {
+  async updateStatus(id: string, verificationStatus: "pending" | "in_review" | "verified" | "suspended" | "expired") {
     const verifiedAt = verificationStatus === "verified" ? new Date() : null;
     const [row] = await db
       .update(organization)

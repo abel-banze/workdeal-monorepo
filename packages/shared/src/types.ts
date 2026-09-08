@@ -4,13 +4,13 @@ export type SystemRole = (typeof SYSTEM_ROLES)[number];
 export const ORG_ROLES = ["owner", "admin", "editor", "member"] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
 
-export const VERIFICATION_STATUSES = ["pre_registered", "pending", "in_review", "verified", "suspended"] as const;
+export const VERIFICATION_STATUSES = ["pre_registered", "pending", "in_review", "verified", "suspended", "expired"] as const;
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 
 export const INVITATION_STATUSES = ["pending", "accepted", "rejected", "canceled"] as const;
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 
-export type ProfileType = "individual" | "company";
+export type ProfileType = "individual" | "company" | "institution";
 
 export interface AuthUser {
   id: string;

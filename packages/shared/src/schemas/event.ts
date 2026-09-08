@@ -4,12 +4,19 @@ import { z } from "zod";
 
 export const eventStatusSchema = z.enum(["draft", "published", "cancelled", "ended"]);
 export const eventRegistrationStatusSchema = z.enum(["registered", "cancelled", "checked_in"]);
+export const eventVisibilitySchema = z.enum(["public", "members_only", "private"]);
 
 export const EVENT_STATUS_LABELS_PT: Record<z.infer<typeof eventStatusSchema>, string> = {
   draft: "Rascunho",
   published: "Publicado",
   cancelled: "Cancelado",
   ended: "Concluído",
+};
+
+export const EVENT_VISIBILITY_LABELS_PT: Record<z.infer<typeof eventVisibilitySchema>, string> = {
+  public: "Público",
+  members_only: "Só para membros",
+  private: "Privado",
 };
 
 export const EVENT_REGISTRATION_STATUS_LABELS_PT: Record<z.infer<typeof eventRegistrationStatusSchema>, string> = {
@@ -35,6 +42,7 @@ const eventFormFields = z.object({
   longitude: z.number().min(-180).max(180).nullable().optional(),
   coverImage: z.string().trim().url("URL da imagem inválido").max(500).nullable().optional(),
   capacity: z.number().int().min(1).nullable().optional(),
+  visibility: eventVisibilitySchema.default("public"),
 });
 
 export const createEventSchema = eventFormFields.refine(
@@ -51,6 +59,7 @@ export const updateEventSchema = eventFormFields.partial().extend({
 
 export const eventListQuerySchema = z.object({
   status: eventStatusSchema.optional().default("published"),
+  visibility: eventVisibilitySchema.optional(),
   upcoming: z.coerce.boolean().optional(),
   q: z.string().trim().max(100).optional(),
   categoryId: z.string().min(1).optional(),
@@ -100,6 +109,7 @@ export const eventViewSchema = z.object({
   longitude: z.number().nullable(),
   coverImage: z.string().nullable(),
   capacity: z.number().nullable(),
+  visibility: eventVisibilitySchema,
   status: eventStatusSchema,
   registrationCount: z.number().optional().default(0),
   createdAt: z.date(),
@@ -133,6 +143,7 @@ export const eventRegistrationViewSchema = z.object({
 
 export type EventStatus = z.infer<typeof eventStatusSchema>;
 export type EventRegistrationStatus = z.infer<typeof eventRegistrationStatusSchema>;
+export type EventVisibility = z.infer<typeof eventVisibilitySchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 export type EventListQuery = z.infer<typeof eventListQuerySchema>;

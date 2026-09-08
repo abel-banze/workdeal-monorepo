@@ -172,6 +172,7 @@ export function EventsManager({
         address: form.address.trim() || null,
         coverImage: form.coverImage.trim() || null,
         capacity: form.capacity === "" ? null : Number.parseInt(form.capacity, 10),
+        visibility: "public",
       })) as unknown as { data: EventListItem }
       const created = res.data
       setEvents((prev) => [created, ...prev])

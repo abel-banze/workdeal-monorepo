@@ -14,6 +14,9 @@ import { z } from "zod";
 import { preRegisterController } from "../controllers/pre-register.controller.js";
 import { categoriesController } from "../controllers/categories.controller.js";
 import { adminDashboardController } from "../controllers/admin-dashboard.controller.js";
+import { adminBadgesRoute } from "./admin-badges.route.js";
+import { adminPlansRoute } from "./admin-plans.route.js";
+import { adminSubscriptionsRoute } from "./admin-subscriptions.route.js";
 
 export const adminRoute = new Hono<Env>();
 
@@ -157,3 +160,13 @@ adminRoute.post("/categories/:id/toggle", async (c) => {
   const { body, status } = await categoriesController.toggleActive(c.req.param("id"));
   return c.json(body, status);
 });
+
+// ── Selos (catálogo CRUD + atribuição manual em instituições) ─────────────
+// Mantém-se após /badges/run (rota literal acima) para não o sombrear.
+adminRoute.route("/badges", adminBadgesRoute);
+
+// ── Subscrições e planos ──────────────────────────────────────────────────
+// O prefixo "/plans" tem rotas literais (/:id) — monta-se depois de "/badges"
+// e mantém-se o código actual da cadeia, sem sombreamento com outras rotas.
+adminRoute.route("/plans", adminPlansRoute);
+adminRoute.route("/subscriptions", adminSubscriptionsRoute);

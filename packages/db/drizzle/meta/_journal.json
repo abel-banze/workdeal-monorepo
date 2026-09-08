@@ -222,15 +222,50 @@
     {
       "idx": 31,
       "version": "7",
-      "when": 1790000000000,
+      "when": 1788000000000,
       "tag": "0031_add_pre_register",
       "breakpoints": true
     },
     {
       "idx": 32,
       "version": "7",
-      "when": 1790000000001,
+      "when": 1788100000000,
       "tag": "0032_search_tag_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788700002618,
+      "tag": "0033_early_grim_reaper",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788774222879,
+      "tag": "0034_cheerful_rockslide",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1788796247735,
+      "tag": "0035_orange_tomorrow_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788808579504,
+      "tag": "0036_free_stepford_cuckoos",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1788809498096,
+      "tag": "0037_ambitious_nighthawk",
       "breakpoints": true
     }
   ]

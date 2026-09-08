@@ -53,15 +53,13 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 
 const STATUS_META = {
   active: { label: "Convite activo", dot: "bg-[#0B5E56]", chip: "border-[#0B5E56]/25 bg-[#0B5E56]/[0.06] text-[#0B5E56]" },
-  expired: { label: "Convite expirado", dot: "bg-[#B27300]", chip: "border-[#B27300]/30 bg-[#B27300]/[0.08] text-[#B27300]" },
   none: { label: "Sem convite", dot: "bg-[#C9C2B4]", chip: "border-[#D9D2C2] bg-[#F6F3EE] text-[#0F1A2E]/55" },
 } as const;
 
 type LinkStatus = keyof typeof STATUS_META;
 
-function getLinkStatus(o: PreRegisterListItem, now: number): LinkStatus {
+function getLinkStatus(o: PreRegisterListItem): LinkStatus {
   if (!o.completionUrl) return "none";
-  if (o.completionTokenExpiresAt && Date.parse(o.completionTokenExpiresAt) < now) return "expired";
   return "active";
 }
 
@@ -81,16 +79,14 @@ function StatCard({
   label: string;
   value: number;
   caption: string;
-  accent: "teal" | "navy" | "amber" | "vermilion";
+  accent: "teal" | "navy" | "vermilion";
 }) {
   const dot =
     accent === "teal"
       ? "bg-[#0B5E56]"
       : accent === "navy"
         ? "bg-[#0F1A2E]"
-        : accent === "amber"
-          ? "bg-[#B27300]"
-          : "bg-[#FF3B1F]";
+        : "bg-[#FF3B1F]";
   return (
     <div className="rounded-2xl border border-[#D9D2C2] bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center gap-2">
@@ -107,7 +103,6 @@ function StatCard({
 
 export function PreRegisterList({ items, isAdmin, total }: { items: PreRegisterListItem[]; isAdmin: boolean; total?: number }) {
   const router = useRouter();
-  const [now] = React.useState(() => Date.now());
   const [sorting, setSorting] = React.useState<SortingState>([{ id: "preRegisteredAt", desc: true }]);
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<LinkStatus | "all">("all");
@@ -126,22 +121,20 @@ export function PreRegisterList({ items, isAdmin, total }: { items: PreRegisterL
   const stats = React.useMemo(() => {
     const total = items.length;
     let active = 0;
-    let expired = 0;
     let none = 0;
     let noContact = 0;
     let withEmail = 0;
     let withPhone = 0;
     for (const o of items) {
-      const s = getLinkStatus(o, now);
+      const s = getLinkStatus(o);
       if (s === "active") active++;
-      else if (s === "expired") expired++;
       else none++;
       if (!o.contactPhone && !o.contactEmail) noContact++;
       if (o.contactEmail) withEmail++;
       if (o.contactPhone) withPhone++;
     }
-    return { total, active, expired, none, noContact, withEmail, withPhone };
-  }, [items, now]);
+    return { total, active, none, noContact, withEmail, withPhone };
+  }, [items]);
 
   const columns = React.useMemo<ColumnDef<PreRegisterListItem>[]>(
     () => [
@@ -227,10 +220,10 @@ export function PreRegisterList({ items, isAdmin, total }: { items: PreRegisterL
       },
       {
         id: "status",
-        accessorFn: (o) => getLinkStatus(o, now),
+        accessorFn: (o) => getLinkStatus(o),
         header: "Convite",
         cell: ({ row }) => {
-          const meta = STATUS_META[getLinkStatus(row.original, now)];
+          const meta = STATUS_META[getLinkStatus(row.original)];
           return (
             <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.chip}`}>
               <span className={`size-1.5 rounded-full ${meta.dot}`} aria-hidden />
@@ -269,7 +262,7 @@ export function PreRegisterList({ items, isAdmin, total }: { items: PreRegisterL
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [busy, copied, isAdmin, now],
+    [busy, copied, isAdmin],
   );
 
   const table = useReactTable({
@@ -307,7 +300,7 @@ export function PreRegisterList({ items, isAdmin, total }: { items: PreRegisterL
       ? table.getSortedRowModel().rows
       : table.getSortedRowModel().rows.filter((row) => {
           const o = row.original;
-          if (statusFilter !== "all" && getLinkStatus(o, now) !== statusFilter) return false;
+          if (statusFilter !== "all" && getLinkStatus(o) !== statusFilter) return false;
           if (categoryFilter !== "all" && !(o.categorySlugs ?? []).includes(categoryFilter)) return false;
           return true;
         });
@@ -394,7 +387,7 @@ export function PreRegisterList({ items, isAdmin, total }: { items: PreRegisterL
             Do primeiro contacto ao registo completo
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
           <StatCard
             label="Registos"
             value={stats.total}
@@ -404,14 +397,8 @@ export function PreRegisterList({ items, isAdmin, total }: { items: PreRegisterL
           <StatCard
             label="Convite activo"
             value={stats.active}
-            caption="Link válido, à espera de completar"
+            caption="Link válido, sem expiração"
             accent="teal"
-          />
-          <StatCard
-            label="Convite expirado"
-            value={stats.expired}
-            caption="Precisa de novo link"
-            accent="amber"
           />
           <StatCard
             label="Sem convite"
@@ -450,7 +437,6 @@ export function PreRegisterList({ items, isAdmin, total }: { items: PreRegisterL
             >
               <option value="all">Todos os convites</option>
               <option value="active">Convite activo</option>
-              <option value="expired">Convite expirado</option>
               <option value="none">Sem convite</option>
             </select>
 
@@ -563,7 +549,7 @@ export function PreRegisterList({ items, isAdmin, total }: { items: PreRegisterL
         ) : (
           pageRows.map((row) => {
             const o = row.original;
-            const status = getLinkStatus(o, now);
+            const status = getLinkStatus(o);
             const meta = STATUS_META[status];
             return (
               <article key={o.id} className="rounded-2xl border border-[#D9D2C2] bg-white p-4 shadow-sm">

@@ -37,6 +37,10 @@ import { tasksRoute } from "./routes/tasks.route.js";
 import { eventsRoute } from "./routes/events.route.js";
 import { searchRoute } from "./routes/search.route.js";
 import { preRegisterRoute } from "./routes/pre-register.route.js";
+import { adminInvitesRoute } from "./routes/admin-invites.route.js";
+import { institutionsRoute } from "./routes/institutions.route.js";
+import { adminInstitutionsRoute } from "./routes/admin-institutions.route.js";
+import { badgesRoute } from "./routes/badges.route.js";
 
 const app = new Hono();
 
@@ -464,6 +468,10 @@ app.route("/api/v1/tasks", tasksRoute);
 app.route("/api/v1/events", eventsRoute);
 app.route("/api/v1/search", searchRoute);
 app.route("/api/v1/pre-register", preRegisterRoute);
+app.route("/api/v1/admin/invites", adminInvitesRoute);
+app.route("/api/v1/institutions", institutionsRoute);
+app.route("/api/v1/admin/institutions", adminInstitutionsRoute);
+app.route("/api/v1/badges", badgesRoute);
 
 app.notFound(() => {
   throw new AppError(404, "NOT_FOUND", "Rota não encontrada");

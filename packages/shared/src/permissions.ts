@@ -12,6 +12,8 @@ export type DomainPermission =
   | "reviews:moderate"
   | "badges:manage"
   | "users:manage"
+  | "institutions:manage"
+  | "managers:manage"
   | "system:manage";
 
 export const ORG_PERMISSIONS: Record<OrgRole, readonly DomainPermission[]> = {
@@ -24,7 +26,7 @@ export const ORG_PERMISSIONS: Record<OrgRole, readonly DomainPermission[]> = {
 export const SYSTEM_ROLE_PERMISSIONS: Record<SystemRole, readonly DomainPermission[]> = {
   user: [],
   moderator: ["verifications:review", "reviews:moderate", "badges:manage"],
-  admin: ["verifications:review", "reviews:moderate", "badges:manage", "users:manage", "system:manage"],
+  admin: ["verifications:review", "reviews:moderate", "badges:manage", "users:manage", "institutions:manage", "system:manage"],
 };
 
 export const SELF_PERMISSIONS: readonly DomainPermission[] = [
@@ -33,6 +35,19 @@ export const SELF_PERMISSIONS: readonly DomainPermission[] = [
   "tasks:manage",
   "reviews:manage",
 ];
+
+// Matriz de permissões para a equipa de gestão de uma instituição. Os papéis
+// reutilizam os org_role (owner/admin/editor/member) — ver `institution_manager`.
+export const INSTITUTION_MANAGER_PERMISSIONS: Record<OrgRole, readonly DomainPermission[]> = {
+  owner: ["profile:edit", "profile:delete", "members:manage", "managers:manage", "tasks:manage", "tasks:view", "events:manage", "badges:manage"],
+  admin: ["profile:edit", "members:manage", "managers:manage", "tasks:manage", "tasks:view", "events:manage"],
+  editor: ["profile:edit", "tasks:manage", "tasks:view"],
+  member: ["tasks:view"],
+};
+
+export function hasInstitutionManagerPermission(role: OrgRole, permission: DomainPermission): boolean {
+  return INSTITUTION_MANAGER_PERMISSIONS[role].includes(permission);
+}
 
 export function hasOrgPermission(role: OrgRole, permission: DomainPermission): boolean {
   return ORG_PERMISSIONS[role].includes(permission);

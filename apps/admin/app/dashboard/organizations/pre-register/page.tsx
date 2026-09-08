@@ -22,7 +22,6 @@ export interface PreRegisterListItem {
   preRegisteredAt: string | null;
   promoterEmail: string | null;
   completionToken: string | null;
-  completionTokenExpiresAt: string | null;
   completionUrl: string | null;
 }
 

@@ -6,11 +6,11 @@ export const adminUserListQuerySchema = z.object({
   role: z.enum(SYSTEM_ROLES).optional(),
   search: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(20).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(20).optional(),
 });
 
 export const adminOrgListQuerySchema = z.object({
-  verificationStatus: z.enum(["pre_registered", "pending", "in_review", "verified", "suspended"]).optional(),
+  verificationStatus: z.enum(["pre_registered", "pending", "in_review", "verified", "suspended", "expired"]).optional(),
   search: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).default(20).optional(),
@@ -21,7 +21,7 @@ export const adminUpdateUserRoleSchema = z.object({
 });
 
 export const adminUpdateOrgStatusSchema = z.object({
-  verificationStatus: z.enum(["pending", "in_review", "verified", "suspended"]),
+  verificationStatus: z.enum(["pending", "in_review", "verified", "suspended", "expired"]),
   note: z.string().trim().max(1000).optional(),
 });
 
@@ -63,6 +63,36 @@ export const preRegisterUpdateSchema = preRegisterBaseSchema
     logoUrl: z.string().trim().url().max(1000).optional().nullable(),
     categorySlugs: z.array(z.string().trim().min(1).max(100)).max(10).optional().nullable(),
   });
+
+// --- Convites para a equipa do painel (admin moderação) ---
+
+export const ADMIN_INVITE_STATUSES = ["pending", "accepted", "revoked", "expired"] as const;
+export type AdminInviteStatus = (typeof ADMIN_INVITE_STATUSES)[number];
+
+// Papéis que podem ser atribuídos via convite — nunca "user".
+export const adminInviteRoles = ["moderator", "admin"] as const;
+export type AdminInviteRole = (typeof adminInviteRoles)[number];
+
+export const adminInviteCreateSchema = z.object({
+  email: z.string().trim().email().max(200),
+  role: z.enum(adminInviteRoles).default("moderator"),
+  expiresInDays: z.coerce.number().int().min(1).max(30).default(7),
+});
+
+export const adminInviteListQuerySchema = z.object({
+  status: z.enum(ADMIN_INVITE_STATUSES).optional(),
+  search: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(20).optional(),
+});
+
+export const adminInviteAcceptSchema = z.object({
+  token: z.string().trim().min(8).max(200),
+});
+
+export type AdminInviteCreateInput = z.infer<typeof adminInviteCreateSchema>;
+export type AdminInviteListQuery = z.infer<typeof adminInviteListQuerySchema>;
+export type AdminInviteAcceptInput = z.infer<typeof adminInviteAcceptSchema>;
 
 // --- Categorias ---
 

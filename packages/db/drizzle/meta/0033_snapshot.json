@@ -1,6 +1,6 @@
 {
-  "id": "78bd31e4-fc52-401e-8626-1f23265da4ad",
-  "prevId": "99e2fa51-16a0-45a9-ab32-6069e95e2462",
+  "id": "ceb8c810-3e41-4a23-882b-509103f3155c",
+  "prevId": "fc2c7a0e-bce0-4183-87e1-34101511c91d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -144,6 +144,144 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.admin_invite": {
+      "name": "admin_invite",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "system_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'moderator'"
+        },
+        "status": {
+          "name": "status",
+          "type": "admin_invite_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invited_by": {
+          "name": "invited_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "admin_invite_email_idx": {
+          "name": "admin_invite_email_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_invite_status_idx": {
+          "name": "admin_invite_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "admin_invite_invited_by_user_id_fk": {
+          "name": "admin_invite_invited_by_user_id_fk",
+          "tableFrom": "admin_invite",
+          "tableTo": "user",
+          "columnsFrom": [
+            "invited_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "admin_invite_token_unique": {
+          "name": "admin_invite_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1605,6 +1743,48 @@
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
+        },
+        "pre_registered_at": {
+          "name": "pre_registered_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pre_registered_by": {
+          "name": "pre_registered_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_name": {
+          "name": "contact_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_phone": {
+          "name": "contact_phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_email": {
+          "name": "contact_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completion_token": {
+          "name": "completion_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completion_token_expires_at": {
+          "name": "completion_token_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -1622,9 +1802,53 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "organization_completion_token_idx": {
+          "name": "organization_completion_token_idx",
+          "columns": [
+            {
+              "expression": "completion_token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "organization_pre_registered_idx": {
+          "name": "organization_pre_registered_idx",
+          "columns": [
+            {
+              "expression": "verification_status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "organization_pre_registered_by_user_id_fk": {
+          "name": "organization_pre_registered_by_user_id_fk",
+          "tableFrom": "organization",
+          "tableTo": "user",
+          "columnsFrom": [
+            "pre_registered_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "organization_slug_unique": {
@@ -1896,6 +2120,24 @@
         },
         "search_tsv": {
           "name": "search_tsv",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "search_category_text": {
+          "name": "search_category_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "search_location_text": {
+          "name": "search_location_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "search_tag_text": {
+          "name": "search_tag_text",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -2603,6 +2845,12 @@
         "geom": {
           "name": "geom",
           "type": "geography",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "google_place_id": {
+          "name": "google_place_id",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -4647,6 +4895,16 @@
     }
   },
   "enums": {
+    "public.admin_invite_status": {
+      "name": "admin_invite_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "accepted",
+        "revoked",
+        "expired"
+      ]
+    },
     "public.analytics_event_type": {
       "name": "analytics_event_type",
       "schema": "public",
@@ -4886,6 +5144,7 @@
       "name": "verification_status",
       "schema": "public",
       "values": [
+        "pre_registered",
         "pending",
         "in_review",
         "verified",
