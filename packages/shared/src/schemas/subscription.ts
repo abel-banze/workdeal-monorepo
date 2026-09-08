@@ -402,19 +402,20 @@ export const couponCodeSchema = z
   .transform((v) => v.toUpperCase())
   .refine((v) => /^[A-Z0-9][A-Z0-9-]{2,31}$/.test(v), "Código inválido: apenas letras, números e hífens");
 
-export const couponCreateSchema = z
-  .object({
-    code: couponCodeSchema,
-    description: z.string().trim().max(300).nullable().optional(),
-    type: couponTypeSchema,
-    value: z.number().int().min(1).max(1000000),
-    maxTotalUses: z.number().int().min(1).nullable().optional(),
-    maxUsesPerUser: z.number().int().min(1).default(1),
-    minAmountMzn: z.number().int().min(0).nullable().optional(),
-    validFrom: z.coerce.date().nullable().optional(),
-    validUntil: z.coerce.date().nullable().optional(),
-    appliesTo: z.string().trim().max(64).nullable().optional(),
-  })
+const couponFieldsSchema = z.object({
+  code: couponCodeSchema,
+  description: z.string().trim().max(300).nullable().optional(),
+  type: couponTypeSchema,
+  value: z.number().int().min(1).max(1000000),
+  maxTotalUses: z.number().int().min(1).nullable().optional(),
+  maxUsesPerUser: z.number().int().min(1).default(1),
+  minAmountMzn: z.number().int().min(0).nullable().optional(),
+  validFrom: z.coerce.date().nullable().optional(),
+  validUntil: z.coerce.date().nullable().optional(),
+  appliesTo: z.string().trim().max(64).nullable().optional(),
+});
+
+export const couponCreateSchema = couponFieldsSchema
   .refine((d) => d.type !== "percent" || d.value <= 100, {
     message: "Percentagem deve ser ≤ 100",
     path: ["value"],
@@ -426,7 +427,7 @@ export const couponCreateSchema = z
 export type CouponCreateInput = z.infer<typeof couponCreateSchema>;
 
 // `code` e `type` são imutáveis após criação.
-export const couponUpdateSchema = couponCreateSchema
+export const couponUpdateSchema = couponFieldsSchema
   .omit({ code: true, type: true })
   .partial()
   .extend({
