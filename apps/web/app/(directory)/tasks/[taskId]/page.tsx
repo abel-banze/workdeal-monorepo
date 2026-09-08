@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPublicTask } from "@/lib/directory";
@@ -45,7 +44,6 @@ export default async function PublicTaskPage({ params }: Props) {
   const categoryName = task.categoryId ? cats.find((c) => c.id === task.categoryId)?.name ?? null : null;
 
   const proposable = task.status === "open" || task.status === "in_review";
-  const requesterHref = task.requesterProfileSlug ? `/profiles/${task.requesterProfileSlug}` : null;
 
   return (
     <div className="bg-[#F6F3EE]">
@@ -81,26 +79,6 @@ export default async function PublicTaskPage({ params }: Props) {
             >
               {task.title}
             </h1>
-
-            {requesterHref && task.requesterProfileName ? (
-              <Link href={requesterHref} className="mt-5 inline-flex items-center gap-3 rounded-2xl border border-[#D9D2C2] bg-white px-4 py-3 hover:border-[#0B5E56]/30">
-                <div className="relative flex size-10 items-center justify-center overflow-hidden rounded-xl border border-[#D9D2C2] bg-[#F6F3EE] text-xs font-black text-[#0F1A2E]">
-                  {task.requesterProfileLogo ? (
-                    <Image src={task.requesterProfileLogo} alt="" fill sizes="40px" className="object-cover" />
-                  ) : (
-                    task.requesterProfileName.slice(0, 2).toUpperCase()
-                  )}
-                </div>
-                <span className="text-left">
-                  <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0F1A2E]/45">Pedido por</span>
-                  <span className="block text-sm font-black text-[#0F1A2E]">{task.requesterProfileName}</span>
-                </span>
-              </Link>
-            ) : task.requesterProfileName ? (
-              <p className="mt-5 text-sm text-[#0F1A2E]/60">
-                Pedido por <span className="font-bold text-[#0F1A2E]">{task.requesterProfileName}</span>
-              </p>
-            ) : null}
 
             <div className="mt-6 grid gap-4 rounded-[20px] border border-[#D9D2C2] bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
               <div>

@@ -304,6 +304,44 @@ export const billingRepository = {
     return row ?? null;
   },
 
+  // ── Subscrição por defeito (plano free) ────────────────────────────────
+  // Dá a uma empresa o plano free na primeira vez que é activada (onboarding).
+  // Idempotente: não cria nada se já existir uma subscrição para a organização.
+  async ensureDefaultSubscription(params: {
+    userId: string;
+    organizationId: string;
+    planSlug?: string;
+  }): Promise<{ created: boolean; subscriptionId: string | null }> {
+    const freePlan = await this.findPlanBySlug(params.planSlug ?? "free");
+    if (!freePlan) return { created: false, subscriptionId: null };
+
+    const [existing] = await db
+      .select({ id: subscription.id })
+      .from(subscription)
+      .where(eq(subscription.organizationId, params.organizationId))
+      .limit(1);
+    if (existing) return { created: false, subscriptionId: existing.id };
+
+    const now = new Date();
+    const currentPeriodEnd = new Date(now);
+    currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 100);
+
+    const [row] = await db
+      .insert(subscription)
+      .values({
+        id: crypto.randomUUID(),
+        userId: params.userId,
+        organizationId: params.organizationId,
+        planId: freePlan.id,
+        status: "active",
+        currentPeriodStart: now,
+        currentPeriodEnd,
+        updatedAt: now,
+      })
+      .returning({ id: subscription.id });
+    return { created: true, subscriptionId: row?.id ?? null };
+  },
+
   // ── Facturas / pagamentos de uma subscrição ─────────────────────────────
   async listInvoicesForSubscription(subscriptionId: string): Promise<InvoiceAdminRow[]> {
     return db
