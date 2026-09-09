@@ -57,6 +57,15 @@ export type CurrentSubscription = {
   }
   plan: PublicPlan | null
   features: PlanFeatureView[]
+  pendingPayment: {
+    id: string
+    amountMzn: number
+    method: string | null
+    status: string
+    invoiceNumber: string | null
+    createdAt: string
+    proof: { fileId?: string; url?: string; name?: string; reference?: string } | null
+  } | null
 }
 
 async function getAuthToken(): Promise<string> {

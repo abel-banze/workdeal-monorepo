@@ -211,7 +211,7 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
                     {PAYMENT_STATUS_LABELS_PT[p.status as keyof typeof PAYMENT_STATUS_LABELS_PT] ?? p.status} · {formatDateTime(p.createdAt)}
                   </div>
                 </div>
-                {proof?.url && (
+                {proof?.url ? (
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="text-muted-foreground">Comprovativo:</span>
                     <a href={proof.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline underline-offset-2">
@@ -219,6 +219,10 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
                     </a>
                     {proof.reference && <span className="text-muted-foreground">· ref: {proof.reference}</span>}
                   </div>
+                ) : (
+                  isActivation && (
+                    <p className="text-xs font-medium text-amber-600">Sem comprovativo anexado a este pagamento.</p>
+                  )
                 )}
                 {isAdmin && p.status === "pending" && (
                   isActivation
