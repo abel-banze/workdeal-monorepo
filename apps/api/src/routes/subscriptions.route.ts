@@ -8,6 +8,7 @@ import {
   changeMySubscriptionPlanSchema,
   pauseMySubscriptionSchema,
   resumeMySubscriptionSchema,
+  subscribeMySubscriptionSchema,
   subscriptionScopeSchema,
 } from "@workdeal/shared";
 
@@ -20,6 +21,12 @@ subscriptionsRoute.get("/current", requireAuth, zValidator("query", subscription
   const q = c.req.valid("query");
   const { body, status } = await tenantBillingController.getCurrentSubscription(c.get("user"), q.organizationId ?? null);
   c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
+subscriptionsRoute.post("/current/subscribe", requireAuth, zValidator("json", subscribeMySubscriptionSchema), async (c) => {
+  const input = c.req.valid("json");
+  const { body, status } = await tenantBillingController.subscribe(c.get("user"), input.organizationId ?? null, input);
   return c.json(body, status);
 });
 

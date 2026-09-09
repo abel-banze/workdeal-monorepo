@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { uploadFilesAction } from "@/app/actions/files"
 import {
   CheckCircle2,
   ChevronRight,
@@ -16,8 +17,8 @@ import {
 } from "lucide-react"
 import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@workspace/ui/components/dialog"
-import { SUBSCRIPTION_STATUS_LABELS_PT } from "@workdeal/shared"
-import { cancelMyPlan, changeMyPlan, pauseMyPlan, resumeMyPlan, type CurrentSubscription, type PublicPlan } from "@/app/actions/subscriptions"
+import { SUBSCRIPTION_STATUS_LABELS_PT, VERIFICATION_TRUST_PAYMENT } from "@workdeal/shared"
+import { cancelMyPlan, changeMyPlan, pauseMyPlan, resumeMyPlan, subscribeMyPlan, type CurrentSubscription, type PublicPlan, type SubscribePayment } from "@/app/actions/subscriptions"
 
 const STATUS_STYLES: Record<string, string> = {
   active: "bg-[#0B5E56] text-white",
@@ -71,6 +72,14 @@ export function SubscriptionManager({
   const [changeOpen, setChangeOpen] = useState(false)
   const [changePlan, setChangePlan] = useState<PublicPlan | null>(null)
 
+  // Comprovativo de pagamento (só na activação de planos pagos — mesmos
+  // dados e formato do pedido de verificação de identidade)
+  const [proof, setProof] = useState<{ fileId: string; url: string; name: string } | null>(null)
+  const [proofReference, setProofReference] = useState("")
+  const [uploadingProof, setUploadingProof] = useState(false)
+  const [dialogError, setDialogError] = useState<string | null>(null)
+  const proofInputRef = useRef<HTMLInputElement>(null)
+
   // Cancel dialog
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState("")
@@ -100,14 +109,59 @@ export function SubscriptionManager({
 
   function openChangePlan(plan: PublicPlan) {
     setChangePlan(plan)
+    setProof(null)
+    setProofReference("")
+    setDialogError(null)
     setChangeOpen(true)
   }
 
+  async function handleProof(file: File) {
+    setUploadingProof(true)
+    setDialogError(null)
+    try {
+      const fd = new FormData()
+      fd.set("file", file, file.name)
+      fd.set("purpose", "subscription")
+      const res = await uploadFilesAction(fd)
+      if (!res.ok || !res.file) {
+        setDialogError(res.error ?? "Falha ao carregar o comprovativo.")
+        return
+      }
+      setProof({ fileId: res.file.id, url: res.file.url, name: res.file.originalFilename ?? file.name })
+    } catch (err) {
+      setDialogError(err instanceof Error ? err.message : "Falha ao carregar o comprovativo.")
+    } finally {
+      setUploadingProof(false)
+      if (proofInputRef.current) proofInputRef.current.value = ""
+    }
+  }
+
+  // Sem subscrição — ou com subscrição cancelada/expirada — o botão da
+  // grelha activa (cria ou reactiva) em vez de mudar de plano.
+  const needsSubscribe = !canManage || status === "cancelled" || status === "expired"
+
+  // A activação de um plano pago exige comprovativo (o backend rejeita
+  // com PROOF_REQUIRED sem ele); planos gratuitos activam sem pagamento.
+  const paidActivation = needsSubscribe && (changePlan?.priceMzn ?? 0) > 0
+
   async function confirmChangePlan() {
     if (!changePlan) return
+    if (paidActivation && !proof) {
+      setDialogError("Anexa o comprovativo de pagamento para activar este plano.")
+      return
+    }
     const planId = changePlan.id
+    const activate = needsSubscribe
+    const payment: SubscribePayment | undefined =
+      activate && proof
+        ? { method: "bank_transfer", fileId: proof.fileId, url: proof.url, name: proof.name, reference: proofReference.trim() || undefined }
+        : undefined
     setChangeOpen(false)
-    await runAction("change", () => changeMyPlan(organizationId, planId))
+    if (activate) {
+      await runAction("subscribe", () => subscribeMyPlan(organizationId, planId, payment))
+    } else {
+      await runAction("change", () => changeMyPlan(organizationId, planId))
+    }
   }
 
   async function confirmCancel() {
@@ -251,7 +305,7 @@ export function SubscriptionManager({
           <div className={`grid gap-4 ${plans.length > 2 ? "lg:grid-cols-3" : "sm:grid-cols-2"}`}>
             {plans.map((plan) => {
               const isCurrent = currentPlan?.id === plan.id
-              const disabled = !canManage || isCurrent || busy
+              const disabled = isCurrent || busy
               return (
                 <div
                   key={plan.id}
@@ -285,14 +339,11 @@ export function SubscriptionManager({
                   <Button
                     className="mt-5 w-full"
                     variant={isCurrent ? "outline" : "default"}
-                    disabled={disabled && !isCurrent}
+                    disabled={disabled}
                     onClick={() => openChangePlan(plan)}
                   >
-                    {isCurrent ? "Plano actual" : busy ? "A processar…" : `Mudar para ${plan.name}`}
+                    {isCurrent ? "Plano actual" : busy ? "A processar…" : needsSubscribe ? `Activar ${plan.name}` : `Mudar para ${plan.name}`}
                   </Button>
-                  {!canManage && (
-                    <p className="mt-2 text-center text-[11px] text-[#0F1A2E]/45">Sem subscrição activa para mudar plano.</p>
-                  )}
                 </div>
               )
             })}
@@ -305,21 +356,90 @@ export function SubscriptionManager({
         <DialogContent className="max-w-[440px] rounded-[22px] border-[#D9D2C2] bg-white p-6">
           <DialogHeader className="text-left">
             <DialogTitle className="text-[17px] font-black tracking-[-0.02em] text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
-              Mudar para {changePlan?.name}
+              {needsSubscribe ? `Activar ${changePlan?.name}` : `Mudar para ${changePlan?.name}`}
             </DialogTitle>
             <DialogDescription className="mt-1 text-xs leading-relaxed text-[#0F1A2E]/55">
               {changePlan
-                ? `A subscrição passa para ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}). A mudança é imediata e os limites do novo plano aplicam-se de seguida.`
+                ? needsSubscribe
+                  ? `A organização fica com o plano ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}). A activação é imediata e os limites do novo plano aplicam-se de seguida.`
+                  : `A subscrição passa para ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}). A mudança é imediata e os limites do novo plano aplicam-se de seguida.`
                 : ""}
             </DialogDescription>
           </DialogHeader>
+
+          {paidActivation && (
+            <div className="mt-4 space-y-3">
+              <div className="rounded-2xl border border-[#0B5E56]/25 bg-[#0B5E56]/[0.04] p-4">
+                <p className="text-[11px] font-bold tracking-[0.14em] text-[#0B5E56]">PAGAMENTO — {VERIFICATION_TRUST_PAYMENT.planName.toUpperCase()}</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#0F1A2E]/70">
+                  Faz a transferência para a conta abaixo e anexa o comprovativo. A equipa Workdeal confirma em 24–48h úteis.
+                </p>
+                <div className="mt-3 space-y-1 rounded-xl border border-[#D9D2C2] bg-white px-4 py-3 font-mono text-xs leading-relaxed text-[#0F1A2E]">
+                  <p>Banco: <span className="font-bold">{VERIFICATION_TRUST_PAYMENT.bankName}</span></p>
+                  <p>NIB: <span className="font-bold tracking-wide">{VERIFICATION_TRUST_PAYMENT.nib}</span></p>
+                  <p>Conta: <span className="font-bold">{VERIFICATION_TRUST_PAYMENT.accountNumber}</span></p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold tracking-[0.07em] text-[#0F1A2E]/70 uppercase">Referência do pagamento (opcional)</label>
+                <input
+                  value={proofReference}
+                  onChange={(e) => setProofReference(e.target.value)}
+                  placeholder="Ex.: nome do titular, referência bancária"
+                  className="h-9 w-full rounded-md border border-[#D9D2C2] bg-white px-3 text-sm text-[#0F1A2E] placeholder:text-[#0F1A2E]/30"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold tracking-[0.07em] text-[#0F1A2E]/70 uppercase">
+                  Comprovativo de pagamento <span className="text-[#FF3B1F]">*</span>
+                </label>
+                <p className="text-xs text-[#0F1A2E]/50">PDF ou imagem, máx 10 MB.</p>
+                {proof ? (
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#0B5E56]/30 bg-[#0B5E56]/[0.04] p-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#0B5E56] text-sm text-white">✓</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-bold text-[#0F1A2E]">{proof.name || "Comprovativo anexado"}</p>
+                        <p className="truncate text-xs text-[#0F1A2E]/55">
+                          <a href={proof.url} target="_blank" rel="noopener noreferrer" className="text-[#0B5E56] underline underline-offset-2">ver</a>
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setProof(null); setProofReference("") }}
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[#0F1A2E]/55 ring-1 ring-[#D9D2C2] transition hover:bg-[#FF3B1F]/10 hover:text-[#7A1A0A]"
+                      aria-label="Remover comprovativo"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input ref={proofInputRef} type="file" accept="image/*,.pdf,.doc,.docx" className="hidden" disabled={uploadingProof} onChange={(e) => e.target.files?.[0] && void handleProof(e.target.files[0])} />
+                    <Button type="button" variant="outline" size="sm" onClick={() => proofInputRef.current?.click()} disabled={uploadingProof}>
+                      {uploadingProof ? <Loader2 className="size-4 animate-spin" /> : null}
+                      {uploadingProof ? "A carregar…" : "Anexar comprovativo"}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {dialogError && (
+            <p className="mt-3 rounded-lg border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 px-3 py-2 text-xs font-medium text-[#7A1A0A]">{dialogError}</p>
+          )}
+
           <DialogFooter className="mt-4 flex gap-2">
             <Button variant="ghost" onClick={() => setChangeOpen(false)}>
               Voltar
             </Button>
-            <Button onClick={confirmChangePlan}>
-              {busyAction === "change" ? <Loader2 className="size-4 animate-spin" /> : <ChevronRight className="size-4" />}
-              Confirmar mudança
+            <Button onClick={confirmChangePlan} disabled={uploadingProof || (paidActivation && !proof)}>
+              {busyAction === "subscribe" || busyAction === "change" ? <Loader2 className="size-4 animate-spin" /> : <ChevronRight className="size-4" />}
+              {needsSubscribe ? "Confirmar activação" : "Confirmar mudança"}
             </Button>
           </DialogFooter>
         </DialogContent>

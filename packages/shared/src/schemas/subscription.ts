@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { verificationPaymentProofSchema } from "./verification.js";
 
 // ── Subscriptions / Pagamentos ─────────────────────────────────
 // Ecossistema de billing: planos, subscrições, facturas, pagamentos,
@@ -246,6 +247,19 @@ export const changeMySubscriptionPlanSchema = z.object({
   prorate: z.boolean().default(true),
 });
 export type ChangeMySubscriptionPlanInput = z.infer<typeof changeMySubscriptionPlanSchema>;
+
+// Primeira activação: cria a subscrição do âmbito (ou reactiva uma
+// cancelada/expirada). Mesmo formato do change — a diferença é semântica:
+// aqui ainda não existe subscrição activa.
+// `payment` usa o mesmo formato do pedido de verificação de identidade
+// (transferência Millennium BIM + comprovativo anexado); obrigatório quando
+// o plano é pago (priceMzn > 0), ignorado nos gratuitos.
+export const subscribeMySubscriptionSchema = z.object({
+  organizationId: z.string().min(1).optional(),
+  planId: z.string().min(1, "Plano obrigatório"),
+  payment: verificationPaymentProofSchema.optional(),
+});
+export type SubscribeMySubscriptionInput = z.infer<typeof subscribeMySubscriptionSchema>;
 
 export const cancelMySubscriptionSchema = cancelSubscriptionSchema.extend({
   organizationId: z.string().min(1).optional(),

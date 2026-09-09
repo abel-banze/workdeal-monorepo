@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { coupon, db, invoice, invoiceLineItem, organization, payment, plan, planFeature, subscription, user } from "@workdeal/db";
-import type { PlanInterval, PlanListQuery, SubscriptionListQuery } from "@workdeal/shared";
+import type { PlanInterval, PlanListQuery, SubscriptionListQuery, SubscriptionStatus } from "@workdeal/shared";
 
 // ── Tipos de linha (admin) ────────────────────────────────────────────────
 
@@ -313,6 +313,36 @@ export const billingRepository = {
       .innerJoin(user, eq(subscription.userId, user.id))
       .leftJoin(organization, eq(subscription.organizationId, organization.id))
       .leftJoin(coupon, eq(subscription.couponId, coupon.id));
+  },
+
+  // Criação self-service (primeira activação): só os campos obrigatórios —
+  // `id`, `status`, `discountMzn` e timestamps têm defaults na tabela.
+  async createSubscription(data: {
+    userId: string;
+    organizationId: string | null;
+    planId: string;
+    status: SubscriptionStatus;
+    currentPeriodStart: Date;
+    currentPeriodEnd: Date;
+  }) {
+    const [row] = await db.insert(subscription).values(data).returning({ id: subscription.id });
+    return row ?? null;
+  },
+
+  // Pagamento manual self-service (activação com comprovativo): fica
+  // `pending` com a prova em metadata, para o admin confirmar no fluxo
+  // existente (confirmManualPayment). Sem factura associada nesta fase.
+  async createManualPayment(data: {
+    userId: string;
+    amountMzn: number;
+    method: string | null;
+    metadata: Record<string, unknown> | null;
+  }) {
+    const [row] = await db
+      .insert(payment)
+      .values({ ...data, status: "pending" })
+      .returning({ id: payment.id });
+    return row ?? null;
   },
 
   async updateSubscription(id: string, data: Partial<Record<string, unknown>>) {

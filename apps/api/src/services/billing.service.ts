@@ -2,7 +2,16 @@ import { billingRepository, type PlanRow } from "../repositories/billing.reposit
 import { affiliateService } from "./affiliate.service.js";
 import { AppError } from "../lib/errors.js";
 import { getOrgRole } from "@workdeal/auth";
-import type { CancelSubscriptionInput, ChangeSubscriptionPlanInput, AdminUpdateSubscriptionStatusInput, PlanCreateInput, PlanFeatureUpsertInput, PlanUpdateInput } from "@workdeal/shared";
+import type { CancelSubscriptionInput, ChangeSubscriptionPlanInput, SubscribeMySubscriptionInput, AdminUpdateSubscriptionStatusInput, PlanCreateInput, PlanFeatureUpsertInput, PlanUpdateInput, PlanInterval } from "@workdeal/shared";
+
+/** Fim do período inicial a partir do intervalo do plano. */
+function addPlanPeriod(from: Date, interval: PlanInterval): Date {
+  const end = new Date(from);
+  if (interval === "yearly") end.setFullYear(end.getFullYear() + 1);
+  else if (interval === "quarterly") end.setMonth(end.getMonth() + 3);
+  else end.setMonth(end.getMonth() + 1);
+  return end;
+}
 
 class BillingService {
   // ── Planos ──────────────────────────────────────────────────────────────
@@ -275,6 +284,76 @@ class BillingService {
       plan: plan ?? null,
       features: plan ? await this.resolveOwnAndInheritedFeatureKeys(plan.id) : [],
     };
+  }
+
+  /**
+   * Primeira activação self-service: cria a subscrição do âmbito no plano
+   * escolhido, ou reactiva uma subscrição cancelada/expirada. Lança 403 sem
+   * membership, 404 se o plano não estiver disponível, 409 se já existir
+   * subscrição activa (nesse caso usa-se a mudança de plano).
+   *
+   * Pagamento: mesmos dados da verificação de identidade (Millennium BIM +
+   * comprovativo). Planos pagos exigem o comprovativo (400 PROOF_REQUIRED sem
+   * ele) e geram um pagamento `pending` para o admin confirmar no fluxo
+   * manual existente; planos gratuitos activam sem pagamento.
+   */
+  async subscribeMySubscriptionPlan(userId: string, organizationId: string | null, input: SubscribeMySubscriptionInput) {
+    if (organizationId) {
+      const role = await getOrgRole(userId, organizationId);
+      if (!role) {
+        throw new AppError(403, "FORBIDDEN", "Sem acesso à subscrição desta organização");
+      }
+    }
+    const plan = await billingRepository.findPlanById(input.planId);
+    if (!plan || !plan.isActive || !plan.isPublic) {
+      throw new AppError(404, "NOT_FOUND", "Plano não disponível");
+    }
+    const existing = await billingRepository.findSubscriptionForScope(userId, organizationId);
+    if (existing && ["active", "trialing", "past_due", "paused"].includes(existing.status)) {
+      throw new AppError(409, "ALREADY_SUBSCRIBED", "Já existe uma subscrição activa — usa Mudar de plano");
+    }
+    const proof = input.payment && input.payment.fileId && input.payment.url ? input.payment : null;
+    if (plan.priceMzn > 0 && !proof) {
+      throw new AppError(400, "PROOF_REQUIRED", "Este plano é pago — anexa o comprovativo de pagamento");
+    }
+    const now = new Date();
+    const currentPeriodEnd = addPlanPeriod(now, plan.interval);
+    const subscription = existing
+      ? // Reactivação: limpa cancelamento/pausa e abre um período novo no plano escolhido.
+        await billingRepository.updateSubscription(existing.id, {
+          planId: plan.id,
+          status: "active",
+          currentPeriodStart: now,
+          currentPeriodEnd,
+          cancelAt: null,
+          cancelledAt: null,
+          cancelReason: null,
+          pausedAt: null,
+          resumeAt: null,
+        })
+      : await billingRepository.createSubscription({
+          userId,
+          organizationId,
+          planId: plan.id,
+          status: "active",
+          currentPeriodStart: now,
+          currentPeriodEnd,
+        });
+    const payment = proof
+      ? await billingRepository.createManualPayment({
+          userId,
+          amountMzn: plan.priceMzn,
+          method: proof.method ?? "bank_transfer",
+          metadata: {
+            kind: "subscription_activation",
+            subscriptionId: (subscription as { id?: unknown } | null)?.id ?? null,
+            organizationId,
+            planId: plan.id,
+            proof: { fileId: proof.fileId, url: proof.url, name: proof.name ?? "", reference: proof.reference ?? "" },
+          },
+        })
+      : null;
+    return { subscription, payment };
   }
 
   async changeMySubscriptionPlan(userId: string, organizationId: string | null, input: ChangeSubscriptionPlanInput) {
