@@ -93,12 +93,14 @@ export function SubscriptionManager({
   const currentPlan = initial?.plan ?? null
   const status = sub?.status ?? null
   const canManage = sub != null
+  // Pedido pago ainda por validar: fica em pausa até o admin confirmar.
+  const awaitingPayment = ((sub?.metadata as Record<string, unknown> | null) ?? {}).awaitingPayment === true
 
-  async function runAction(key: string, fn: () => Promise<unknown>) {
+  async function runAction(key: string, fn: () => Promise<unknown>, successMessage?: string) {
     setBusyAction(key)
     try {
       await fn()
-      toast.success("Subscrição actualizada.")
+      toast.success(successMessage ?? "Subscrição actualizada.")
       router.refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao actualizar a subscrição.")
@@ -158,7 +160,13 @@ export function SubscriptionManager({
         : undefined
     setChangeOpen(false)
     if (activate) {
-      await runAction("subscribe", () => subscribeMyPlan(organizationId, planId, payment))
+      await runAction(
+        "subscribe",
+        () => subscribeMyPlan(organizationId, planId, payment),
+        paidActivation
+          ? "Pedido enviado — enviámos a factura por email. A subscrição activa após confirmação do pagamento."
+          : "Subscrição activada.",
+      )
     } else {
       await runAction("change", () => changeMyPlan(organizationId, planId))
     }
@@ -255,11 +263,16 @@ export function SubscriptionManager({
                     </Button>
                   </>
                 )}
-                {canManage && status === "paused" && (
+                {canManage && status === "paused" && !awaitingPayment && (
                   <Button variant="outline" size="sm" disabled={busy} onClick={() => runAction("resume", () => resumeMyPlan(organizationId))}>
                     {busyAction === "resume" ? <Loader2 className="size-4 animate-spin" /> : <PlayCircle className="size-4" />}
                     Retomar
                   </Button>
+                )}
+                {awaitingPayment && (
+                  <span className="rounded-full border border-[#B45309]/30 bg-[#B45309]/5 px-3 py-1.5 text-xs font-semibold text-[#B45309]">
+                    Aguarda confirmação do pagamento
+                  </span>
                 )}
                 {!canManage && (
                   <span className="rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-1.5 text-xs font-semibold text-[#0F1A2E]/55">
@@ -361,7 +374,9 @@ export function SubscriptionManager({
             <DialogDescription className="mt-1 text-xs leading-relaxed text-[#0F1A2E]/55">
               {changePlan
                 ? needsSubscribe
-                  ? `A organização fica com o plano ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}). A activação é imediata e os limites do novo plano aplicam-se de seguida.`
+                  ? paidActivation
+                    ? `O pedido do plano ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}) fica em pausa até confirmarmos o pagamento. Enviamos a factura por email (Codebaz SU, Lda).`
+                    : `A organização fica com o plano ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}). A activação é imediata e os limites do novo plano aplicam-se de seguida.`
                   : `A subscrição passa para ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}). A mudança é imediata e os limites do novo plano aplicam-se de seguida.`
                 : ""}
             </DialogDescription>

@@ -671,6 +671,24 @@ export async function confirmManualPayment(paymentId: string) {
   });
 }
 
+export async function validateSubscriptionPayment(paymentId: string, note?: string) {
+  await requireSystemRole("admin");
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/subscriptions/payments/${paymentId}/validate`, token, {
+    method: "POST",
+    body: JSON.stringify(note ? { note } : {}),
+  });
+}
+
+export async function notifySubscriptionCompany(id: string, message: string) {
+  await requireSystemRole("admin");
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/subscriptions/${id}/notify`, token, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}
+
 // ── Verificações de identidade ───────────────────────────────────────────
 
 export async function listAdminVerifications(query: { status?: string; page?: number; limit?: number } = {}) {

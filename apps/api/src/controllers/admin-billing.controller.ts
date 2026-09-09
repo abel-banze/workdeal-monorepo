@@ -1,6 +1,6 @@
 import { ok } from "../lib/api-response.js";
 import { billingService } from "../services/billing.service.js";
-import type { CancelSubscriptionInput, ChangeSubscriptionPlanInput, AdminUpdateSubscriptionStatusInput, PlanFeatureUpsertInput, PauseSubscriptionInput } from "@workdeal/shared";
+import type { CancelSubscriptionInput, ChangeSubscriptionPlanInput, AdminUpdateSubscriptionStatusInput, AdminValidatePaymentInput, AdminNotifyCompanyInput, PlanFeatureUpsertInput, PauseSubscriptionInput } from "@workdeal/shared";
 
 export const adminBillingController = {
   // ── Planos ──────────────────────────────────────────────────────────────
@@ -78,6 +78,18 @@ export const adminBillingController = {
   // ── Pagamentos (modo manual) ────────────────────────────────────────────
   async confirmPayment(id: string) {
     const row = await billingService.confirmPaymentAsAdmin(id);
+    return { body: ok(row), status: 200 as const };
+  },
+
+  // Validação de activação: confirma, emite recibo, activa e envia-o à empresa.
+  async validatePayment(id: string, input: AdminValidatePaymentInput) {
+    const row = await billingService.validateSubscriptionPaymentAsAdmin(id, input);
+    return { body: ok(row), status: 200 as const };
+  },
+
+  // Notificação à empresa (email + nota interna).
+  async notifyCompany(id: string, input: AdminNotifyCompanyInput) {
+    const row = await billingService.notifyCompanyAsAdmin(id, input);
     return { body: ok(row), status: 200 as const };
   },
 };

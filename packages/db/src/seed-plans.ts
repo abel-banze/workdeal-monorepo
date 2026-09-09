@@ -76,6 +76,8 @@ type PlanSeed = {
   name: string;
   description: string;
   inheritFromPlanId?: string;
+  // Preços comerciais são anuais — os planos pagos usam "yearly".
+  interval: "monthly" | "quarterly" | "yearly";
   priceMzn: number;
   trialDays: number;
   maxProfiles: number | null;
@@ -98,6 +100,7 @@ export const PLANS_SEED: PlanSeed[] = [
     slug: "free",
     name: "Free",
     description: "Entrada no ecossistema — perfil, pesquisa e acesso ao mercado.",
+    interval: "monthly",
     priceMzn: 0,
     trialDays: 0,
     maxProfiles: 1,
@@ -127,6 +130,7 @@ export const PLANS_SEED: PlanSeed[] = [
     name: "Workdeal Trust",
     description: "Camada de confiança — verificação da identidade e legitimidade da empresa.",
     inheritFromPlanId: "plan-free",
+    interval: "yearly",
     priceMzn: TRUST_PRICING_TEST_MZN[0],
     trialDays: 7,
     maxProfiles: 1,
@@ -157,6 +161,7 @@ export const PLANS_SEED: PlanSeed[] = [
     name: "Premium",
     description: "Crescimento e produtividade — visibilidade, analytics, IA e equipa.",
     inheritFromPlanId: "plan-trust",
+    interval: "yearly",
     priceMzn: 10000,
     trialDays: 7,
     maxProfiles: 5,
@@ -193,6 +198,7 @@ export const PLANS_SEED: PlanSeed[] = [
     name: "Enterprise",
     description: "Procurement, inteligência empresarial, automação e API.",
     inheritFromPlanId: "plan-premium",
+    interval: "yearly",
     priceMzn: 35000,
     trialDays: 14,
     maxProfiles: null,
@@ -246,6 +252,7 @@ export async function seedPlans(): Promise<{ plans: number; features: number }> 
           set: {
             name: p.name,
             description: p.description,
+            interval: p.interval,
             priceMzn: p.priceMzn,
             trialDays: p.trialDays,
             maxProfiles: p.maxProfiles,
