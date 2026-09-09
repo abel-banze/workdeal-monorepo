@@ -8,6 +8,12 @@ import { verificationPaymentProofSchema } from "./verification.js";
 export const SUBSCRIPTION_STATUSES = ["active", "past_due", "trialing", "cancelled", "paused", "expired"] as const;
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
+// Emitente das facturas/recibos de subscrição (facturação manual).
+export const CODEBAZ_BILLING_ISSUER = {
+  name: "Codebaz SU, Lda",
+  nuit: "401733655",
+} as const;
+
 export const PAYMENT_STATUSES = ["pending", "processing", "succeeded", "failed", "refunded", "partially_refunded", "cancelled"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
@@ -275,6 +281,21 @@ export const resumeMySubscriptionSchema = z.object({
   organizationId: z.string().min(1).optional(),
 });
 export type ResumeMySubscriptionInput = z.infer<typeof resumeMySubscriptionSchema>;
+
+// Validação de pagamento de activação: confirma o pagamento, activa a
+// subscrição em pausa, emite o recibo e envia-o à empresa. Nota opcional
+// fica registada nas notas internas.
+export const adminValidatePaymentSchema = z.object({
+  note: z.string().trim().max(1000).optional(),
+});
+export type AdminValidatePaymentInput = z.infer<typeof adminValidatePaymentSchema>;
+
+// Notificação à empresa (ex: pagamento por confirmar): envia email com a
+// mensagem e regista-a nas notas internas da subscrição.
+export const adminNotifyCompanySchema = z.object({
+  message: z.string().trim().min(1, "Mensagem obrigatória").max(2000),
+});
+export type AdminNotifyCompanyInput = z.infer<typeof adminNotifyCompanySchema>;
 
 // Override administrativo do estado de uma subscrição (ex: extensão de trial,
 // reactivação de subscrição cancelada). Não altera o provider externo.

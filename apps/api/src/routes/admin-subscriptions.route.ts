@@ -5,6 +5,8 @@ import { requireSystemRole } from "../middlewares/rbac.middleware.js";
 import { adminBillingController } from "../controllers/admin-billing.controller.js";
 import {
   adminUpdateSubscriptionStatusSchema,
+  adminValidatePaymentSchema,
+  adminNotifyCompanySchema,
   cancelSubscriptionSchema,
   changeSubscriptionPlanSchema,
   pauseSubscriptionSchema,
@@ -58,6 +60,20 @@ adminSubscriptionsRoute.post("/:id/resume", requireSystemRole("admin"), async (c
 // paga e dispara a creditação de comissão de afiliado (se aplicável).
 adminSubscriptionsRoute.post("/payments/:paymentId/confirm", requireSystemRole("admin"), async (c) => {
   const { body, status } = await adminBillingController.confirmPayment(c.req.param("paymentId"));
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
+// Validação de activação: confirma + recibo + activa subscrição + email à empresa.
+adminSubscriptionsRoute.post("/payments/:paymentId/validate", requireSystemRole("admin"), zValidator("json", adminValidatePaymentSchema), async (c) => {
+  const { body, status } = await adminBillingController.validatePayment(c.req.param("paymentId"), c.req.valid("json"));
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
+// Notificação à empresa (email com mensagem + nota interna).
+adminSubscriptionsRoute.post("/:id/notify", requireSystemRole("admin"), zValidator("json", adminNotifyCompanySchema), async (c) => {
+  const { body, status } = await adminBillingController.notifyCompany(c.req.param("id"), c.req.valid("json"));
   c.header("Cache-Control", "no-store");
   return c.json(body, status);
 });

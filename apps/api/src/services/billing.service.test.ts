@@ -7,18 +7,38 @@ const mocks = vi.hoisted(() => ({
   billing: {
     findPlanById: vi.fn(),
     findSubscriptionForScope: vi.fn(),
+    findSubscriptionById: vi.fn(),
     createSubscription: vi.fn(),
     createManualPayment: vi.fn(),
     updateSubscription: vi.fn(),
+    createInvoice: vi.fn(),
+    createInvoiceLineItem: vi.fn(),
+    setPaymentInvoice: vi.fn(),
+    findBillingContact: vi.fn(),
+    findInvoiceById: vi.fn(),
+    findInvoiceByNumber: vi.fn(),
+    findPaymentById: vi.fn(),
+    createReceipt: vi.fn(),
+    findReceiptByPaymentId: vi.fn(),
+    findReceiptByNumber: vi.fn(),
+    confirmManualPayment: vi.fn(),
   },
   affiliateService: {
     creditOnInvoicePaid: vi.fn(),
   },
+  emailInvoice: vi.fn(),
+  emailReceipt: vi.fn(),
+  emailNotice: vi.fn(),
 }));
 
 vi.mock("@workdeal/auth", () => ({ getOrgRole: mocks.getOrgRole }));
 vi.mock("../repositories/billing.repository.js", () => ({ billingRepository: mocks.billing }));
 vi.mock("./affiliate.service.js", () => ({ affiliateService: mocks.affiliateService }));
+vi.mock("./email.service.js", () => ({
+  sendSubscriptionInvoiceEmail: mocks.emailInvoice,
+  sendSubscriptionReceiptEmail: mocks.emailReceipt,
+  sendSubscriptionNoticeEmail: mocks.emailNotice,
+}));
 
 import { billingService } from "./billing.service.js";
 
@@ -44,6 +64,26 @@ beforeEach(() => {
   mocks.billing.findSubscriptionForScope.mockResolvedValue(null);
   mocks.billing.createSubscription.mockResolvedValue({ id: "sub-1" });
   mocks.billing.updateSubscription.mockResolvedValue({ id: "sub-1" });
+  mocks.billing.createInvoice.mockResolvedValue({ id: "inv-1" });
+  mocks.billing.createInvoiceLineItem.mockResolvedValue({ id: "li-1" });
+  mocks.billing.setPaymentInvoice.mockResolvedValue({ id: "pay-1" });
+  mocks.billing.findInvoiceByNumber.mockResolvedValue(null);
+  mocks.billing.findReceiptByNumber.mockResolvedValue(null);
+  mocks.billing.confirmManualPayment.mockResolvedValue({
+    paymentId: "pay-1",
+    invoiceId: "inv-1",
+    organizationId: "org-1",
+    totalMzn: 3500,
+    alreadyPaid: false,
+  });
+  mocks.billing.findBillingContact.mockResolvedValue({
+    userEmail: "ana@empresa.co.mz",
+    userName: "Ana",
+    organization: { name: "Empresa XYZ", contactEmail: "contato@empresa.co.mz" },
+  });
+  mocks.emailInvoice.mockResolvedValue({ ok: true });
+  mocks.emailReceipt.mockResolvedValue({ ok: true });
+  mocks.emailNotice.mockResolvedValue({ ok: true });
 });
 
 describe("billingService.subscribeMySubscriptionPlan", () => {
@@ -134,10 +174,20 @@ describe("billingService.subscribeMySubscriptionPlan", () => {
     expect(mocks.billing.createManualPayment).not.toHaveBeenCalled();
   });
 
-  it("plano pago com comprovativo cria pagamento pending com a prova", async () => {
+  it("plano pago com comprovativo cria subscrição em pausa + factura + pagamento + email", async () => {
     mocks.billing.findPlanById.mockResolvedValue(PLAN_PAID);
     mocks.billing.createManualPayment.mockResolvedValue({ id: "pay-1" });
     const result = await billingService.subscribeMySubscriptionPlan("u1", "org-1", { planId: "plan-trust", payment: PROOF });
+    expect(mocks.billing.createSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "paused", metadata: { awaitingPayment: true } }),
+    );
+    expect(mocks.billing.createInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "u1", organizationId: "org-1", totalMzn: 3500 }),
+    );
+    expect(mocks.billing.createInvoiceLineItem).toHaveBeenCalledWith(
+      expect.objectContaining({ invoiceId: "inv-1", quantity: 1, totalMzn: 3500 }),
+    );
+    expect(mocks.billing.setPaymentInvoice).toHaveBeenCalledWith("pay-1", "inv-1");
     expect(mocks.billing.createManualPayment).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "u1", amountMzn: 3500, method: "bank_transfer" }),
     );
@@ -146,6 +196,9 @@ describe("billingService.subscribeMySubscriptionPlan", () => {
       kind: "subscription_activation",
       proof: { fileId: "file-1", url: "https://cdn/x.pdf", name: "comp.pdf", reference: "Titular X" },
     });
+    expect(mocks.emailInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "contato@empresa.co.mz", customerName: "Empresa XYZ", planName: "Workdeal Trust" }),
+    );
     expect(result).toMatchObject({ payment: { id: "pay-1" } });
   });
 
@@ -154,6 +207,79 @@ describe("billingService.subscribeMySubscriptionPlan", () => {
     expect(mocks.billing.createSubscription).toHaveBeenCalledTimes(1);
     expect(mocks.billing.createManualPayment).not.toHaveBeenCalled();
     expect(result).toMatchObject({ payment: null });
+  });
+
+  it("retoma própria bloqueada enquanto aguarda pagamento (409 PAYMENT_PENDING)", async () => {
+    mocks.billing.findSubscriptionForScope.mockResolvedValue({ id: "sub-1", status: "paused", metadata: { awaitingPayment: true } });
+    await expect(billingService.resumeMySubscription("u1", "org-1")).rejects.toMatchObject({
+      status: 409,
+      code: "PAYMENT_PENDING",
+    });
+  });
+
+  it("validação admin confirma, emite recibo, activa e envia email", async () => {
+    mocks.billing.findPaymentById.mockResolvedValue({
+      id: "pay-1",
+      userId: "u1",
+      amountMzn: 3500,
+      invoiceId: "inv-1",
+      metadata: { kind: "subscription_activation", subscriptionId: "sub-1" },
+    });
+    mocks.billing.findSubscriptionById.mockResolvedValue({
+      id: "sub-1",
+      userId: "u1",
+      organizationId: "org-1",
+      status: "paused",
+      metadata: { awaitingPayment: true },
+      planName: "Workdeal Trust",
+      planPriceMzn: 3500,
+    });
+    mocks.billing.findInvoiceById.mockResolvedValue({ id: "inv-1", invoiceNumber: "FT-2026-ABC123" });
+    mocks.billing.findReceiptByPaymentId.mockResolvedValue(null);
+    mocks.billing.createReceipt.mockResolvedValue({ id: "rc-1", receiptNumber: "RC-2026-XYZ789" });
+    const result = await billingService.validateSubscriptionPaymentAsAdmin("pay-1", { note: "Conferido no BIM" });
+    expect(mocks.billing.updateSubscription).toHaveBeenCalledWith(
+      "sub-1",
+      expect.objectContaining({ status: "active", pausedAt: null, resumeAt: null }),
+    );
+    const cleared = mocks.billing.updateSubscription.mock.calls[0]?.[1] as { metadata: Record<string, unknown> };
+    expect(cleared.metadata.awaitingPayment).toBeUndefined();
+    expect(mocks.billing.createReceipt).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentId: "pay-1", userId: "u1", amountMzn: 3500 }),
+    );
+    expect(mocks.emailReceipt).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "contato@empresa.co.mz", receiptNumber: "RC-2026-XYZ789" }),
+    );
+    expect(result.receiptEmail).toMatchObject({ ok: true });
+  });
+
+  it("validação rejeita pagamento que não é de activação (400)", async () => {
+    mocks.billing.findPaymentById.mockResolvedValue({ id: "pay-9", userId: "u1", metadata: {} });
+    await expect(billingService.validateSubscriptionPaymentAsAdmin("pay-9", {})).rejects.toMatchObject({
+      status: 400,
+      code: "NOT_ACTIVATION_PAYMENT",
+    });
+  });
+
+  it("notificação admin envia email e regista nota", async () => {
+    mocks.billing.findSubscriptionById.mockResolvedValue({
+      id: "sub-1",
+      userId: "u1",
+      organizationId: "org-1",
+      status: "paused",
+      planName: "Workdeal Trust",
+      planPriceMzn: 3500,
+      metadata: {},
+    });
+    const result = await billingService.notifyCompanyAsAdmin("sub-1", { message: "Aguarda pagamento" });
+    expect(mocks.emailNotice).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "contato@empresa.co.mz", message: "Aguarda pagamento" }),
+    );
+    expect(mocks.billing.updateSubscription).toHaveBeenCalledWith(
+      "sub-1",
+      expect.objectContaining({ metadata: expect.objectContaining({}) }),
+    );
+    expect(result).toMatchObject({ emailed: "contato@empresa.co.mz" });
   });
 
   it("permite âmbito pessoal sem verificação de papel", async () => {

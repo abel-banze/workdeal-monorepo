@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate, formatDateTime, formatMzn } from "@/lib/format";
 import { SubscriptionActions } from "./subscription-actions";
 import { PaymentConfirmButton } from "./payment-confirm-button";
+import { PaymentValidateButton } from "./payment-validate-button";
 
 export const metadata = {
   title: "Subscrição | Workdeal Admin",
@@ -50,6 +51,13 @@ interface Invoice {
   lineItems: LineItem[];
 }
 
+interface PaymentProof {
+  fileId?: string;
+  url?: string;
+  name?: string;
+  reference?: string;
+}
+
 interface Payment {
   id: string;
   invoiceId: string | null;
@@ -61,6 +69,7 @@ interface Payment {
   refundedAt: string | null;
   refundAmountMzn: number | null;
   failureReason: string | null;
+  metadata?: { kind?: string; proof?: PaymentProof } | null;
   createdAt: string;
   invoiceNumber: string | null;
 }
@@ -108,6 +117,9 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
           <p className="text-sm text-muted-foreground">
             {subscriber} · {d.planName as string}
           </p>
+          {(d.contactEmail as string | null) && (
+            <p className="text-sm text-muted-foreground">Contacto: {d.contactEmail as string}</p>
+          )}
         </div>
         <StatusBadge status={d.status as string} />
       </div>
@@ -181,23 +193,41 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
         </CardHeader>
         <CardContent className="space-y-3">
           {payments.length === 0 && <p className="text-sm text-muted-foreground">Sem pagamentos.</p>}
-          {payments.map((p) => (
-            <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
-              <div>
-                <span className="font-medium">{formatMzn(p.amountMzn)}</span>
-                <span className="ml-2 text-muted-foreground">
-                  {p.method ? (PAYMENT_METHOD_LABELS_PT[p.method as keyof typeof PAYMENT_METHOD_LABELS_PT] ?? p.method) : "—"}
-                  {p.invoiceNumber ? ` · ${p.invoiceNumber}` : ""}
-                </span>
+          {payments.map((p) => {
+            const proof = p.metadata?.proof;
+            const isActivation = p.metadata?.kind === "subscription_activation";
+            return (
+              <div key={p.id} className="rounded-md border p-3 text-sm space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="font-medium">{formatMzn(p.amountMzn)}</span>
+                    <span className="ml-2 text-muted-foreground">
+                      {p.method ? (PAYMENT_METHOD_LABELS_PT[p.method as keyof typeof PAYMENT_METHOD_LABELS_PT] ?? p.method) : "—"}
+                      {p.invoiceNumber ? ` · ${p.invoiceNumber}` : ""}
+                      {isActivation ? " · activação" : ""}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {PAYMENT_STATUS_LABELS_PT[p.status as keyof typeof PAYMENT_STATUS_LABELS_PT] ?? p.status} · {formatDateTime(p.createdAt)}
+                  </div>
+                </div>
+                {proof?.url && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">Comprovativo:</span>
+                    <a href={proof.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline underline-offset-2">
+                      {proof.name || "ver ficheiro"}
+                    </a>
+                    {proof.reference && <span className="text-muted-foreground">· ref: {proof.reference}</span>}
+                  </div>
+                )}
+                {isAdmin && p.status === "pending" && (
+                  isActivation
+                    ? <PaymentValidateButton paymentId={p.id} />
+                    : <PaymentConfirmButton paymentId={p.id} />
+                )}
               </div>
-              <div className="text-xs text-muted-foreground">
-                {PAYMENT_STATUS_LABELS_PT[p.status as keyof typeof PAYMENT_STATUS_LABELS_PT] ?? p.status} · {formatDateTime(p.createdAt)}
-              </div>
-              {isAdmin && p.status === "pending" && (
-                <PaymentConfirmButton paymentId={p.id} />
-              )}
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 

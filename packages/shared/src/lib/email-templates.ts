@@ -303,3 +303,96 @@ export function preRegisterCompanyHtml(params: {
 function escapeHtml(str: string): string {
   return str.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
 }
+
+// ── Facturação de subscrições (emitente: Codebaz SU, Lda) ─────────────
+
+export interface SubscriptionInvoiceEmailParams {
+  customerName: string;
+  invoiceNumber: string;
+  planName: string;
+  intervalLabel: string;
+  amount: string;
+  dueDate: string;
+  issuerName: string;
+  issuerNuit: string;
+  bankName: string;
+  nib: string;
+  accountNumber: string;
+}
+
+export function subscriptionInvoiceHtml(params: SubscriptionInvoiceEmailParams): string {
+  const p = Object.fromEntries(Object.entries(params).map(([k, v]) => [k, escapeHtml(v)]));
+  const inner = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#0F1A2E;line-height:1.1;">Factura ${p.invoiceNumber}</h1>
+    <p style="margin:0 0 16px;font-size:14px;color:#0F1A2E;opacity:0.7;line-height:1.6;">
+      Olá ${p.customerName}, segue a factura da subscrição <strong>${p.planName}</strong> (${p.intervalLabel}) no Workdeal.
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;background:#F6F3EE;border:1px solid #D9D2C2;border-radius:12px;">
+      <tr><td style="padding:16px;">
+        <p style="margin:0 0 4px;font-size:13px;color:#0F1A2E;">Subscrição ${p.planName} — ${p.intervalLabel}</p>
+        <p style="margin:0;font-size:18px;font-weight:900;color:#0F1A2E;">${p.amount}</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#0F1A2E;opacity:0.6;">Vencimento: ${p.dueDate}</p>
+      </td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
+      <tr><td style="background:#ffffff;border:1px solid #D9D2C2;border-radius:12px;padding:16px;">
+        <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;color:#0B5E56;text-transform:uppercase;">Emitente</p>
+        <p style="margin:0;font-size:13px;color:#0F1A2E;"><strong>${p.issuerName}</strong> · NUIT ${p.issuerNuit}</p>
+        <p style="margin:12px 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;color:#0B5E56;text-transform:uppercase;">Dados para transferência</p>
+        <p style="margin:0;font-size:13px;color:#0F1A2E;font-family:monospace;">Banco: <strong>${p.bankName}</strong><br/>NIB: <strong>${p.nib}</strong><br/>Conta: <strong>${p.accountNumber}</strong></p>
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:13px;color:#0F1A2E;opacity:0.65;line-height:1.5;">Após a transferência, anexa o comprovativo na página da subscrição. A activação é concluída quando o pagamento for confirmado.</p>
+  `;
+  return baseLayout(`Factura ${params.invoiceNumber} — Workdeal`, "FACTURA", inner);
+}
+
+export interface SubscriptionReceiptEmailParams {
+  customerName: string;
+  receiptNumber: string;
+  invoiceNumber: string;
+  planName: string;
+  amount: string;
+  paidAt: string;
+  issuerName: string;
+  issuerNuit: string;
+}
+
+export function subscriptionReceiptHtml(params: SubscriptionReceiptEmailParams): string {
+  const p = Object.fromEntries(Object.entries(params).map(([k, v]) => [k, escapeHtml(v)]));
+  const inner = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#0F1A2E;line-height:1.1;">Recibo ${p.receiptNumber}</h1>
+    <p style="margin:0 0 16px;font-size:14px;color:#0F1A2E;opacity:0.7;line-height:1.6;">
+      Olá ${p.customerName}, confirmámos o pagamento da subscrição <strong>${p.planName}</strong>. A subscrição está activa.
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;background:#0B5E56;border-radius:12px;">
+      <tr><td style="padding:16px;">
+        <p style="margin:0 0 4px;font-size:12px;color:#ffffff;opacity:0.75;">Valor recebido · ${p.paidAt}</p>
+        <p style="margin:0;font-size:20px;font-weight:900;color:#ffffff;">${p.amount}</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#ffffff;opacity:0.75;">Recibo ${p.receiptNumber} · Factura ${p.invoiceNumber}</p>
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:12px;color:#0F1A2E;opacity:0.55;">Emitente: <strong>${p.issuerName}</strong> · NUIT ${p.issuerNuit}</p>
+  `;
+  return baseLayout(`Recibo ${params.receiptNumber} — Workdeal`, "PAGAMENTO CONFIRMADO", inner);
+}
+
+export interface SubscriptionNoticeEmailParams {
+  customerName: string;
+  planName: string;
+  amount: string;
+  message: string;
+}
+
+export function subscriptionPaymentNoticeHtml(params: SubscriptionNoticeEmailParams): string {
+  const safeMessage = escapeHtml(params.message).replace(/\n/g, "<br/>");
+  const inner = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#0F1A2E;line-height:1.1;">Pagamento da subscrição ${escapeHtml(params.planName)}</h1>
+    <p style="margin:0 0 16px;font-size:14px;color:#0F1A2E;opacity:0.7;line-height:1.6;">Olá ${escapeHtml(params.customerName)},</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:12px;">
+      <tr><td style="padding:16px;font-size:14px;color:#0F1A2E;line-height:1.6;">${safeMessage}</td></tr>
+    </table>
+    <p style="margin:0;font-size:13px;color:#0F1A2E;opacity:0.65;">Valor em causa: <strong>${escapeHtml(params.amount)}</strong>. Responde a este email ou fala connosco para regularizar.</p>
+  `;
+  return baseLayout(`Subscrição ${params.planName} — Workdeal`, "AVISO DE PAGAMENTO", inner);
+}

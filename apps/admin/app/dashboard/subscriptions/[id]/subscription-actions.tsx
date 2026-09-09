@@ -7,6 +7,7 @@ import { SUBSCRIPTION_STATUS_LABELS_PT, SUBSCRIPTION_STATUSES, type Subscription
 import {
   cancelSubscription,
   changeSubscriptionPlan,
+  notifySubscriptionCompany,
   pauseSubscription,
   resumeSubscription,
   setSubscriptionStatus,
@@ -32,6 +33,8 @@ export function SubscriptionActions({
   const [targetPlanId, setTargetPlanId] = useState("");
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(true);
   const [cancelReason, setCancelReason] = useState("");
+  const [notifyMessage, setNotifyMessage] = useState("");
+  const [notifySent, setNotifySent] = useState<string | null>(null);
   const [resumeAt, setResumeAt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
@@ -39,7 +42,7 @@ export function SubscriptionActions({
   const inputClass = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
   const labelClass = "text-xs font-medium text-muted-foreground";
 
-  async function run(label: string, fn: () => Promise<{ success: boolean; error?: { message?: string } }>) {
+  async function run(label: string, fn: () => Promise<{ success: boolean; error?: { message?: string } }>): Promise<boolean> {
     setError(null);
     setLoading(label);
     try {
@@ -48,8 +51,10 @@ export function SubscriptionActions({
       setNote("");
       setCancelReason("");
       router.refresh();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha na operação");
+      return false;
     } finally {
       setLoading(null);
     }
@@ -114,6 +119,40 @@ export function SubscriptionActions({
           onClick={() => run("plan", () => changeSubscriptionPlan(subscription.id, { planId: targetPlanId, prorate: true }))}
         >
           {loading === "plan" ? "A mudar…" : "Mudar plano"}
+        </Button>
+      </div>
+
+      <div className="rounded-md border p-4 space-y-3">
+        <h3 className="text-sm font-semibold">Notificar empresa por email</h3>
+        <p className="text-xs text-muted-foreground">
+          Ex: pagamento por confirmar. A mensagem é enviada por email e fica registada nas notas internas.
+        </p>
+        <div className="space-y-1">
+          <label className={labelClass}>Mensagem</label>
+          <textarea
+            value={notifyMessage}
+            onChange={(e) => setNotifyMessage(e.target.value)}
+            maxLength={2000}
+            rows={3}
+            placeholder="Ex.: Olá, ainda não confirmámos o pagamento da factura FT-… Por favor verifica…"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        {notifySent && <p className="text-xs text-emerald-600">{notifySent}</p>}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={loading !== null || !notifyMessage.trim()}
+          onClick={async () => {
+            setNotifySent(null);
+            const ok = await run("notify", () => notifySubscriptionCompany(subscription.id, notifyMessage.trim()));
+            if (ok) {
+              setNotifyMessage("");
+              setNotifySent("Email enviado e registado nas notas.");
+            }
+          }}
+        >
+          {loading === "notify" ? "A enviar…" : "Enviar notificação"}
         </Button>
       </div>
 

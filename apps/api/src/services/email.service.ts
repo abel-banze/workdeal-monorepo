@@ -1,5 +1,16 @@
 import { resend, EMAIL_FROM } from "../lib/resend.js";
-import { otpEmailHtml, welcomeAccountHtml, welcomeCompanyHtml, resetPasswordHtml } from "@workdeal/shared/lib/email-templates";
+import {
+  otpEmailHtml,
+  welcomeAccountHtml,
+  welcomeCompanyHtml,
+  resetPasswordHtml,
+  subscriptionInvoiceHtml,
+  subscriptionReceiptHtml,
+  subscriptionPaymentNoticeHtml,
+  type SubscriptionInvoiceEmailParams,
+  type SubscriptionReceiptEmailParams,
+  type SubscriptionNoticeEmailParams,
+} from "@workdeal/shared/lib/email-templates";
 
 export interface SendOtpEmailParams {
   to: string;
@@ -222,4 +233,63 @@ export async function sendResetPasswordEmail({ to, name, resetUrl }: SendResetPa
     console.error("[Email] Falha reset:", msg.slice(0, 800));
     return { ok: false as const, error: msg };
   }
+}
+
+async function sendTemplatedEmail(tag: string, to: string, subject: string, html: string) {
+  if (!resend) {
+    if (process.env.NODE_ENV === "production") {
+      return { ok: false as const, error: "RESEND_API_KEY em falta no servidor — email não configurado" };
+    }
+    console.warn(`[Email] RESEND_API_KEY não configurado — mock ${tag}`);
+    console.log(`[Email ${tag} mock] para ${to} — ${subject}`);
+    return { ok: true as const, mocked: true as const };
+  }
+  try {
+    const sendPromise = resend.emails.send({ from: EMAIL_FROM, to, subject, html });
+    const timeoutPromise = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Resend timeout 8s")), 8000));
+    const { data, error } = (await Promise.race([sendPromise, timeoutPromise])) as Awaited<typeof sendPromise>;
+    if (error) {
+      const msg = (error as { message?: string })?.message || JSON.stringify(error).slice(0, 500);
+      console.error(`[Email] Resend ${tag} error:`, msg.slice(0, 300));
+      return { ok: false as const, error: msg };
+    }
+    if (!data?.id) {
+      console.error(`[Email] Resend ${tag} sem id:`, JSON.stringify(data).slice(0, 300));
+      return { ok: false as const, error: "Resposta sem id" };
+    }
+    console.log(`[Email] ${tag} enviado para ${to} (id: ${data.id})`);
+    return { ok: true as const };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[Email] Falha ${tag}:`, msg.slice(0, 300));
+    return { ok: false as const, error: msg };
+  }
+}
+
+// Factura de subscrição (emitente Codebaz SU, Lda) enviada à empresa.
+export async function sendSubscriptionInvoiceEmail(params: { to: string } & SubscriptionInvoiceEmailParams) {
+  const { to, ...tpl } = params;
+  return sendTemplatedEmail(
+    "factura-subscricao",
+    to,
+    `Factura ${tpl.invoiceNumber} — Subscrição ${tpl.planName} Workdeal`,
+    subscriptionInvoiceHtml(tpl),
+  );
+}
+
+// Recibo após validação do pagamento.
+export async function sendSubscriptionReceiptEmail(params: { to: string } & SubscriptionReceiptEmailParams) {
+  const { to, ...tpl } = params;
+  return sendTemplatedEmail(
+    "recibo-subscricao",
+    to,
+    `Recibo ${tpl.receiptNumber} — Pagamento confirmado Workdeal`,
+    subscriptionReceiptHtml(tpl),
+  );
+}
+
+// Notificação administrativa à empresa (ex: pagamento por confirmar).
+export async function sendSubscriptionNoticeEmail(params: { to: string; subject: string } & SubscriptionNoticeEmailParams) {
+  const { to, subject, ...tpl } = params;
+  return sendTemplatedEmail("aviso-pagamento", to, subject, subscriptionPaymentNoticeHtml(tpl));
 }

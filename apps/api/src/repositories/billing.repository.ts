@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
-import { coupon, db, invoice, invoiceLineItem, organization, payment, plan, planFeature, subscription, user } from "@workdeal/db";
+import { coupon, db, invoice, invoiceLineItem, organization, payment, plan, planFeature, receipt, subscription, user } from "@workdeal/db";
 import type { PlanInterval, PlanListQuery, SubscriptionListQuery, SubscriptionStatus } from "@workdeal/shared";
 
 // ── Tipos de linha (admin) ────────────────────────────────────────────────
@@ -63,6 +63,7 @@ export interface SubscriptionAdminRow {
   planInterval: string;
   couponCode: string | null;
   organizationName: string | null;
+  contactEmail: string | null;
   userEmail: string;
   userName: string | null;
 }
@@ -103,6 +104,7 @@ export interface PaymentAdminRow {
   refundedAt: Date | null;
   refundAmountMzn: number | null;
   failureReason: string | null;
+  metadata: Record<string, unknown> | null;
   createdAt: Date;
   updatedAt: Date;
   invoiceNumber: string | null;
@@ -297,6 +299,7 @@ export const billingRepository = {
         provider: subscription.provider,
         providerSubscriptionId: subscription.providerSubscriptionId,
         metadata: subscription.metadata,
+        contactEmail: organization.contactEmail,
         createdAt: subscription.createdAt,
         updatedAt: subscription.updatedAt,
         planName: plan.name,
@@ -324,6 +327,8 @@ export const billingRepository = {
     status: SubscriptionStatus;
     currentPeriodStart: Date;
     currentPeriodEnd: Date;
+    pausedAt?: Date | null;
+    metadata?: Record<string, unknown> | null;
   }) {
     const [row] = await db.insert(subscription).values(data).returning({ id: subscription.id });
     return row ?? null;
@@ -433,6 +438,7 @@ export const billingRepository = {
         refundedAt: payment.refundedAt,
         refundAmountMzn: payment.refundAmountMzn,
         failureReason: payment.failureReason,
+        metadata: payment.metadata,
         createdAt: payment.createdAt,
         updatedAt: payment.updatedAt,
         invoiceNumber: invoice.invoiceNumber,
@@ -441,6 +447,101 @@ export const billingRepository = {
       .leftJoin(invoice, eq(payment.invoiceId, invoice.id))
       .where(sql`${invoice.subscriptionId} = ${subscriptionId}`)
       .orderBy(desc(payment.createdAt)) as Promise<PaymentAdminRow[]>;
+  },
+
+  // ── Facturas / recibos / pagamentos manuais ────────────────────────────
+
+  // Contacto de facturação: nome + email da organização (se houver) e do utilizador.
+  async findBillingContact(userId: string, organizationId: string | null) {
+    const [u] = await db
+      .select({ email: user.email, name: user.name })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1);
+    let org: { name: string; contactEmail: string | null } | null = null;
+    if (organizationId) {
+      const [o] = await db
+        .select({ name: organization.name, contactEmail: organization.contactEmail })
+        .from(organization)
+        .where(eq(organization.id, organizationId))
+        .limit(1);
+      org = o ?? null;
+    }
+    return { userEmail: u?.email ?? null as string | null, userName: u?.name ?? null, organization: org };
+  },
+
+  async createInvoice(data: {
+    subscriptionId: string | null;
+    userId: string;
+    organizationId: string | null;
+    invoiceNumber: string;
+    subtotalMzn: number;
+    discountMzn: number;
+    taxMzn: number;
+    totalMzn: number;
+    periodStart: Date;
+    periodEnd: Date;
+    dueDate: Date | null;
+    metadata: Record<string, unknown> | null;
+  }) {
+    const [row] = await db.insert(invoice).values(data).returning({ id: invoice.id });
+    return row ?? null;
+  },
+
+  async createInvoiceLineItem(data: {
+    invoiceId: string;
+    description: string;
+    quantity: number;
+    unitPriceMzn: number;
+    totalMzn: number;
+  }) {
+    const [row] = await db.insert(invoiceLineItem).values(data).returning({ id: invoiceLineItem.id });
+    return row ?? null;
+  },
+
+  async findInvoiceById(id: string) {
+    const [row] = await db.select().from(invoice).where(eq(invoice.id, id)).limit(1);
+    return row ?? null;
+  },
+
+  async findInvoiceByNumber(invoiceNumber: string) {
+    const [row] = await db.select({ id: invoice.id }).from(invoice).where(eq(invoice.invoiceNumber, invoiceNumber)).limit(1);
+    return row ?? null;
+  },
+
+  async findReceiptByNumber(receiptNumber: string) {
+    const [row] = await db.select({ id: receipt.id }).from(receipt).where(eq(receipt.receiptNumber, receiptNumber)).limit(1);
+    return row ?? null;
+  },
+
+  async findPaymentById(id: string) {
+    const [row] = await db.select().from(payment).where(eq(payment.id, id)).limit(1);
+    return row ?? null;
+  },
+
+  async setPaymentInvoice(paymentId: string, invoiceId: string) {
+    const [row] = await db
+      .update(payment)
+      .set({ invoiceId, updatedAt: new Date() })
+      .where(eq(payment.id, paymentId))
+      .returning({ id: payment.id });
+    return row ?? null;
+  },
+
+  async createReceipt(data: {
+    paymentId: string;
+    receiptNumber: string;
+    userId: string;
+    amountMzn: number;
+    metadata: Record<string, unknown> | null;
+  }) {
+    const [row] = await db.insert(receipt).values(data).returning({ id: receipt.id, receiptNumber: receipt.receiptNumber });
+    return row ?? null;
+  },
+
+  async findReceiptByPaymentId(paymentId: string) {
+    const [row] = await db.select().from(receipt).where(eq(receipt.paymentId, paymentId)).limit(1);
+    return row ?? null;
   },
 
   /**

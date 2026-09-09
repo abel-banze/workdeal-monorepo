@@ -13,10 +13,16 @@ const mocks = vi.hoisted(() => ({
     createSubscription: vi.fn(),
     createManualPayment: vi.fn(),
     updateSubscription: vi.fn(),
+    createInvoice: vi.fn(),
+    createInvoiceLineItem: vi.fn(),
+    setPaymentInvoice: vi.fn(),
+    findBillingContact: vi.fn(),
+    findInvoiceByNumber: vi.fn(),
   },
   affiliateService: {
     creditOnInvoicePaid: vi.fn(),
   },
+  emailInvoice: vi.fn(),
 }));
 
 vi.mock("../middlewares/auth.middleware.js", () => ({
@@ -29,6 +35,7 @@ vi.mock("../middlewares/auth.middleware.js", () => ({
 vi.mock("@workdeal/auth", () => ({ getOrgRole: mocks.getOrgRole }));
 vi.mock("../repositories/billing.repository.js", () => ({ billingRepository: mocks.billing }));
 vi.mock("./affiliate.service.js", () => ({ affiliateService: mocks.affiliateService }));
+vi.mock("./email.service.js", () => ({ sendSubscriptionInvoiceEmail: mocks.emailInvoice }));
 
 import { subscriptionsRoute } from "../routes/subscriptions.route.js";
 import { errorHandler } from "../lib/errors.js";
@@ -64,7 +71,18 @@ beforeEach(() => {
   mocks.billing.findPlanById.mockResolvedValue(PLAN);
   mocks.billing.findSubscriptionForScope.mockResolvedValue(null);
   mocks.billing.createSubscription.mockResolvedValue({ id: "sub-1" });
+  mocks.billing.createManualPayment.mockResolvedValue({ id: "pay-1" });
   mocks.billing.updateSubscription.mockResolvedValue({ id: "sub-0" });
+  mocks.billing.createInvoice.mockResolvedValue({ id: "inv-1" });
+  mocks.billing.createInvoiceLineItem.mockResolvedValue({ id: "li-1" });
+  mocks.billing.setPaymentInvoice.mockResolvedValue({ id: "pay-1" });
+  mocks.billing.findInvoiceByNumber.mockResolvedValue(null);
+  mocks.billing.findBillingContact.mockResolvedValue({
+    userEmail: "ana@empresa.co.mz",
+    userName: "Ana",
+    organization: { name: "Empresa XYZ", contactEmail: "contato@empresa.co.mz" },
+  });
+  mocks.emailInvoice.mockResolvedValue({ ok: true });
 });
 
 describe("POST /api/v1/subscriptions/current/subscribe", () => {

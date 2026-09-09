@@ -2,7 +2,9 @@ import { billingRepository, type PlanRow } from "../repositories/billing.reposit
 import { affiliateService } from "./affiliate.service.js";
 import { AppError } from "../lib/errors.js";
 import { getOrgRole } from "@workdeal/auth";
-import type { CancelSubscriptionInput, ChangeSubscriptionPlanInput, SubscribeMySubscriptionInput, AdminUpdateSubscriptionStatusInput, PlanCreateInput, PlanFeatureUpsertInput, PlanUpdateInput, PlanInterval } from "@workdeal/shared";
+import type { CancelSubscriptionInput, ChangeSubscriptionPlanInput, SubscribeMySubscriptionInput, AdminUpdateSubscriptionStatusInput, AdminValidatePaymentInput, AdminNotifyCompanyInput, PlanCreateInput, PlanFeatureUpsertInput, PlanUpdateInput, PlanInterval } from "@workdeal/shared";
+import { CODEBAZ_BILLING_ISSUER, PLAN_INTERVAL_LABELS_PT, VERIFICATION_TRUST_PAYMENT } from "@workdeal/shared";
+import { sendSubscriptionInvoiceEmail, sendSubscriptionReceiptEmail, sendSubscriptionNoticeEmail } from "./email.service.js";
 
 /** Fim do período inicial a partir do intervalo do plano. */
 function addPlanPeriod(from: Date, interval: PlanInterval): Date {
@@ -11,6 +13,27 @@ function addPlanPeriod(from: Date, interval: PlanInterval): Date {
   else if (interval === "quarterly") end.setMonth(end.getMonth() + 3);
   else end.setMonth(end.getMonth() + 1);
   return end;
+}
+
+function formatMzn(value: number): string {
+  return `${value.toLocaleString("pt-MZ")} MZN`;
+}
+
+function formatDatePt(value: Date): string {
+  return value.toLocaleDateString("pt-MZ", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/** Número de documento (factura/recibo) único, com retry em colisão. */
+async function uniqueDocumentNumber(
+  prefix: string,
+  exists: (n: string) => Promise<unknown>,
+): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const rand = Math.random().toString(36).slice(2, 8).toUpperCase().padEnd(6, "X");
+    const number = `${prefix}-${new Date().getFullYear()}-${rand}`;
+    if (!(await exists(number))) return number;
+  }
+  throw new AppError(500, "DOCUMENT_NUMBER_FAILED", "Não foi possível gerar número de documento único");
 }
 
 class BillingService {
@@ -294,8 +317,10 @@ class BillingService {
    *
    * Pagamento: mesmos dados da verificação de identidade (Millennium BIM +
    * comprovativo). Planos pagos exigem o comprovativo (400 PROOF_REQUIRED sem
-   * ele) e geram um pagamento `pending` para o admin confirmar no fluxo
-   * manual existente; planos gratuitos activam sem pagamento.
+   * ele): a subscrição nasce em `paused` (aguarda validação), com factura
+   * gerada e enviada por email (Codebaz SU, Lda) e pagamento `pending`.
+   * O admin valida no painel (activa + recibo). Planos gratuitos activam
+   * de imediato, sem pagamento nem factura.
    */
   async subscribeMySubscriptionPlan(userId: string, organizationId: string | null, input: SubscribeMySubscriptionInput) {
     if (organizationId) {
@@ -318,42 +343,108 @@ class BillingService {
     }
     const now = new Date();
     const currentPeriodEnd = addPlanPeriod(now, plan.interval);
+    const paid = plan.priceMzn > 0;
     const subscription = existing
-      ? // Reactivação: limpa cancelamento/pausa e abre um período novo no plano escolhido.
+      ? // Reactivação: pausa a aguardar pagamento (ou activa se gratuito),
+        // limpa cancelamento/pausa anterior e abre um período novo.
         await billingRepository.updateSubscription(existing.id, {
           planId: plan.id,
-          status: "active",
+          status: paid ? "paused" : "active",
           currentPeriodStart: now,
           currentPeriodEnd,
           cancelAt: null,
           cancelledAt: null,
           cancelReason: null,
-          pausedAt: null,
+          pausedAt: paid ? now : null,
           resumeAt: null,
+          metadata: {
+            ...((existing.metadata as Record<string, unknown> | null) ?? {}),
+            awaitingPayment: paid,
+          },
         })
       : await billingRepository.createSubscription({
           userId,
           organizationId,
           planId: plan.id,
-          status: "active",
+          status: paid ? "paused" : "active",
           currentPeriodStart: now,
           currentPeriodEnd,
+          ...(paid
+            ? {
+                pausedAt: now,
+                metadata: { awaitingPayment: true },
+              }
+            : {}),
         });
-    const payment = proof
-      ? await billingRepository.createManualPayment({
-          userId,
-          amountMzn: plan.priceMzn,
-          method: proof.method ?? "bank_transfer",
-          metadata: {
-            kind: "subscription_activation",
-            subscriptionId: (subscription as { id?: unknown } | null)?.id ?? null,
-            organizationId,
-            planId: plan.id,
-            proof: { fileId: proof.fileId, url: proof.url, name: proof.name ?? "", reference: proof.reference ?? "" },
-          },
-        })
-      : null;
-    return { subscription, payment };
+    if (!proof) return { subscription, payment: null, invoice: null, invoiceEmail: null };
+
+    const subscriptionId = (subscription as { id?: string } | null)?.id ?? null;
+    const invoiceNumber = await uniqueDocumentNumber("FT", (n) => billingRepository.findInvoiceByNumber(n));
+    const dueDate = new Date(now);
+    dueDate.setDate(dueDate.getDate() + 7);
+    const invoice = await billingRepository.createInvoice({
+      subscriptionId,
+      userId,
+      organizationId,
+      invoiceNumber,
+      subtotalMzn: plan.priceMzn,
+      discountMzn: 0,
+      taxMzn: 0,
+      totalMzn: plan.priceMzn,
+      periodStart: now,
+      periodEnd: currentPeriodEnd,
+      dueDate,
+      metadata: { kind: "subscription_activation", planId: plan.id },
+    });
+    await billingRepository.createInvoiceLineItem({
+      invoiceId: (invoice as { id: string }).id,
+      description: `Subscrição ${plan.name} — ${PLAN_INTERVAL_LABELS_PT[plan.interval] ?? plan.interval}`,
+      quantity: 1,
+      unitPriceMzn: plan.priceMzn,
+      totalMzn: plan.priceMzn,
+    });
+    const payment = await billingRepository.createManualPayment({
+      userId,
+      amountMzn: plan.priceMzn,
+      method: proof.method ?? "bank_transfer",
+      metadata: {
+        kind: "subscription_activation",
+        subscriptionId,
+        invoiceId: (invoice as { id: string }).id,
+        organizationId,
+        planId: plan.id,
+        proof: { fileId: proof.fileId, url: proof.url, name: proof.name ?? "", reference: proof.reference ?? "" },
+      },
+    });
+    // Liga o pagamento à factura (exigido pelo confirmManualPayment).
+    await billingRepository.setPaymentInvoice(
+      (payment as { id: string }).id,
+      (invoice as { id: string }).id,
+    );
+
+    // Factura por email (best-effort: falha no envio não anula o pedido).
+    const contact = await billingRepository.findBillingContact(userId, organizationId);
+    const recipient = contact.organization?.contactEmail ?? contact.userEmail;
+    const customerName = contact.organization?.name ?? contact.userName ?? contact.userEmail ?? "Cliente";
+    let invoiceEmail: { ok: boolean; error?: string } = { ok: false, error: "Sem email de contacto" };
+    if (recipient) {
+      const sent = await sendSubscriptionInvoiceEmail({
+        to: recipient,
+        customerName,
+        invoiceNumber,
+        planName: plan.name,
+        intervalLabel: PLAN_INTERVAL_LABELS_PT[plan.interval] ?? plan.interval,
+        amount: formatMzn(plan.priceMzn),
+        dueDate: formatDatePt(dueDate),
+        issuerName: CODEBAZ_BILLING_ISSUER.name,
+        issuerNuit: CODEBAZ_BILLING_ISSUER.nuit,
+        bankName: VERIFICATION_TRUST_PAYMENT.bankName,
+        nib: VERIFICATION_TRUST_PAYMENT.nib,
+        accountNumber: VERIFICATION_TRUST_PAYMENT.accountNumber,
+      });
+      invoiceEmail = sent.ok ? { ok: true } : { ok: false, error: sent.error };
+    }
+    return { subscription, payment, invoice, invoiceEmail };
   }
 
   async changeMySubscriptionPlan(userId: string, organizationId: string | null, input: ChangeSubscriptionPlanInput) {
@@ -382,7 +473,128 @@ class BillingService {
 
   async resumeMySubscription(userId: string, organizationId: string | null) {
     const sub = await this.requireOwnedSubscription(userId, organizationId);
+    const meta = (sub.metadata as Record<string, unknown> | null) ?? {};
+    if (meta.awaitingPayment) {
+      throw new AppError(409, "PAYMENT_PENDING", "Subscrição aguarda confirmação do pagamento — será activada após validação.");
+    }
     return this.resumeSubscription(sub.id);
+  }
+
+  /** Regista nota interna sem alterar mais nada (reusa o formato de setSubscriptionStatus). */
+  private async appendAdminNote(subscriptionId: string, status: string, note: string | null) {
+    const sub = await billingRepository.findSubscriptionById(subscriptionId);
+    if (!sub) return;
+    const meta = ((sub.metadata as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+    const adminNotes = [...((meta.adminNotes ?? []) as unknown[])];
+    adminNotes.push({ status, note, at: new Date().toISOString() });
+    await billingRepository.updateSubscription(subscriptionId, { metadata: { ...meta, adminNotes } });
+  }
+
+  private resolveRecipient(contact: {
+    userEmail: string | null;
+    userName: string | null;
+    organization: { name: string; contactEmail: string | null } | null;
+  }) {
+    return {
+      recipient: contact.organization?.contactEmail ?? contact.userEmail,
+      customerName: contact.organization?.name ?? contact.userName ?? contact.userEmail ?? "Cliente",
+    };
+  }
+
+  /**
+   * Validação administrativa de pagamento de activação: confirma o pagamento
+   * (factura paga), emite o recibo (idempotente), activa a subscrição em
+   * pausa e envia o recibo à empresa por email. Nota opcional vai para as
+   * notas internas.
+   */
+  async validateSubscriptionPaymentAsAdmin(paymentId: string, input: AdminValidatePaymentInput) {
+    const pay = await billingRepository.findPaymentById(paymentId);
+    if (!pay) throw new AppError(404, "NOT_FOUND", "Pagamento não encontrado");
+    const payMeta = (pay.metadata as Record<string, unknown> | null) ?? {};
+    const subscriptionId = typeof payMeta.subscriptionId === "string" ? payMeta.subscriptionId : null;
+    if (payMeta.kind !== "subscription_activation" || !subscriptionId) {
+      throw new AppError(400, "NOT_ACTIVATION_PAYMENT", "Este pagamento não é de activação de subscrição");
+    }
+    const sub = await billingRepository.findSubscriptionById(subscriptionId);
+    if (!sub) throw new AppError(404, "NOT_FOUND", "Subscrição não encontrada");
+
+    const confirmed = await billingRepository.confirmManualPayment(paymentId);
+    if (!confirmed) throw new AppError(404, "NOT_FOUND", "Factura do pagamento não encontrada");
+
+    let receipt: { id: string; receiptNumber: string } | null = await billingRepository.findReceiptByPaymentId(paymentId);
+    if (!receipt) {
+      const receiptNumber = await uniqueDocumentNumber("RC", (n) => billingRepository.findReceiptByNumber(n));
+      receipt = await billingRepository.createReceipt({
+        paymentId,
+        receiptNumber,
+        userId: pay.userId,
+        amountMzn: pay.amountMzn,
+        metadata: { kind: "subscription_activation", subscriptionId, invoiceId: pay.invoiceId },
+      });
+    }
+    const receiptNumber = receipt?.receiptNumber ?? "";
+
+    const subMeta = ((sub.metadata as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+    delete subMeta.awaitingPayment;
+    const subscription = await billingRepository.updateSubscription(sub.id, {
+      status: "active",
+      pausedAt: null,
+      resumeAt: null,
+      metadata: subMeta,
+    });
+
+    await this.appendAdminNote(
+      sub.id,
+      "active",
+      input.note
+        ? `Pagamento validado — recibo ${receiptNumber}. ${input.note}`
+        : `Pagamento validado — recibo ${receiptNumber}.`,
+    );
+
+    const contact = await billingRepository.findBillingContact(sub.userId, sub.organizationId);
+    const { recipient, customerName } = this.resolveRecipient(contact);
+    let receiptEmail: { ok: boolean; error?: string } = { ok: false, error: "Sem email de contacto" };
+    if (recipient) {
+      const invoice = pay.invoiceId ? await billingRepository.findInvoiceById(pay.invoiceId) : null;
+      const sent = await sendSubscriptionReceiptEmail({
+        to: recipient,
+        customerName,
+        receiptNumber,
+        invoiceNumber: invoice?.invoiceNumber ?? "",
+        planName: sub.planName ?? "Subscrição",
+        amount: formatMzn(pay.amountMzn),
+        paidAt: formatDatePt(new Date()),
+        issuerName: CODEBAZ_BILLING_ISSUER.name,
+        issuerNuit: CODEBAZ_BILLING_ISSUER.nuit,
+      });
+      receiptEmail = sent.ok ? { ok: true } : { ok: false, error: sent.error };
+    }
+    return { payment: confirmed, receipt, subscription, receiptEmail };
+  }
+
+  /**
+   * Notifica a empresa por email (ex: pagamento por confirmar) e regista a
+   * mensagem nas notas internas. Para cancelar em seguida, usar o cancelamento
+   * administrativo existente.
+   */
+  async notifyCompanyAsAdmin(subscriptionId: string, input: AdminNotifyCompanyInput) {
+    const sub = await billingRepository.findSubscriptionById(subscriptionId);
+    if (!sub) throw new AppError(404, "NOT_FOUND", "Subscrição não encontrada");
+    const contact = await billingRepository.findBillingContact(sub.userId, sub.organizationId);
+    const { recipient, customerName } = this.resolveRecipient(contact);
+    if (!recipient) throw new AppError(400, "NO_CONTACT_EMAIL", "Empresa sem email de contacto");
+    const planName = sub.planName ?? "Subscrição";
+    const sent = await sendSubscriptionNoticeEmail({
+      to: recipient,
+      subject: `Subscrição ${planName} — mensagem da equipa Workdeal`,
+      customerName,
+      planName,
+      amount: formatMzn(sub.planPriceMzn ?? 0),
+      message: input.message,
+    });
+    if (!sent.ok) throw new AppError(502, "EMAIL_FAILED", `Falha ao enviar email: ${sent.error ?? "erro desconhecido"}`);
+    await this.appendAdminNote(sub.id, sub.status, `Email à empresa: ${input.message}`);
+    return { emailed: recipient };
   }
 
   /** Busca a subscrição do âmbito e confirma que o utilizador a pode gerir. */

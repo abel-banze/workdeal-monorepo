@@ -53,6 +53,7 @@ export type CurrentSubscription = {
     planPriceMzn?: number
     planInterval?: "monthly" | "quarterly" | "yearly"
     organizationName?: string | null
+    metadata?: Record<string, unknown> | null
   }
   plan: PublicPlan | null
   features: PlanFeatureView[]
