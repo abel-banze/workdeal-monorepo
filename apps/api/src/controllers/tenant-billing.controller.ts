@@ -15,6 +15,11 @@ export const tenantBillingController = {
     return { body: ok(row), status: 200 as const };
   },
 
+  async subscribe(user: AuthUser, organizationId: string | null, input: Parameters<typeof billingService.subscribeMySubscriptionPlan>[2]) {
+    const row = await billingService.subscribeMySubscriptionPlan(user.id, organizationId, input);
+    return { body: ok(row), status: 201 as const };
+  },
+
   async changePlan(user: AuthUser, organizationId: string | null, input: Parameters<typeof billingService.changeMySubscriptionPlan>[2]) {
     const row = await billingService.changeMySubscriptionPlan(user.id, organizationId, input);
     return { body: ok(row), status: 200 as const };

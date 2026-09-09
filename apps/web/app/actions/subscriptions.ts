@@ -9,6 +9,7 @@ import {
   changeMySubscriptionPlanSchema,
   pauseMySubscriptionSchema,
   resumeMySubscriptionSchema,
+  subscribeMySubscriptionSchema,
 } from "@workdeal/shared"
 
 export type PlanFeatureView = { featureKey: string; featureValue: string | null; label: string | null }
@@ -74,6 +75,24 @@ export async function getCurrentSubscription(organizationId: string) {
     `/api/v1/subscriptions/current?organizationId=${encodeURIComponent(organizationId)}`,
     { cache: "no-store" },
   )
+}
+
+export type SubscribePayment = {
+  method?: "bank_transfer" | "mpesa" | "emola" | "card" | "credits";
+  fileId: string;
+  url: string;
+  name?: string;
+  reference?: string;
+};
+
+export async function subscribeMyPlan(organizationId: string, planId: string, payment?: SubscribePayment) {
+  await requireAuth()
+  const data = subscribeMySubscriptionSchema.parse({ organizationId, planId, payment })
+  const token = await getAuthToken()
+  return apiFetchWithAuth("/api/v1/subscriptions/current/subscribe", token, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
 }
 
 export async function changeMyPlan(organizationId: string, planId: string) {
