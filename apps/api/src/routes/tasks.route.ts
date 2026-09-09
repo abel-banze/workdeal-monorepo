@@ -80,6 +80,14 @@ tasksRoute.patch("/bids/:id", requireAuth, zValidator("json", updateBidStatusSch
   return c.json(resBody, status);
 });
 
+// ── Tarefas da organização (antes de /:id) ─────────────────────────
+tasksRoute.get("/by-organization/:organizationId", requireAuth, zValidator("query", taskListQuerySchema), async (c) => {
+  const q = c.req.valid("query");
+  const { body, status } = await tasksController.organizationTasks(c.get("user"), c.req.param("organizationId"), { status: q.status, page: q.page, limit: q.limit });
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
 // ── Tarefa individual ─────────────────────────────────────────────
 tasksRoute.get("/:id", async (c) => {
   const { body, status } = await tasksController.get(c.req.param("id"));

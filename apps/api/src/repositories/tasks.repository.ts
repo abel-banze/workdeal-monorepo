@@ -219,6 +219,17 @@ export const tasksRepository = {
     return { items: enriched as (TaskRow & { tags: { id: string; slug: string; name: string }[] })[], total: cntRow?.cnt ?? 0 };
   },
 
+  async listByOrganization(organizationId: string, status: string | undefined, page: number, limit: number) {
+    const where = status
+      ? and(eq(task.requesterOrganizationId, organizationId), eq(task.status, asTaskStatus(status)))
+      : eq(task.requesterOrganizationId, organizationId);
+    const [cntRow] = await db.select({ cnt: count() }).from(task).where(where);
+    const items = await db.select(taskColumns).from(task).where(where).orderBy(desc(task.createdAt)).limit(limit).offset((page - 1) * limit);
+    const tagMap = await tagsRepository.getTaskTagsForTasks(items.map((i) => i.id));
+    const enriched = items.map((i) => ({ ...i, tags: tagMap.get(i.id) ?? [] }));
+    return { items: enriched as (TaskRow & { tags: { id: string; slug: string; name: string }[] })[], total: cntRow?.cnt ?? 0 };
+  },
+
   async update(id: string, data: Partial<typeof task.$inferInsert>): Promise<TaskRow | null> {
     return db.transaction(async (tx) => {
       const [row] = await tx.update(task).set({ ...data, updatedAt: new Date() }).where(eq(task.id, id)).returning(taskColumns);

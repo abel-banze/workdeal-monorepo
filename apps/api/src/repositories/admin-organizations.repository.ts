@@ -7,6 +7,7 @@ export interface AdminOrganizationRow {
   name: string;
   slug: string;
   logo: string | null;
+  contactPhone: string | null;
   verificationStatus: string;
   createdAt: Date;
   verifiedAt: Date | null;
@@ -48,6 +49,7 @@ export const adminOrganizationsRepository = {
           name: organization.name,
           slug: organization.slug,
           logo: organization.logo,
+          contactPhone: organization.contactPhone,
           verificationStatus: organization.verificationStatus,
           createdAt: organization.createdAt,
           verifiedAt: organization.verifiedAt,
