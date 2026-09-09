@@ -74,4 +74,10 @@ export const adminBillingController = {
     const row = await billingService.resumeSubscription(id);
     return { body: ok(row), status: 200 as const };
   },
+
+  // ── Pagamentos (modo manual) ────────────────────────────────────────────
+  async confirmPayment(id: string) {
+    const row = await billingService.confirmPaymentAsAdmin(id);
+    return { body: ok(row), status: 200 as const };
+  },
 };

@@ -24,6 +24,9 @@ import type {
   ChangeSubscriptionPlanInput,
   CancelSubscriptionInput,
   PauseSubscriptionInput,
+  AffiliateListQuery,
+  AffiliateCreateInput,
+  AffiliateUpdateInput,
 } from "@workdeal/shared";
 import { apiFetch, apiFetchWithAuth, apiUpload } from "@/lib/api";
 import { requireSystemRole } from "@/lib/auth";
@@ -620,4 +623,80 @@ export async function resumeSubscription(id: string) {
   if (session.user.systemRole !== "admin") throw new Error("Só administradores podem retomar subscrições");
   const token = await getAuthToken();
   return apiFetchWithAuth(`/api/v1/admin/subscriptions/${id}/resume`, token, { method: "POST" });
+}
+
+// ── Afiliados ─────────────────────────────────────────────────────────────
+
+export async function listAdminAffiliates(query: AffiliateListQuery) {
+  await requireSystemRole("moderator", "admin");
+  const params = new URLSearchParams();
+  if (query.search) params.set("search", query.search);
+  if (query.status) params.set("status", query.status);
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const res = await apiFetch<unknown>(`/api/v1/admin/affiliates${qs ? `?${qs}` : ""}`);
+  return res;
+}
+
+export async function createAdminAffiliate(input: AffiliateCreateInput) {
+  await requireSystemRole("admin");
+  const token = await getAuthToken();
+  return apiFetchWithAuth("/api/v1/admin/affiliates", token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAdminAffiliate(id: string, input: AffiliateUpdateInput) {
+  await requireSystemRole("admin");
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/affiliates/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function listAdminAffiliateReferrals(id: string) {
+  await requireSystemRole("moderator", "admin");
+  const res = await apiFetch<unknown>(`/api/v1/admin/affiliates/${id}/referrals?limit=50`);
+  return res;
+}
+
+export async function confirmManualPayment(paymentId: string) {
+  await requireSystemRole("admin");
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/subscriptions/payments/${paymentId}/confirm`, token, {
+    method: "POST",
+  });
+}
+
+// ── Verificações de identidade ───────────────────────────────────────────
+
+export async function listAdminVerifications(query: { status?: string; page?: number; limit?: number } = {}) {
+  await requireSystemRole("moderator", "admin");
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  return apiFetch<unknown>(`/api/v1/admin/verifications${qs ? `?${qs}` : ""}`);
+}
+
+export async function approveVerification(id: string, reviewNote?: string) {
+  await requireSystemRole("moderator", "admin");
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/verifications/${id}/approve`, token, {
+    method: "POST",
+    body: JSON.stringify({ reviewNote: reviewNote ?? undefined }),
+  });
+}
+
+export async function rejectVerification(id: string, reviewNote?: string) {
+  await requireSystemRole("moderator", "admin");
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/verifications/${id}/reject`, token, {
+    method: "POST",
+    body: JSON.stringify({ reviewNote: reviewNote ?? undefined }),
+  });
 }

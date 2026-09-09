@@ -43,6 +43,7 @@ import { adminInstitutionsRoute } from "./routes/admin-institutions.route.js";
 import { badgesRoute } from "./routes/badges.route.js";
 import { plansRoute } from "./routes/plans.route.js";
 import { subscriptionsRoute } from "./routes/subscriptions.route.js";
+import { affiliateRoute } from "./routes/affiliate.route.js";
 
 const app = new Hono();
 
@@ -476,6 +477,7 @@ app.route("/api/v1/admin/institutions", adminInstitutionsRoute);
 app.route("/api/v1/badges", badgesRoute);
 app.route("/api/v1/plans", plansRoute);
 app.route("/api/v1/subscriptions", subscriptionsRoute);
+app.route("/api/v1/affiliate", affiliateRoute);
 
 app.notFound(() => {
   throw new AppError(404, "NOT_FOUND", "Rota não encontrada");

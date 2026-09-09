@@ -84,8 +84,8 @@ export default async function EditCompanyProfilePage({
     const pData = profileRes
     if (!pData && orgSlug) {
       try {
-        const listRes = await apiFetch<{ items: ProfileData[] }>("/api/v1/profiles?limit=50", { cache: "no-store" })
-        const items = listRes.data?.items ?? []
+        const listRes = await apiFetch<ProfileData[]>("/api/v1/profiles?limit=50", { cache: "no-store" })
+        const items = listRes.data ?? []
         const found = items.find((it) => it && it.slug === orgSlug) ?? items.find((it) => it && it.name === orgName) ?? null
         profile = found ?? pData
       } catch {

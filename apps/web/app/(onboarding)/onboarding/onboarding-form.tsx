@@ -178,6 +178,10 @@ export function OnboardingForm({
   const [timers, setTimers] = useState<Record<"whatsapp" | "phone" | "email", number | null>>({ whatsapp: null, phone: null, email: null });
   const [timerNow, setTimerNow] = useState(Date.now());
 
+  // Código de indicação (preenchido no /signup via ?ref=, ou digitado aqui)
+  const [affiliateCode, setAffiliateCode] = useState("");
+  const [affiliateStatus, setAffiliateStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
+
   useEffect(() => {
     const hasActive = timers.whatsapp != null || timers.phone != null || timers.email != null;
     if (!hasActive) return;
@@ -392,6 +396,23 @@ export function OnboardingForm({
       } catch {}
       if (alive) setHydrated(true);
     })();
+
+    // 4. Código de indicação vindo do link de registo (?ref=) — validado ao montar
+    try {
+      const raw = window.localStorage.getItem("wd:ref");
+      if (raw) {
+        const d = JSON.parse(raw) as { code?: string };
+        if (d.code) {
+          const code = d.code.slice(0, 20);
+          setAffiliateCode(code);
+          void (async () => {
+            const { validateAffiliateCodeAction } = await import("@/app/actions/affiliates");
+            const res = await validateAffiliateCodeAction({ code });
+            if (alive) setAffiliateStatus(res.ok ? "valid" : "invalid");
+          })();
+        }
+      }
+    } catch {}
 
     return () => {
       alive = false;
@@ -720,6 +741,20 @@ export function OnboardingForm({
       });
 
       if (!res.ok) throw new Error(res.error);
+
+      // Atribui a indicação (não bloqueia o fluxo — se falhar, mostramos apenas)
+      try {
+        const code = affiliateCode.trim().toUpperCase();
+        if (code) {
+          const { attachAffiliateAction } = await import("@/app/actions/affiliates");
+          const ares = await attachAffiliateAction({ organizationId: orgId, code, source: "coupon" });
+          if (ares.ok) {
+            try { window.localStorage.removeItem("wd:ref"); } catch {}
+          } else {
+            setMsg({ type: "info", text: ares.error });
+          }
+        }
+      } catch {}
 
       try {
         window.localStorage.removeItem("wd:onb:orgId");
@@ -1139,6 +1174,42 @@ export function OnboardingForm({
               <div className="space-y-1.5">
                 <label className={labelCls}>Descrição</label>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="O que a empresa faz, diferenciais…" rows={3} className={textareaCls} maxLength={800} />
+              </div>
+
+              <div className="space-y-1.5 rounded-2xl border border-[#D9D2C2] bg-[#F6F3EE] p-4">
+                <label htmlFor="onb-affiliateCode" className={labelCls}>
+                  Código de indicação <span className="font-normal normal-case text-[#0F1A2E]/35">(opcional)</span>
+                </label>
+                <input
+                  id="onb-affiliateCode"
+                  value={affiliateCode}
+                  onChange={(e) => {
+                    setAffiliateCode(e.target.value.toUpperCase());
+                    setAffiliateStatus("idle");
+                  }}
+                  onBlur={(e) => {
+                    const raw = e.target.value.trim().toUpperCase();
+                    if (raw.length < 4) { setAffiliateStatus("idle"); return; }
+                    setAffiliateStatus("checking");
+                    void (async () => {
+                      const { validateAffiliateCodeAction } = await import("@/app/actions/affiliates");
+                      const res = await validateAffiliateCodeAction({ code: raw });
+                      setAffiliateStatus(res.ok ? "valid" : "invalid");
+                      if (!res.ok) setMsg({ type: "info", text: res.error });
+                    })();
+                  }}
+                  placeholder="Ex: WD-ABC123"
+                  autoComplete="off"
+                  className={inputCls}
+                />
+                {affiliateStatus === "checking" && <p className="text-xs text-[#0F1A2E]/40">A validar código…</p>}
+                {affiliateStatus === "valid" && (
+                  <p className="inline-flex rounded-full bg-[#0B5E56]/10 px-2.5 py-1 text-xs font-medium text-[#0B5E56]">✓ Código válido — aplicado ao publicar</p>
+                )}
+                {affiliateStatus === "invalid" && (
+                  <p className="text-xs font-medium text-[#7A1A0A]">Código inválido — verifica ou remove.</p>
+                )}
+                <p className="text-xs leading-relaxed text-[#0F1A2E]/50">Ouve falar da Workdeal por um parceiro? Adiciona o código dele e ele ganha ao veres a tua empresa a crescer.</p>
               </div>
             </div>
 

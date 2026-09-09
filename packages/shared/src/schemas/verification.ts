@@ -31,11 +31,34 @@ export const verificationDocumentSchema = z.object({
   name: z.string().trim().max(255).optional().default(""),
 });
 
+// Conta Millennium BIM para pagamento do plano Workdeal Trust associado à
+// verificação de identidade. O comprovativo de pagamento é anexado ao pedido.
+export const VERIFICATION_TRUST_PAYMENT = {
+  planName: "Workdeal Trust",
+  bankName: "Millennium BIM",
+  nib: "000100000102582039757",
+  accountNumber: "1025820397",
+} as const;
+
+export const verificationPaymentProofSchema = z.object({
+  method: z.enum(["bank_transfer", "mpesa", "emola", "card", "credits"]).default("bank_transfer"),
+  // Comprovativo enviado pelo utilizador (ficheiro carregado via purpose "verification")
+  fileId: z.string().min(1, "Comprovativo em falta"),
+  url: z.string().min(1, "URL do comprovativo em falta"),
+  name: z.string().trim().max(255).optional().default(""),
+  // Referência/observação da transferência (opcional)
+  reference: z.string().trim().max(128).optional().default(""),
+});
+
 export const verificationRequestSchema = z.object({
   profileId: z.string().min(1, "profileId obrigatório"),
   documents: z.array(verificationDocumentSchema).max(VERIFICATION_DOCUMENT_TYPES.length).default([]),
   // level1 = todos os documentos de registo legal; level2 = ainda em processo de legalização
   level: verificationLevelSchema.default("level1"),
+  // Estatutos / BR (Boletim da República) — número de publicação do registo da empresa
+  brNumber: z.string().trim().max(120).optional().default(""),
+  // Comprovativo do pagamento do plano Workdeal Trust (transferência Millennium BIM)
+  payment: verificationPaymentProofSchema.optional(),
 });
 
 export const verificationReviewSchema = z.object({
@@ -56,3 +79,51 @@ export type VerificationListQuery = z.infer<typeof verificationListQuerySchema>;
 export type VerificationReviewInput = z.infer<typeof verificationReviewSchema>;
 export type VerificationRequestInput = z.infer<typeof verificationRequestSchema>;
 export type VerificationDocumentInput = z.infer<typeof verificationDocumentSchema>;
+export type VerificationPaymentProofInput = z.infer<typeof verificationPaymentProofSchema>;
+
+// ── Painel admin ────────────────────────────────────────────────────────────
+
+export type VerificationRequestStatus = z.infer<typeof verificationStatusSchema>;
+export type VerificationRequestLevel = z.infer<typeof verificationLevelSchema>;
+
+export const VERIFICATION_STATUS_LABELS_PT: Record<VerificationRequestStatus, string> = {
+  pending: "Pendente",
+  in_review: "Em análise",
+  approved: "Aprovada",
+  rejected: "Rejeitada",
+};
+
+export const VERIFICATION_LEVEL_LABELS_PT: Record<VerificationRequestLevel, string> = {
+  level1: "1.º grau (legalizada)",
+  level2: "2.º grau (em legalização)",
+};
+
+export const VERIFICATION_PAYMENT_METHOD_LABELS_PT: Record<string, string> = {
+  bank_transfer: "Transferência bancária",
+  mpesa: "M-Pesa",
+  emola: "eMola",
+  card: "Cartão",
+  credits: "Créditos",
+};
+
+/** Vista de um pedido de verificação para o painel admin (com perfil/org resolvidos). */
+export interface AdminVerificationView {
+  id: string;
+  profileId: string;
+  profileName: string | null;
+  profileType: "company" | "individual" | "institution" | string | null;
+  profileSlug: string | null;
+  organizationName: string | null;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  status: VerificationRequestStatus;
+  level: VerificationRequestLevel;
+  documents: VerificationDocumentInput[];
+  brNumber: string | null;
+  paymentProof: VerificationPaymentProofInput | null;
+  reviewerUserId: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

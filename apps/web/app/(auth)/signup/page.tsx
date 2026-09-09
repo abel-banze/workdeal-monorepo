@@ -6,13 +6,21 @@ import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
 import { getServerSession } from "@/lib/auth";
 import { SignUpForm } from "./signup-form";
 
-export default async function SignUpPage() {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ ref?: string }>;
+}) {
   const session = await getServerSession().catch(() => null);
   if (session) {
     const store = await cookies();
     if (store.has(JWT_COOKIE_NAME)) redirect("/dashboard");
     // Sessão sem JWT (logout parcial) — não redireciona para evitar loop
   }
+
+  // Código de afiliado via link de indicação (ex: /signup?ref=WD-XXXXXX)
+  const sp = searchParams ? await searchParams : {};
+  const ref = sp.ref?.trim() ? sp.ref.trim().toUpperCase().slice(0, 20) : undefined;
 
   return (
     <div className="min-h-dvh bg-[#F6F3EE]">
@@ -130,7 +138,7 @@ export default async function SignUpPage() {
                   <p className="mt-1 text-sm text-[#0F1A2E]/60">Comece a fazer parte do ecossistema.</p>
                 </div>
 
-                <SignUpForm />
+                <SignUpForm initialAffiliateCode={ref} />
               </div>
 
               <p className="mt-6 text-center text-sm text-[#0F1A2E]/60">

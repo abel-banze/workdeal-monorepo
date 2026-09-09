@@ -281,6 +281,20 @@
       "when": 1788889147871,
       "tag": "0039_dry_captain_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1788946273028,
+      "tag": "0040_whole_screwball",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1788952712164,
+      "tag": "0041_wandering_solo",
+      "breakpoints": true
     }
   ]
 }

@@ -214,7 +214,7 @@ export function EventsManager({
     setError(null)
     try {
       const res = await listEventRegistrations(eventId)
-      const items = ((res.data as { items?: RegistrationItem[] } | null)?.items ?? []) as RegistrationItem[]
+      const items = (res.data ?? []) as RegistrationItem[]
       setRegsByEvent((prev) => ({ ...prev, [eventId]: items }))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao carregar inscrições")

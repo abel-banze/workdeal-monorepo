@@ -25,8 +25,8 @@ export default async function ServicesPage({ params }: { params: Promise<{ organ
     const pRes = await apiFetch<{ id: string; slug: string; name: string } | null>(`/api/v1/profiles/${encodeURIComponent(org.slug)}`, { cache: "no-store" }).catch(() => ({ data: null } as never))
     profile = pRes.data ?? null
     if (!profile) {
-      const list = await apiFetch<{ items: { id: string; slug: string; name: string }[] }>(`/api/v1/profiles?limit=50`, { cache: "no-store" }).catch(() => ({ data: { items: [] } } as never))
-      const found = (list.data?.items ?? []).find((it) => it.slug === org.slug) ?? null
+      const list = await apiFetch<{ id: string; slug: string; name: string }[]>(`/api/v1/profiles?limit=50`, { cache: "no-store" }).catch(() => ({ data: [] as { id: string; slug: string; name: string }[] } as never))
+      const found = (list.data ?? []).find((it) => it.slug === org.slug) ?? null
       profile = found as never
     }
     const cats = await apiFetch<{ id: string; name: string; slug: string }[]>(`/api/v1/categories`, { cache: "no-store" }).catch(() => ({ data: [] } as never))

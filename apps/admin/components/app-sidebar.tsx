@@ -24,6 +24,7 @@ import {
   FlagIcon,
   CreditCardIcon,
   SettingsIcon,
+  GiftIcon,
 } from "lucide-react"
 import { NavMain, type NavMainItem } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
@@ -74,6 +75,13 @@ const groups: { label: string; items: NavMainItem[] }[] = [
           { title: "Todas", url: "/dashboard/institutions" },
           { title: "Pendentes", url: "/dashboard/institutions/pending" },
           { title: "Membresias", url: "/dashboard/institutions/memberships" },
+        ],
+      },
+      {
+        title: "Afiliados",
+        icon: <GiftIcon />,
+        items: [
+          { title: "Todos", url: "/dashboard/affiliates" },
         ],
       },
     ],

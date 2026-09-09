@@ -17,6 +17,7 @@ import { adminDashboardController } from "../controllers/admin-dashboard.control
 import { adminBadgesRoute } from "./admin-badges.route.js";
 import { adminPlansRoute } from "./admin-plans.route.js";
 import { adminSubscriptionsRoute } from "./admin-subscriptions.route.js";
+import { adminAffiliatesRoute } from "./admin-affiliates.route.js";
 
 export const adminRoute = new Hono<Env>();
 
@@ -170,3 +171,4 @@ adminRoute.route("/badges", adminBadgesRoute);
 // e mantém-se o código actual da cadeia, sem sombreamento com outras rotas.
 adminRoute.route("/plans", adminPlansRoute);
 adminRoute.route("/subscriptions", adminSubscriptionsRoute);
+adminRoute.route("/affiliates", adminAffiliatesRoute);

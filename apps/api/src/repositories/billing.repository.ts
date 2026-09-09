@@ -412,4 +412,40 @@ export const billingRepository = {
       .where(sql`${invoice.subscriptionId} = ${subscriptionId}`)
       .orderBy(desc(payment.createdAt)) as Promise<PaymentAdminRow[]>;
   },
+
+  /**
+   * Modo manual: marca um pagamento e a factura correspondente como pagos
+   * (status 'succeeded'). Idempotente — re-confirmar já não faz nada.
+   * Devolve os dados necessários ao afiliado para creditar a 1ª conversão.
+   */
+  async confirmManualPayment(paymentId: string) {
+    return db.transaction(async (tx) => {
+      const [pay] = await tx.select().from(payment).where(eq(payment.id, paymentId)).limit(1);
+      if (!pay) return null;
+      if (pay.invoiceId == null) throw new Error("Pagamento sem factura associada");
+
+      const [inv] = await tx
+        .select()
+        .from(invoice)
+        .where(eq(invoice.id, pay.invoiceId))
+        .limit(1);
+      if (!inv) return null;
+
+      const now = new Date();
+      if (pay.status !== "succeeded") {
+        await tx.update(payment).set({ status: "succeeded", paidAt: now, updatedAt: now }).where(eq(payment.id, pay.id));
+      }
+      if (inv.status !== "succeeded") {
+        await tx.update(invoice).set({ status: "succeeded", paidAt: now, updatedAt: now }).where(eq(invoice.id, inv.id));
+      }
+
+      return {
+        paymentId: pay.id,
+        invoiceId: inv.id,
+        organizationId: inv.organizationId,
+        totalMzn: inv.totalMzn,
+        alreadyPaid: pay.status === "succeeded",
+      };
+    });
+  },
 };

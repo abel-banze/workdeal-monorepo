@@ -2,6 +2,7 @@ import { db, badge, organization, profile, profileBadge } from "@workdeal/db";
 import { eq } from "drizzle-orm";
 import {
   type VerificationListQuery,
+  type VerificationPaymentProofInput,
   VERIFICATION_DOCUMENT_TYPES,
   missingVerificationDocuments,
   verificationDocumentLabel,
@@ -38,7 +39,13 @@ class VerificationsService {
     return updated;
   }
 
-  async create(profileId: string, documents: unknown, level: "level1" | "level2" = "level1") {
+  async create(
+    profileId: string,
+    documents: unknown,
+    level: "level1" | "level2" = "level1",
+    brNumber: string | null | undefined,
+    payment?: VerificationPaymentProofInput,
+  ) {
     // Permite re-submissão: só bloqueia se já existe pending/in_review
     const pending = await db
       .select()
@@ -61,7 +68,29 @@ class VerificationsService {
       const labels = missing.map((t) => verificationDocumentLabel(t)).join(", ");
       throw new AppError(400, "DOCUMENTS_REQUIRED", `Faltam documentos obrigatórios: ${labels}`);
     }
-    return verificationsRepository.create({ id: newId(), profileId, documents: docs as never, status: "pending" as never, level: level as never });
+    // Comprovativo de pagamento do plano Workdeal Trust — se fornecido, validar campos obrigatórios
+    let paymentProof: Record<string, unknown> | null = null;
+    if (payment) {
+      if (!payment.fileId || !payment.url) {
+        throw new AppError(400, "PAYMENT_PROOF_REQUIRED", "Comprovativo de pagamento incompleto — anexa o ficheiro.");
+      }
+      paymentProof = {
+        method: payment.method ?? "bank_transfer",
+        fileId: payment.fileId,
+        url: payment.url,
+        name: payment.name ?? "",
+        reference: payment.reference ?? "",
+      };
+    }
+    return verificationsRepository.create({
+      id: newId(),
+      profileId,
+      documents: docs as never,
+      status: "pending" as never,
+      level: level as never,
+      brNumber: brNumber?.trim() || null,
+      paymentProof: paymentProof as never,
+    });
   }
 
   private async assignBadgeForLevel(vr: { profileId: string; level: "level1" | "level2" | null }) {

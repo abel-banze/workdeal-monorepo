@@ -81,8 +81,8 @@ export default async function EventsPage({
       const pRes = await apiFetch<{ id: string; name: string; slug: string } | null>(`/api/v1/profiles/${encodeURIComponent(orgSlug)}`, { cache: "no-store" }).catch(() => ({ data: null } as never))
       let profile = pRes.data ?? null
       if (!profile) {
-        const list = await apiFetch<{ items: { id: string; name: string; slug: string }[] }>("/api/v1/profiles?limit=50&groupId=all", { cache: "no-store" }).catch(() => ({ data: null } as never))
-        const items = ((list.data as { items?: { id: string; name: string; slug: string }[] } | null)?.items ?? []) as { id: string; name: string; slug: string }[]
+        const list = await apiFetch<{ id: string; name: string; slug: string }[]>("/api/v1/profiles?limit=50&groupId=all", { cache: "no-store" }).catch(() => ({ data: [] as { id: string; name: string; slug: string }[] } as never))
+        const items = (list.data ?? []) as { id: string; name: string; slug: string }[]
         profile = items.find((it) => it.slug === orgSlug) ?? null
       }
       organizerProfileId = profile?.id ?? null
@@ -91,8 +91,8 @@ export default async function EventsPage({
 
     const params = new URLSearchParams({ limit: "50" })
     if (activeStatus !== "all") params.set("status", activeStatus)
-    const eRes = await apiFetch<{ items?: EventListItem[] }>(`/api/v1/events/my?${params.toString()}`, { cache: "no-store" }).catch(() => ({ data: null } as never))
-    events = ((eRes.data as { items?: EventListItem[] } | null)?.items ?? []) as EventListItem[]
+    const eRes = await apiFetch<EventListItem[]>(`/api/v1/events/my?${params.toString()}`, { cache: "no-store" }).catch(() => ({ data: [] as EventListItem[] } as never))
+    events = (eRes.data ?? []) as EventListItem[]
   } catch {
     events = []
   }

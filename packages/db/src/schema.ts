@@ -603,6 +603,10 @@ export const verificationRequest = pgTable(
     status: verificationRequestStatusEnum("status").notNull().default("pending"),
     level: verificationLevelEnum("level").notNull().default("level1"),
     documents: jsonb("documents").notNull().default([]),
+    // Estatutos / BR (Boletim da República) — número de publicação do registo
+    brNumber: text("br_number"),
+    // Comprovativo do pagamento do plano Workdeal Trust (Millennium BIM)
+    paymentProof: jsonb("payment_proof"),
     reviewerUserId: text("reviewer_user_id").references(() => user.id, { onDelete: "set null" }),
     reviewedAt: timestamp("reviewed_at"),
     reviewNote: text("review_note"),
@@ -1383,5 +1387,90 @@ export const webhookEvent = pgTable(
   (table) => [
     uniqueIndex("webhook_event_provider_external_id_idx").on(table.provider, table.externalId),
     index("webhook_event_status_idx").on(table.provider, table.status),
+  ],
+);
+
+// ── Programa de afiliados ────────────────────────────────────
+// Users ou organizações convidam empresas com código (cupom) ou link; a
+// comissão é creditada quando a empresa convidada paga a primeira factura.
+
+export const affiliateActorTypeEnum = pgEnum("affiliate_actor_type", ["user", "organization"]);
+export const affiliateCommissionTypeEnum = pgEnum("affiliate_commission_type", ["percent", "fixed"]);
+export const affiliateStatusEnum = pgEnum("affiliate_status", ["active", "suspended"]);
+export const affiliateReferralSourceEnum = pgEnum("affiliate_referral_source", ["coupon", "link"]);
+export const affiliateReferralStatusEnum = pgEnum("affiliate_referral_status", ["attributed", "converted", "voided"]);
+export const affiliateEarningStatusEnum = pgEnum("affiliate_earning_status", ["pending", "paid", "cancelled"]);
+
+export const affiliate = pgTable(
+  "affiliate",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    actorType: affiliateActorTypeEnum("actor_type").notNull(),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    organizationId: text("organization_id").references((): AnyPgColumn => organization.id, { onDelete: "set null" }),
+    code: text("code").notNull().unique(),
+    commissionType: affiliateCommissionTypeEnum("commission_type").notNull().default("percent"),
+    commissionValue: integer("commission_value").notNull().default(0),
+    status: affiliateStatusEnum("status").notNull().default("active"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("affiliate_user_idx").on(table.userId),
+    index("affiliate_org_idx").on(table.organizationId),
+  ],
+);
+
+export const affiliateReferral = pgTable(
+  "affiliate_referral",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    affiliateId: text("affiliate_id")
+      .notNull()
+      .references(() => affiliate.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    source: affiliateReferralSourceEnum("source").notNull().default("coupon"),
+    // Empresa convidada; fica preenchido quando a empresa é criada no onboarding.
+    referredOrganizationId: text("referred_organization_id").references((): AnyPgColumn => organization.id, { onDelete: "set null" }),
+    status: affiliateReferralStatusEnum("status").notNull().default("attributed"),
+    convertedInvoiceId: text("converted_invoice_id").references((): AnyPgColumn => invoice.id, { onDelete: "set null" }),
+    commissionAmountMzn: integer("commission_amount_mzn"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    convertedAt: timestamp("converted_at"),
+  },
+  (table) => [
+    index("affiliate_referral_affiliate_idx").on(table.affiliateId),
+    // Uma organização só pode ser atribuída a um único afiliado.
+    uniqueIndex("affiliate_referral_org_uidx").on(table.referredOrganizationId),
+    index("affiliate_referral_status_idx").on(table.status),
+  ],
+);
+
+export const affiliateEarning = pgTable(
+  "affiliate_earning",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    affiliateId: text("affiliate_id")
+      .notNull()
+      .references(() => affiliate.id, { onDelete: "cascade" }),
+    referralId: text("referral_id")
+      .notNull()
+      .references(() => affiliateReferral.id, { onDelete: "cascade" }),
+    invoiceId: text("invoice_id").references((): AnyPgColumn => invoice.id, { onDelete: "set null" }),
+    amountMzn: integer("amount_mzn").notNull(),
+    status: affiliateEarningStatusEnum("status").notNull().default("pending"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    paidAt: timestamp("paid_at"),
+  },
+  (table) => [
+    index("affiliate_earning_affiliate_idx").on(table.affiliateId),
+    index("affiliate_earning_referral_idx").on(table.referralId),
+    uniqueIndex("affiliate_earning_referral_invoice_uidx").on(table.referralId, table.invoiceId),
   ],
 );
