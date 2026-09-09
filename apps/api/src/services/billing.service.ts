@@ -302,10 +302,25 @@ class BillingService {
   async getMySubscription(userId: string, organizationId: string | null) {
     const sub = await this.requireOwnedSubscription(userId, organizationId);
     const plan = await billingRepository.findPlanById(sub.planId);
+    // Pagamento de activação ainda por validar (comprovativo para a empresa rever).
+    const payments = await billingRepository.listPaymentsForSubscription(sub.id);
+    const pending = payments.find((p) => p.status === "pending" && (p.metadata as Record<string, unknown> | null)?.kind === "subscription_activation") ?? null;
+    const pendingPayment = pending
+      ? {
+          id: pending.id,
+          amountMzn: pending.amountMzn,
+          method: pending.method,
+          status: pending.status,
+          invoiceNumber: pending.invoiceNumber,
+          createdAt: pending.createdAt,
+          proof: ((pending.metadata as Record<string, unknown> | null)?.proof as { fileId?: string; url?: string; name?: string; reference?: string } | undefined) ?? null,
+        }
+      : null;
     return {
       subscription: sub,
       plan: plan ?? null,
       features: plan ? await this.resolveOwnAndInheritedFeatureKeys(plan.id) : [],
+      pendingPayment,
     };
   }
 

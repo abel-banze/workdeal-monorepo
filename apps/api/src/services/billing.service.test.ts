@@ -6,8 +6,10 @@ const mocks = vi.hoisted(() => ({
   getOrgRole: vi.fn(),
   billing: {
     findPlanById: vi.fn(),
+    listFeatures: vi.fn(),
     findSubscriptionForScope: vi.fn(),
     findSubscriptionById: vi.fn(),
+    listPaymentsForSubscription: vi.fn(),
     createSubscription: vi.fn(),
     createManualPayment: vi.fn(),
     updateSubscription: vi.fn(),
@@ -62,6 +64,8 @@ beforeEach(() => {
   mocks.getOrgRole.mockResolvedValue("owner");
   mocks.billing.findPlanById.mockResolvedValue(PLAN_MONTHLY);
   mocks.billing.findSubscriptionForScope.mockResolvedValue(null);
+  mocks.billing.listPaymentsForSubscription.mockResolvedValue([]);
+  mocks.billing.listFeatures.mockResolvedValue([]);
   mocks.billing.createSubscription.mockResolvedValue({ id: "sub-1" });
   mocks.billing.updateSubscription.mockResolvedValue({ id: "sub-1" });
   mocks.billing.createInvoice.mockResolvedValue({ id: "inv-1" });
@@ -280,6 +284,39 @@ describe("billingService.subscribeMySubscriptionPlan", () => {
       expect.objectContaining({ metadata: expect.objectContaining({}) }),
     );
     expect(result).toMatchObject({ emailed: "contato@empresa.co.mz" });
+  });
+
+  it("getMySubscription devolve pagamento pendente com comprovativo", async () => {
+    mocks.billing.findSubscriptionForScope.mockResolvedValue({ id: "sub-1", planId: "plan-trust" });
+    mocks.billing.listPaymentsForSubscription.mockResolvedValue([
+      {
+        id: "pay-1",
+        amountMzn: 3500,
+        method: "bank_transfer",
+        status: "pending",
+        invoiceNumber: "FT-2026-A1",
+        createdAt: new Date("2026-09-09"),
+        metadata: {
+          kind: "subscription_activation",
+          proof: { fileId: "f1", url: "https://cdn/x.pdf", name: "comp.pdf", reference: "Titular" },
+        },
+      },
+      { id: "pay-0", status: "succeeded", metadata: {} },
+    ]);
+    const result = await billingService.getMySubscription("u1", "org-1");
+    expect(result.pendingPayment).toMatchObject({
+      id: "pay-1",
+      amountMzn: 3500,
+      invoiceNumber: "FT-2026-A1",
+      proof: { url: "https://cdn/x.pdf", name: "comp.pdf", reference: "Titular" },
+    });
+  });
+
+  it("getMySubscription devolve pendingPayment nulo sem pendentes", async () => {
+    mocks.billing.findSubscriptionForScope.mockResolvedValue({ id: "sub-1", planId: "plan-trust" });
+    mocks.billing.listPaymentsForSubscription.mockResolvedValue([]);
+    const result = await billingService.getMySubscription("u1", "org-1");
+    expect(result.pendingPayment).toBeNull();
   });
 
   it("permite âmbito pessoal sem verificação de papel", async () => {

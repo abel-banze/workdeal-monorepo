@@ -290,6 +290,37 @@ export function SubscriptionManager({
           </div>
         </div>
 
+        {/* Pagamento em validação (comprovativo anexado no pedido) */}
+        {initial?.pendingPayment && (
+          <div className="rounded-[20px] border border-[#B45309]/30 bg-[#B45309]/[0.04] p-5 sm:p-6">
+            <h3 className="text-sm font-black tracking-tight text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
+              Pagamento em validação
+            </h3>
+            <div className="mt-3 space-y-1.5 text-[13px] text-[#0F1A2E]/75">
+              <p>
+                <span className="font-bold text-[#0F1A2E]">{formatMzn(initial.pendingPayment.amountMzn)}</span>
+                {initial.pendingPayment.invoiceNumber && (
+                  <span className="text-[#0F1A2E]/55"> · Factura {initial.pendingPayment.invoiceNumber}</span>
+                )}
+              </p>
+              {initial.pendingPayment.proof?.url ? (
+                <p>
+                  Comprovativo:{" "}
+                  <a href={initial.pendingPayment.proof.url} target="_blank" rel="noopener noreferrer" className="font-bold text-[#0B5E56] underline underline-offset-2">
+                    {initial.pendingPayment.proof.name || "ver ficheiro"}
+                  </a>
+                  {initial.pendingPayment.proof.reference && (
+                    <span className="text-[#0F1A2E]/55"> · ref: {initial.pendingPayment.proof.reference}</span>
+                  )}
+                </p>
+              ) : (
+                <p className="text-[#0F1A2E]/55">Comprovativo registado — a equipa Workdeal está a validar.</p>
+              )}
+              <p className="text-xs text-[#0F1A2E]/50">A subscrição activa automaticamente quando o pagamento for confirmado.</p>
+            </div>
+          </div>
+        )}
+
         {/* Features do plano actual */}
         {initial && initial.features.length > 0 && (
           <div className="rounded-[20px] border border-[#D9D2C2] bg-white p-5 sm:p-6">
