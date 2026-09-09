@@ -165,7 +165,9 @@ async function sendViaZernio(toDigits: string, code: string): Promise<SendResult
         participantId: toDigits,
         templateName: TEMPLATE_NAME,
         templateLanguage: "pt_PT",
-        templateParams: [code],
+        // verify_otp_usage tem 2 variáveis (ordem Zernio: header -> body -> URL-button):
+        // 1 no corpo (o código) + 1 no botão URL "Copiar código" (...&code=otp{{1}}).
+        templateParams: [code, code],
       }),
       cache: "no-store",
     });
