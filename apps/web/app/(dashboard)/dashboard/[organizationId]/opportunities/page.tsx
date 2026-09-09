@@ -66,11 +66,11 @@ export default async function OpportunitiesPage({
   try {
     const { apiFetch } = await import("@/lib/api")
     if (activeTab === "proposals") {
-      const pRes = await apiFetch<{ items?: ProposalSentItem[] }>("/api/v1/tasks/proposals?role=sent&limit=50", { cache: "no-store" }).catch(() => ({ data: null } as never))
-      proposals = (pRes.data as { items?: ProposalSentItem[] } | null)?.items ?? []
+      const pRes = await apiFetch<ProposalSentItem[]>("/api/v1/tasks/proposals?role=sent&limit=50", { cache: "no-store" }).catch(() => ({ data: [] as ProposalSentItem[] } as never))
+      proposals = (pRes.data ?? []) as ProposalSentItem[]
     } else {
-      const bRes = await apiFetch<{ items?: BidWonItem[] }>("/api/v1/tasks/bids?role=provider&limit=50", { cache: "no-store" }).catch(() => ({ data: null } as never))
-      bids = (bRes.data as { items?: BidWonItem[] } | null)?.items ?? []
+      const bRes = await apiFetch<BidWonItem[]>("/api/v1/tasks/bids?role=provider&limit=50", { cache: "no-store" }).catch(() => ({ data: [] as BidWonItem[] } as never))
+      bids = (bRes.data ?? []) as BidWonItem[]
     }
   } catch {
     proposals = []

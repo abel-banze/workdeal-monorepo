@@ -93,8 +93,8 @@ export default async function TaskDetailPage({
     if (isRequester) {
       const pRes = await apiFetch<ProposalItem[]>(`/api/v1/tasks/${encodeURIComponent(taskId)}/proposals?limit=50`, { cache: "no-store" })
       proposals = pRes.data ?? []
-      const bRes = await apiFetch<{ items: BidItem[] }>("/api/v1/tasks/bids?role=requester&limit=50", { cache: "no-store" }).catch(() => ({ data: null } as never))
-      const items = (bRes.data as { items: BidItem[] } | null)?.items ?? []
+      const bRes = await apiFetch<BidItem[]>("/api/v1/tasks/bids?role=requester&limit=50", { cache: "no-store" }).catch(() => ({ data: [] as BidItem[] } as never))
+      const items = (bRes.data ?? []) as BidItem[]
       bid = items.find((b) => b.taskId === taskRow.id) ?? null
     }
   } catch (e) {

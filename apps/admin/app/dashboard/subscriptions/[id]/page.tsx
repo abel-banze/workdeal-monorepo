@@ -12,6 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate, formatDateTime, formatMzn } from "@/lib/format";
 import { SubscriptionActions } from "./subscription-actions";
+import { PaymentConfirmButton } from "./payment-confirm-button";
 
 export const metadata = {
   title: "Subscrição | Workdeal Admin",
@@ -192,6 +193,9 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
               <div className="text-xs text-muted-foreground">
                 {PAYMENT_STATUS_LABELS_PT[p.status as keyof typeof PAYMENT_STATUS_LABELS_PT] ?? p.status} · {formatDateTime(p.createdAt)}
               </div>
+              {isAdmin && p.status === "pending" && (
+                <PaymentConfirmButton paymentId={p.id} />
+              )}
             </div>
           ))}
         </CardContent>

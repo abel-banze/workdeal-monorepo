@@ -15,7 +15,7 @@ export const verificationsRoute = new Hono<Env>();
 
 verificationsRoute.post("/request", requireAuth, zValidator("json", verificationRequestSchema), async (c) => {
   const user = c.get("user");
-  const { profileId, documents, level } = c.req.valid("json");
+  const { profileId, documents, level, brNumber, payment } = c.req.valid("json");
 
   // Verifica propriedade: individual (userId) ou empresa (organizationId + permissão)
   const [row] = await db.select(profileColumns).from(profile).where(eq(profile.id, profileId)).limit(1);
@@ -33,7 +33,7 @@ verificationsRoute.post("/request", requireAuth, zValidator("json", verification
   }
 
   // Delegar criação com verificação de duplicado pendente no service
-  const created = await verificationsService.create(profileId, documents, level);
+  const created = await verificationsService.create(profileId, documents, level, brNumber, payment);
   return c.json({ success: true, data: created }, 201);
 });
 

@@ -4,11 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signUpSchema } from "@workdeal/shared";
+import { validateAffiliateCodeAction } from "@/app/actions/affiliates";
 import { authClient, fetchJwtToken } from "@/lib/auth-client";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Label } from "@workspace/ui/components/label";
 
-export function SignUpForm() {
+const REF_KEY = "wd:ref";
+
+export function SignUpForm({ initialAffiliateCode }: { initialAffiliateCode?: string }) {
   const router = useRouter();
   const [form, setForm] = useState({
     name: "",
@@ -19,6 +22,38 @@ export function SignUpForm() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Código de indicação (via ?ref= ou digitado) — persistido para o onboarding
+  const [affiliateCode, setAffiliateCode] = useState(initialAffiliateCode ?? "");
+  const [affiliateStatus, setAffiliateStatus] = useState<"idle" | "checking" | "valid" | "invalid">(
+    initialAffiliateCode ? "idle" : "idle",
+  );
+
+  function persistRef(code: string) {
+    try {
+      if (code) window.localStorage.setItem(REF_KEY, JSON.stringify({ code, source: "link" }));
+      else window.localStorage.removeItem(REF_KEY);
+    } catch {}
+  }
+
+  async function validateAffiliate(e: React.FocusEvent<HTMLInputElement>) {
+    const raw = e.target.value.trim().toUpperCase();
+    if (raw.length < 4) {
+      setAffiliateStatus("idle");
+      persistRef("");
+      return;
+    }
+    setAffiliateStatus("checking");
+    const res = await validateAffiliateCodeAction({ code: raw });
+    if (res.ok) {
+      setAffiliateStatus("valid");
+      setAffiliateCode(res.data.code);
+      persistRef(res.data.code);
+    } else {
+      setAffiliateStatus("invalid");
+      setError(res.error);
+    }
+  }
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -118,6 +153,34 @@ export function SignUpForm() {
           className={inputCls}
         />
         <p className="text-xs text-[#0F1A2E]/40">Mínimo 8 caracteres. Use uma combinação segura.</p>
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="affiliateCode" className={labelCls}>
+          CÓDIGO DE INDICAÇÃO{" "}
+          <span className="font-normal normal-case text-[#0F1A2E]/35">(opcional)</span>
+        </label>
+        <input
+          id="affiliateCode"
+          value={affiliateCode}
+          onChange={(e) => {
+            setAffiliateCode(e.target.value.toUpperCase());
+            setAffiliateStatus("idle");
+          }}
+          onBlur={(e) => void validateAffiliate(e)}
+          placeholder="Ex: WD-ABC123"
+          autoComplete="off"
+          className={inputCls}
+        />
+        {affiliateStatus === "checking" && <p className="text-xs text-[#0F1A2E]/40">A validar código…</p>}
+        {affiliateStatus === "valid" && (
+          <p className="inline-flex rounded-full bg-[#0B5E56]/10 px-2.5 py-1 text-xs font-medium text-[#0B5E56]">
+            ✓ Código válido — será aplicado ao criar a empresa
+          </p>
+        )}
+        {affiliateStatus === "invalid" && (
+          <p className="text-xs font-medium text-[#7A1A0A]">Código inválido — verifica ou remove.</p>
+        )}
       </div>
 
       <div className="flex items-start gap-2.5 rounded-lg border border-[#D9D2C2] bg-[#F6F3EE]/60 px-3 py-2.5">

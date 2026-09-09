@@ -21,6 +21,7 @@ export * from "./schemas/pre-register.js";
 export * from "./schemas/institution.js";
 export * from "./schemas/badge.js";
 export * from "./schemas/subscription.js";
+export * from "./schemas/affiliate.js";
 export * from "./institution-labels.js";
 export * from "./lib/geo.js";
 export * from "./lib/smart-search.js";

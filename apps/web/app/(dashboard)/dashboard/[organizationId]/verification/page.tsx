@@ -63,7 +63,7 @@ export default async function VerificationPage({ params }: { params: Promise<{ o
           Selo “Verificada”
         </h1>
         <p className="mt-1 text-sm leading-relaxed text-[#0F1A2E]/60">
-          Perfil verificado ganha destaque, selo e prioridade no ranking. Prazo BRD: 24–48h úteis. Contactos já verificados por OTP aceleram aprovação.
+          Perfil verificado ganha destaque, selo e prioridade no ranking. A verificação está associada ao plano Workdeal Trust (pagamento por transferência Millennium BIM + comprovativo). Prazo BRD: 24–48h úteis. Contactos já verificados por OTP aceleram aprovação.
         </p>
         {!profile ? (
           <div className="mt-4 rounded-xl border border-dashed border-[#D9D2C2] bg-[#F6F3EE] p-4">

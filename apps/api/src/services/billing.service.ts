@@ -1,4 +1,5 @@
 import { billingRepository, type PlanRow } from "../repositories/billing.repository.js";
+import { affiliateService } from "./affiliate.service.js";
 import { AppError } from "../lib/errors.js";
 import { getOrgRole } from "@workdeal/auth";
 import type { CancelSubscriptionInput, ChangeSubscriptionPlanInput, AdminUpdateSubscriptionStatusInput, PlanCreateInput, PlanFeatureUpsertInput, PlanUpdateInput } from "@workdeal/shared";
@@ -225,6 +226,24 @@ class BillingService {
       pausedAt: null,
       resumeAt: null,
     });
+  }
+
+  /**
+   * Modo manual: admin confirma que um pagamento foi recebido (status
+   * 'succeeded'). Dispara a creditação de comissão de afiliado se a empresa
+   * da factura tiver sido indicada por um parceiro.
+   */
+  async confirmPaymentAsAdmin(paymentId: string) {
+    const result = await billingRepository.confirmManualPayment(paymentId);
+    if (!result) throw new AppError(404, "NOT_FOUND", "Pagamento não encontrado");
+
+    const affiliateCredit = await affiliateService.creditOnInvoicePaid({
+      invoiceId: result.invoiceId,
+      organizationId: result.organizationId,
+      totalMzn: result.totalMzn,
+    });
+
+    return { ...result, affiliateCredit };
   }
 
   // ── Portais tenant (dashboard web/mobile) ──────────────────────────────

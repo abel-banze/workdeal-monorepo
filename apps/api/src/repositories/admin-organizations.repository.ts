@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, exists, ilike, notExists, or, sql } from "drizzle-orm";
 import { db, member, organization, profile } from "@workdeal/db";
 import type { AdminOrgListQuery } from "@workdeal/shared";
 
@@ -41,17 +41,17 @@ export const adminOrganizationsRepository = {
       .groupBy(profile.organizationId)
       .as("pc");
 
-    // O subselect agrupado só devolve linhas para organizações com >=1 membro/perfil;
-    // com LEFT JOIN, ausência de linha = NULL nas colunas do subselect.
+    // Presença de membros/perfis: EXISTS/NOT EXISTS não referencia aliases do
+    // subselect no WHERE — a mesma condição serve no select de rows e no count.
     if (query.hasMembers === "with") {
-      conditions.push(sql`${memberCountSub.id} is not null`);
+      conditions.push(exists(db.select({ one: sql`1` }).from(member).where(eq(member.organizationId, organization.id))));
     } else if (query.hasMembers === "without") {
-      conditions.push(sql`${memberCountSub.id} is null`);
+      conditions.push(notExists(db.select({ one: sql`1` }).from(member).where(eq(member.organizationId, organization.id))));
     }
     if (query.hasProfiles === "with") {
-      conditions.push(sql`${profileCountSub.id} is not null`);
+      conditions.push(exists(db.select({ one: sql`1` }).from(profile).where(eq(profile.organizationId, organization.id))));
     } else if (query.hasProfiles === "without") {
-      conditions.push(sql`${profileCountSub.id} is null`);
+      conditions.push(notExists(db.select({ one: sql`1` }).from(profile).where(eq(profile.organizationId, organization.id))));
     }
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;

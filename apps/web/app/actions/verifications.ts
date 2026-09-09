@@ -17,6 +17,14 @@ export async function requestVerification(input: {
   profileId: string
   documents?: Array<{ type: string; fileId: string; url: string; name?: string }>
   level?: "level1" | "level2"
+  brNumber?: string
+  payment?: {
+    method?: string
+    fileId: string
+    url: string
+    name?: string
+    reference?: string
+  }
 }) {
   await requireAuth()
   const data = verificationRequestSchema.parse(input)

@@ -53,3 +53,11 @@ adminSubscriptionsRoute.post("/:id/resume", requireSystemRole("admin"), async (c
   const { body, status } = await adminBillingController.resumeSubscription(c.req.param("id"));
   return c.json(body, status);
 });
+
+// Pagamento manual: admin confirma que recebeu o pagamento → marca a factura
+// paga e dispara a creditação de comissão de afiliado (se aplicável).
+adminSubscriptionsRoute.post("/payments/:paymentId/confirm", requireSystemRole("admin"), async (c) => {
+  const { body, status } = await adminBillingController.confirmPayment(c.req.param("paymentId"));
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});

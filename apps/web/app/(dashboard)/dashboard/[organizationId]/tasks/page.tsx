@@ -70,8 +70,8 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
     const tasksPath = isPersonal
       ? `/api/v1/tasks/my?${params.toString()}`
       : `/api/v1/tasks/by-organization/${organizationId}?${params.toString()}`
-    const tRes = await apiFetch<{ items?: TaskListItem[] }>(tasksPath, { cache: "no-store" }).catch(() => ({ data: null } as never))
-    tasks = ((tRes.data as { items?: TaskListItem[] } | null)?.items ?? []) as TaskListItem[]
+    const tRes = await apiFetch<TaskListItem[]>(tasksPath, { cache: "no-store" }).catch(() => ({ data: [] as TaskListItem[] } as never))
+    tasks = (tRes.data ?? []) as TaskListItem[]
   } catch {
     tasks = []
   }
