@@ -11,6 +11,9 @@ export const adminUserListQuerySchema = z.object({
 
 export const adminOrgListQuerySchema = z.object({
   verificationStatus: z.enum(["pre_registered", "pending", "in_review", "verified", "suspended", "expired"]).optional(),
+  // Presença de membros/perfis na organização: "with" = tem (>=1), "without" = não tem
+  hasMembers: z.enum(["with", "without"]).optional(),
+  hasProfiles: z.enum(["with", "without"]).optional(),
   search: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).default(20).optional(),

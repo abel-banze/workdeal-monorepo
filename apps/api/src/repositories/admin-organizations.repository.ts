@@ -29,7 +29,6 @@ export const adminOrganizationsRepository = {
       const q = `%${query.search}%`;
       conditions.push(or(ilike(organization.name, q), ilike(organization.slug, q)));
     }
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const memberCountSub = db
       .select({ id: member.organizationId, count: count(member.id).as("member_count") })
@@ -41,6 +40,21 @@ export const adminOrganizationsRepository = {
       .from(profile)
       .groupBy(profile.organizationId)
       .as("pc");
+
+    // O subselect agrupado só devolve linhas para organizações com >=1 membro/perfil;
+    // com LEFT JOIN, ausência de linha = NULL nas colunas do subselect.
+    if (query.hasMembers === "with") {
+      conditions.push(sql`${memberCountSub.id} is not null`);
+    } else if (query.hasMembers === "without") {
+      conditions.push(sql`${memberCountSub.id} is null`);
+    }
+    if (query.hasProfiles === "with") {
+      conditions.push(sql`${profileCountSub.id} is not null`);
+    } else if (query.hasProfiles === "without") {
+      conditions.push(sql`${profileCountSub.id} is null`);
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [rows, totalRows] = await Promise.all([
       db

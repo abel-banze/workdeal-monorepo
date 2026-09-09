@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listAdminOrganizations } from "@/app/actions/admin";
+import { OrganizationsFilters } from "@/components/features/organizations-filters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -19,23 +20,27 @@ interface OrgRow {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  pre_registered: "Pré-registada",
   pending: "Pendente",
   in_review: "Em análise",
   verified: "Verificada",
   suspended: "Suspensa",
+  expired: "Expirada",
 };
 
 export default async function OrganizationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ verificationStatus?: string; search?: string; page?: string }>;
+  searchParams: Promise<{ verificationStatus?: string; search?: string; hasMembers?: string; hasProfiles?: string; page?: string }>;
 }) {
   const sp = await searchParams;
-  const verificationStatus = sp.verificationStatus as "pending" | "in_review" | "verified" | "suspended" | undefined;
+  const verificationStatus = sp.verificationStatus as "pre_registered" | "pending" | "in_review" | "verified" | "suspended" | "expired" | undefined;
+  const hasMembers = sp.hasMembers as "with" | "without" | undefined;
+  const hasProfiles = sp.hasProfiles as "with" | "without" | undefined;
   const q = sp.search ?? "";
   const page = sp.page ? Number(sp.page) : 1;
 
-  const res = await listAdminOrganizations({ verificationStatus, search: q || undefined, page, limit: 20 });
+  const res = await listAdminOrganizations({ verificationStatus, hasMembers, hasProfiles, search: q || undefined, page, limit: 20 });
   const items = (res.data as OrgRow[] | null) ?? [];
   const total = (res.meta?.total as number) ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / 20));
@@ -44,9 +49,13 @@ export default async function OrganizationsPage({
     const params = new URLSearchParams();
     const nextStatus = overrides.verificationStatus !== undefined ? overrides.verificationStatus : verificationStatus;
     const nextQ = overrides.search !== undefined ? overrides.search : q;
+    const nextMembers = overrides.hasMembers !== undefined ? overrides.hasMembers : hasMembers;
+    const nextProfiles = overrides.hasProfiles !== undefined ? overrides.hasProfiles : hasProfiles;
     const nextPage = overrides.page ?? (page === 1 ? undefined : String(page));
     if (nextStatus) params.set("verificationStatus", nextStatus);
     if (nextQ) params.set("search", nextQ);
+    if (nextMembers) params.set("hasMembers", nextMembers);
+    if (nextProfiles) params.set("hasProfiles", nextProfiles);
     if (nextPage) params.set("page", nextPage);
     const s = params.toString();
     return `/dashboard/organizations${s ? `?${s}` : ""}`;
@@ -71,22 +80,13 @@ export default async function OrganizationsPage({
           <CardTitle className="text-sm">Lista de empresas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form method="GET" action="/dashboard/organizations" className="flex flex-wrap items-center gap-2">
-            <input
-              name="search"
-              defaultValue={q}
-              placeholder="Pesquisar por nome ou slug"
-              className="h-9 w-64 rounded-md border border-input bg-background px-3 text-sm"
-            />
-            <select name="verificationStatus" defaultValue={verificationStatus ?? ""} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
-              <option value="">Todos os estados</option>
-              <option value="pending">Pendente</option>
-              <option value="in_review">Em análise</option>
-              <option value="verified">Verificada</option>
-              <option value="suspended">Suspensa</option>
-            </select>
-            <Button type="submit" size="sm">Filtrar</Button>
-          </form>
+          <OrganizationsFilters
+            key={[verificationStatus ?? "", q, hasMembers ?? "", hasProfiles ?? ""].join("|")}
+            initialSearch={q}
+            initialStatus={verificationStatus ?? ""}
+            initialHasMembers={hasMembers ?? ""}
+            initialHasProfiles={hasProfiles ?? ""}
+          />
 
           <div className="rounded-md border">
             <table className="w-full text-sm">
