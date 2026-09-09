@@ -51,6 +51,8 @@ export async function listAdminOrganizations(query: AdminOrgListQuery) {
   await requireSystemRole("moderator", "admin");
   const params = new URLSearchParams();
   if (query.verificationStatus) params.set("verificationStatus", query.verificationStatus);
+  if (query.hasMembers) params.set("hasMembers", query.hasMembers);
+  if (query.hasProfiles) params.set("hasProfiles", query.hasProfiles);
   if (query.search) params.set("search", query.search);
   if (query.page) params.set("page", String(query.page));
   if (query.limit) params.set("limit", String(query.limit));
