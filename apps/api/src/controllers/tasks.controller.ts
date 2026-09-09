@@ -17,6 +17,10 @@ export const tasksController = {
     const res = await tasksService.listMyTasks(user, query);
     return { body: ok(res.items, { total: res.total, page: res.page, limit: res.limit }), status: 200 as const };
   },
+  async organizationTasks(user: AuthUser, organizationId: string, query: Parameters<typeof tasksService.listOrganizationTasks>[2]) {
+    const res = await tasksService.listOrganizationTasks(user, organizationId, query);
+    return { body: ok(res.items, { total: res.total, page: res.page, limit: res.limit }), status: 200 as const };
+  },
   async get(id: string) {
     const row = await tasksService.getTask(id);
     return { body: ok(row), status: 200 as const };

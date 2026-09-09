@@ -65,7 +65,12 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
     tags = (tagsRes.data ?? []) as typeof tags
     const params = new URLSearchParams({ limit: "50" })
     if (activeStatus !== "all") params.set("status", activeStatus)
-    const tRes = await apiFetch<{ items?: TaskListItem[] }>(`/api/v1/tasks/my?${params.toString()}`, { cache: "no-store" }).catch(() => ({ data: null } as never))
+    // Contexto empresa: lista TODAS as tarefas da organização (qualquer membro
+    // com tasks:view), não só as criadas pelo utilizador actual. Pessoal: /my.
+    const tasksPath = isPersonal
+      ? `/api/v1/tasks/my?${params.toString()}`
+      : `/api/v1/tasks/by-organization/${organizationId}?${params.toString()}`
+    const tRes = await apiFetch<{ items?: TaskListItem[] }>(tasksPath, { cache: "no-store" }).catch(() => ({ data: null } as never))
     tasks = ((tRes.data as { items?: TaskListItem[] } | null)?.items ?? []) as TaskListItem[]
   } catch {
     tasks = []

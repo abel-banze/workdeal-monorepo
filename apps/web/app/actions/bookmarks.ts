@@ -18,7 +18,10 @@ async function getAuthToken(): Promise<string> {
   return token
 }
 
-export async function toggleProfileBookmark(profileId: string): Promise<{ ok: boolean; bookmarked: boolean; error?: string }> {
+export async function toggleProfileBookmark(
+  profileId: string,
+  organizationId?: string | null,
+): Promise<{ ok: boolean; bookmarked: boolean; error?: string }> {
   try {
     await requireAuth()
     if (!profileId?.trim()) throw new Error("ID do perfil obrigatório")
@@ -27,6 +30,7 @@ export async function toggleProfileBookmark(profileId: string): Promise<{ ok: bo
     const res = await apiFetchWithAuth<{ bookmarked: boolean }>(`/api/v1/bookmarks/${encodeURIComponent(profileId)}/toggle`, token, {
       method: "POST",
       cache: "no-store",
+      body: JSON.stringify(organizationId ? { organizationId } : {}),
     })
 
     return { ok: true, bookmarked: res.data?.bookmarked ?? false }
@@ -35,7 +39,7 @@ export async function toggleProfileBookmark(profileId: string): Promise<{ ok: bo
   }
 }
 
-export async function isProfileBookmarked(profileId: string): Promise<boolean> {
+export async function isProfileBookmarked(profileId: string, organizationId?: string | null): Promise<boolean> {
   const store = await cookies()
   let token = store.get(JWT_COOKIE_NAME)?.value
   if (!token) {
@@ -45,7 +49,8 @@ export async function isProfileBookmarked(profileId: string): Promise<boolean> {
   }
   if (!token || !profileId?.trim()) return false
   try {
-    const res = await apiFetchWithAuth<{ bookmarked: boolean }>(`/api/v1/bookmarks/${encodeURIComponent(profileId)}/status`, token, {
+    const qs = organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : ""
+    const res = await apiFetchWithAuth<{ bookmarked: boolean }>(`/api/v1/bookmarks/${encodeURIComponent(profileId)}/status${qs}`, token, {
       cache: "no-store",
     })
     return res.data?.bookmarked ?? false

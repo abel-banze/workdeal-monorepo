@@ -11,6 +11,7 @@ interface OrgRow {
   id: string;
   name: string;
   slug: string;
+  contactPhone: string | null;
   verificationStatus: string;
   createdAt: string;
   memberCount: number;
@@ -93,6 +94,7 @@ export default async function OrganizationsPage({
                 <tr className="border-b bg-muted/40 text-left">
                   <th className="px-3 py-2 font-medium">Nome</th>
                   <th className="px-3 py-2 font-medium">Slug</th>
+                  <th className="px-3 py-2 font-medium">Contacto</th>
                   <th className="px-3 py-2 font-medium">Estado</th>
                   <th className="px-3 py-2 font-medium">Membros</th>
                   <th className="px-3 py-2 font-medium">Perfis</th>
@@ -102,13 +104,14 @@ export default async function OrganizationsPage({
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">Nenhuma empresa encontrada.</td>
+                    <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">Nenhuma empresa encontrada.</td>
                   </tr>
                 ) : (
                   items.map((org) => (
                     <tr key={org.id} className="border-b last:border-0">
                       <td className="px-3 py-2 font-medium">{org.name}</td>
                       <td className="px-3 py-2 text-muted-foreground">{org.slug}</td>
+                      <td className="px-3 py-2">{org.contactPhone ?? "—"}</td>
                       <td className="px-3 py-2">
                         <span className="rounded-full border px-2 py-0.5 text-xs">
                           {STATUS_LABELS[org.verificationStatus] ?? org.verificationStatus}

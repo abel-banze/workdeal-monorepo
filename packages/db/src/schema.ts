@@ -6,6 +6,7 @@ import {
   boolean,
   uniqueIndex,
   index,
+  uuid,
   jsonb,
   smallint,
   doublePrecision,
@@ -14,6 +15,7 @@ import {
   customType,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import { isNotNull, isNull } from "drizzle-orm";
 
 export const systemRoleEnum = pgEnum("system_role", ["user", "moderator", "admin"]);
 export const orgRoleEnum = pgEnum("org_role", ["owner", "admin", "editor", "member"]);
@@ -530,17 +532,30 @@ export const follow = pgTable(
 export const profileBookmark = pgTable(
   "profile_bookmark",
   {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Quem guardou (sempre preenchido, mesmo em guardados da empresa)
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    // Âmbito do guardado: NULL = conta pessoal; preenchido = empresa.
+    // O guardado da empresa é partilhado por todos os membros.
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "cascade" }),
     profileId: text("profile_id")
       .notNull()
       .references(() => profile.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
-    primaryKey({ columns: [table.userId, table.profileId] }),
     index("profile_bookmark_profile_idx").on(table.profileId),
+    index("profile_bookmark_org_idx").on(table.organizationId),
+    // Pessoal: um guardado por (utilizador, perfil)
+    uniqueIndex("profile_bookmark_personal_uidx")
+      .on(table.userId, table.profileId)
+      .where(isNull(table.organizationId)),
+    // Empresa: um guardado por (perfil, empresa), independentemente de quem guardou
+    uniqueIndex("profile_bookmark_org_uidx")
+      .on(table.profileId, table.organizationId)
+      .where(isNotNull(table.organizationId)),
   ],
 );
 

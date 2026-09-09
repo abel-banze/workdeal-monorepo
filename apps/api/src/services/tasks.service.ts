@@ -11,6 +11,8 @@ import type {
   TaskStatus,
   UpdateTaskInput,
 } from "@workdeal/shared";
+import { getOrgRole } from "@workdeal/auth";
+import { hasOrgPermission } from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 import { tasksRepository } from "../repositories/tasks.repository.js";
 import { tagsRepository } from "../repositories/tags.repository.js";
@@ -40,6 +42,30 @@ function assertTransition(from: string, to: string, matrix: Record<string, TaskS
   if (!matrix[from]?.includes(to as TaskStatus & BidStatus)) {
     throw new AppError(409, "INVALID_TRANSITION", `Transição inválida de ${label} ${from} para ${to}`);
   }
+}
+
+// Dono da tarefa OU membro da organização solicitante com tasks:manage.
+// Sem isto, tarefas da empresa só são geríveis por quem clicou "criar".
+async function assertCanManageTask(user: AuthUser, taskRow: { requesterUserId: string; requesterOrganizationId: string | null }) {
+  if (taskRow.requesterUserId === user.id) return;
+  if (taskRow.requesterOrganizationId) {
+    const role = await getOrgRole(user.id, taskRow.requesterOrganizationId);
+    if (role && hasOrgPermission(role, "tasks:manage")) return;
+  }
+  throw new AppError(403, "FORBIDDEN", "Sem permissão para gerir esta tarefa");
+}
+
+// Parte interessada num bid: solicitante, fornecedor, ou gestor da
+// organização solicitante (tarefas da empresa).
+async function isBidParty(user: AuthUser, bid: { requesterUserId: string; providerProfileId: string; taskId: string }) {
+  if (bid.requesterUserId === user.id) return true;
+  if ((await tasksRepository.getUserProfileIds(user.id)).includes(bid.providerProfileId)) return true;
+  const taskRow = await tasksRepository.findById(bid.taskId);
+  if (taskRow?.requesterOrganizationId) {
+    const role = await getOrgRole(user.id, taskRow.requesterOrganizationId);
+    if (role && hasOrgPermission(role, "tasks:manage")) return true;
+  }
+  return false;
 }
 
 export const tasksService = {
@@ -121,6 +147,18 @@ async listTasks(query: TaskListQuery) {
     return { items: items.map((i) => ({ ...i, proposalCount: counts.get(i.id) ?? 0 })), total, page, limit };
   },
 
+  async listOrganizationTasks(user: AuthUser, organizationId: string, query: TaskListQuery) {
+    const role = await getOrgRole(user.id, organizationId);
+    if (!role || !hasOrgPermission(role, "tasks:view")) {
+      throw new AppError(403, "FORBIDDEN", "Sem permissão para ver as tarefas desta organização");
+    }
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const { items, total } = await tasksRepository.listByOrganization(organizationId, query.status, page, limit);
+    const counts = await tasksRepository.countProposalsForTasks(items.map((i) => i.id));
+    return { items: items.map((i) => ({ ...i, proposalCount: counts.get(i.id) ?? 0 })), total, page, limit };
+  },
+
   async getTask(id: string): Promise<TaskRow> {
     const row = await tasksRepository.findById(id);
     if (!row) throw new AppError(404, "TASK_NOT_FOUND", "Tarefa não encontrada");
@@ -130,7 +168,7 @@ async listTasks(query: TaskListQuery) {
   async updateTask(user: AuthUser, id: string, input: UpdateTaskInput) {
     const existing = await tasksRepository.findById(id);
     if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Tarefa não encontrada");
-    if (existing.requesterUserId !== user.id) throw new AppError(403, "FORBIDDEN", "Sem permissão para editar esta tarefa");
+    await assertCanManageTask(user, existing);
 
     const patch: Partial<{ id: string; requesterUserId: string; requesterOrganizationId: string | null; categoryId: string | null; title: string; description: string; priceMinMzn: number | null; priceMaxMzn: number | null; province: string | null; district: string | null; address: string | null; latitude: number | null; longitude: number | null; dueAt: Date | null; proposalDeadlineAt: Date | null; contractType: TaskContractType | null; attachments: never; status: TaskStatus; createdAt: Date; updatedAt: Date }> = {};
 
@@ -166,6 +204,10 @@ async listTasks(query: TaskListQuery) {
     const taskRow = await tasksRepository.findById(input.taskId);
     if (!taskRow) throw new AppError(404, "TASK_NOT_FOUND", "Tarefa não encontrada");
     if (taskRow.requesterUserId === user.id) throw new AppError(403, "OWN_TASK", "Não podes propor na tua própria tarefa");
+    if (taskRow.requesterOrganizationId) {
+      const requesterRole = await getOrgRole(user.id, taskRow.requesterOrganizationId);
+      if (requesterRole) throw new AppError(403, "OWN_TASK", "Não podes propor numa tarefa da tua própria organização");
+    }
     if (taskRow.status !== "open" && taskRow.status !== "in_review") {
       throw new AppError(409, "TASK_CLOSED", "Tarefa não está a aceitar propostas");
     }
@@ -195,7 +237,7 @@ async listTasks(query: TaskListQuery) {
     const limit = query.limit ?? 20;
     const taskRow = await tasksRepository.findById(taskId);
     if (!taskRow) throw new AppError(404, "TASK_NOT_FOUND", "Tarefa não encontrada");
-    if (taskRow.requesterUserId !== user.id) throw new AppError(403, "FORBIDDEN", "Sem permissão para ver as propostas");
+    await assertCanManageTask(user, taskRow);
     const { items, total } = await tasksRepository.listProposals(taskId, query.status, page, limit);
     return { items, total, page, limit };
   },
@@ -211,7 +253,7 @@ async listTasks(query: TaskListQuery) {
   async updateProposalStatus(user: AuthUser, taskId: string, proposalId: string, status: "shortlisted" | "rejected") {
     const taskRow = await tasksRepository.findById(taskId);
     if (!taskRow) throw new AppError(404, "TASK_NOT_FOUND", "Tarefa não encontrada");
-    if (taskRow.requesterUserId !== user.id) throw new AppError(403, "FORBIDDEN", "Sem permissão para gerir propostas");
+    await assertCanManageTask(user, taskRow);
     const proposal = await tasksRepository.findProposalById(proposalId);
     if (!proposal || proposal.taskId !== taskId) throw new AppError(404, "PROPOSAL_NOT_FOUND", "Proposta não encontrada");
     if (proposal.status !== "submitted" && proposal.status !== "shortlisted") {
@@ -229,7 +271,7 @@ async listTasks(query: TaskListQuery) {
   async acceptProposal(user: AuthUser, taskId: string, proposalId: string, input: CreateBidInput) {
     const taskRow = await tasksRepository.findById(taskId);
     if (!taskRow) throw new AppError(404, "TASK_NOT_FOUND", "Tarefa não encontrada");
-    if (taskRow.requesterUserId !== user.id) throw new AppError(403, "FORBIDDEN", "Sem permissão para adjudicar esta tarefa");
+    await assertCanManageTask(user, taskRow);
     if (taskRow.status !== "open" && taskRow.status !== "in_review" && taskRow.status !== "in_progress") {
       throw new AppError(409, "TASK_CLOSED", "Tarefa já concluída ou cancelada");
     }
@@ -278,16 +320,14 @@ async listTasks(query: TaskListQuery) {
   async getBid(user: AuthUser, id: string) {
     const bid = await tasksRepository.findBidById(id);
     if (!bid) throw new AppError(404, "BID_NOT_FOUND", "Adjudicação não encontrada");
-    const isParty = bid.requesterUserId === user.id || (await tasksRepository.getUserProfileIds(user.id)).includes(bid.providerProfileId);
-    if (!isParty) throw new AppError(403, "FORBIDDEN", "Sem permissão para ver esta adjudicação");
+    if (!(await isBidParty(user, bid))) throw new AppError(403, "FORBIDDEN", "Sem permissão para ver esta adjudicação");
     return bid;
   },
 
   async updateBid(user: AuthUser, id: string, status: BidStatus, reviewNote?: string | null) {
     const bid = await tasksRepository.findBidById(id);
     if (!bid) throw new AppError(404, "BID_NOT_FOUND", "Adjudicação não encontrada");
-    const isParty = bid.requesterUserId === user.id || (await tasksRepository.getUserProfileIds(user.id)).includes(bid.providerProfileId);
-    if (!isParty) throw new AppError(403, "FORBIDDEN", "Sem permissão para esta adjudicação");
+    if (!(await isBidParty(user, bid))) throw new AppError(403, "FORBIDDEN", "Sem permissão para esta adjudicação");
     assertTransition(bid.status, status, BID_TRANSITIONS, "adjudicação");
 
     const patch: Partial<{ status: BidStatus; reviewNote: string | null; updatedAt: Date; agreedPriceMzn: number; agreedDeadlineAt: Date | null; taskId: string; proposalId: string; providerProfileId: string; requesterUserId: string; id: string; createdAt: Date }> = { status };
