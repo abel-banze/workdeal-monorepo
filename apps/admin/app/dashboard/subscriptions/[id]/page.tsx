@@ -99,12 +99,14 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
   const isAdmin = session.user.systemRole === "admin";
   const subscriber = d.organizationName ? `${d.organizationName} (empresa)` : `${d.userName || d.userEmail} (pessoal)`;
 
-  const invoices = ((d.invoices as Record<string, unknown>[] | null) ?? []) as unknown as Invoice[];
-  const payments = ((d.payments as Record<string, unknown>[] | null) ?? []) as unknown as Payment[];
+  const invoices = (Array.isArray(d.invoices) ? d.invoices : []) as unknown as Invoice[];
+  const payments = (Array.isArray(d.payments) ? d.payments : []) as unknown as Payment[];
   const metadata = (d.metadata as Record<string, unknown> | null) ?? {};
-  const adminNotes = (metadata.adminNotes as AdminNote[] | null) ?? [];
+  const adminNotes = (Array.isArray(metadata.adminNotes) ? metadata.adminNotes : []).filter(
+    (n): n is AdminNote => !!n && typeof n === "object",
+  );
 
-  const plans = ((plansRes.data as Record<string, unknown>[] | null) ?? []).map((p) => ({
+  const plans = (Array.isArray(plansRes.data) ? plansRes.data : []).map((p) => ({
     id: p.id as string,
     name: p.name as string,
   }));
@@ -172,7 +174,7 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
               <div className="mt-1 text-xs text-muted-foreground">
                 {formatDate(inv.periodStart)} — {formatDate(inv.periodEnd)} · {formatMzn(inv.totalMzn)}
               </div>
-              {inv.lineItems.length > 0 && (
+              {Array.isArray(inv.lineItems) && inv.lineItems.length > 0 && (
                 <ul className="mt-2 space-y-1">
                   {inv.lineItems.map((li, i) => (
                     <li key={i} className="flex justify-between gap-2 text-xs">
@@ -194,7 +196,11 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
         <CardContent className="space-y-3">
           {payments.length === 0 && <p className="text-sm text-muted-foreground">Sem pagamentos.</p>}
           {payments.map((p) => {
-            const proof = p.metadata?.proof;
+            const rawProof = p.metadata?.proof;
+            const proof = rawProof && typeof rawProof === "object" ? rawProof : null;
+            const proofUrl = typeof proof?.url === "string" ? proof.url : null;
+            const proofName = typeof proof?.name === "string" ? proof.name : null;
+            const proofReference = typeof proof?.reference === "string" ? proof.reference : null;
             const isActivation = p.metadata?.kind === "subscription_activation";
             return (
               <div key={p.id} className="rounded-md border p-3 text-sm space-y-2">
@@ -211,13 +217,13 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
                     {PAYMENT_STATUS_LABELS_PT[p.status as keyof typeof PAYMENT_STATUS_LABELS_PT] ?? p.status} · {formatDateTime(p.createdAt)}
                   </div>
                 </div>
-                {proof?.url ? (
+                {proofUrl ? (
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="text-muted-foreground">Comprovativo:</span>
-                    <a href={proof.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline underline-offset-2">
-                      {proof.name || "ver ficheiro"}
+                    <a href={proofUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline underline-offset-2">
+                      {proofName || "ver ficheiro"}
                     </a>
-                    {proof.reference && <span className="text-muted-foreground">· ref: {proof.reference}</span>}
+                    {proofReference && <span className="text-muted-foreground">· ref: {proofReference}</span>}
                   </div>
                 ) : (
                   isActivation && (
