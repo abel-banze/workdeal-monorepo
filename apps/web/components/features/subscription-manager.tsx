@@ -145,19 +145,26 @@ export function SubscriptionManager({
   // A activação de um plano pago exige comprovativo (o backend rejeita
   // com PROOF_REQUIRED sem ele); planos gratuitos activam sem pagamento.
   const paidActivation = needsSubscribe && (changePlan?.priceMzn ?? 0) > 0
+  // Subir para um plano mais caro também exige comprovativo; descer, não.
+  const currentPrice = currentPlan?.priceMzn ?? sub?.planPriceMzn ?? 0
+  const paidUpgrade = !needsSubscribe && changePlan != null && changePlan.priceMzn > currentPrice
+  const paymentRequired = paidActivation || paidUpgrade
 
   async function confirmChangePlan() {
     if (!changePlan) return
-    if (paidActivation && !proof) {
-      setDialogError("Anexa o comprovativo de pagamento para activar este plano.")
+    if (paymentRequired && !proof) {
+      setDialogError(
+        paidUpgrade
+          ? "Anexa o comprovativo de pagamento para subir de plano."
+          : "Anexa o comprovativo de pagamento para activar este plano.",
+      )
       return
     }
     const planId = changePlan.id
     const activate = needsSubscribe
-    const payment: SubscribePayment | undefined =
-      activate && proof
-        ? { method: "bank_transfer", fileId: proof.fileId, url: proof.url, name: proof.name, reference: proofReference.trim() || undefined }
-        : undefined
+    const payment: SubscribePayment | undefined = proof
+      ? { method: "bank_transfer", fileId: proof.fileId, url: proof.url, name: proof.name, reference: proofReference.trim() || undefined }
+      : undefined
     setChangeOpen(false)
     if (activate) {
       await runAction(
@@ -168,7 +175,11 @@ export function SubscriptionManager({
           : "Subscrição activada.",
       )
     } else {
-      await runAction("change", () => changeMyPlan(organizationId, planId))
+      await runAction(
+        "change",
+        () => changeMyPlan(organizationId, planId, payment),
+        paidUpgrade ? "Plano actualizado — enviámos a factura por email." : undefined,
+      )
     }
   }
 
@@ -408,12 +419,14 @@ export function SubscriptionManager({
                   ? paidActivation
                     ? `O pedido do plano ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}) fica em pausa até confirmarmos o pagamento. Enviamos a factura por email (Codebaz SU, Lda).`
                     : `A organização fica com o plano ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}). A activação é imediata e os limites do novo plano aplicam-se de seguida.`
-                  : `A subscrição passa para ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}). A mudança é imediata e os limites do novo plano aplicam-se de seguida.`
+                  : paidUpgrade
+                    ? `A subscrição passa para ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}) de imediato. Por ser um plano mais caro, gera factura e pagamento com o comprovativo abaixo.`
+                    : `A subscrição passa para ${changePlan.name} (${formatMzn(changePlan.priceMzn)}${INTERVAL_SUFFIX[changePlan.interval] ?? ""}). A mudança é imediata e os limites do novo plano aplicam-se de seguida.`
                 : ""}
             </DialogDescription>
           </DialogHeader>
 
-          {paidActivation && (
+          {paymentRequired && (
             <div className="mt-4 space-y-3">
               <div className="rounded-2xl border border-[#0B5E56]/25 bg-[#0B5E56]/[0.04] p-4">
                 <p className="text-[11px] font-bold tracking-[0.14em] text-[#0B5E56]">PAGAMENTO — {VERIFICATION_TRUST_PAYMENT.planName.toUpperCase()}</p>
@@ -483,7 +496,7 @@ export function SubscriptionManager({
             <Button variant="ghost" onClick={() => setChangeOpen(false)}>
               Voltar
             </Button>
-            <Button onClick={confirmChangePlan} disabled={uploadingProof || (paidActivation && !proof)}>
+            <Button onClick={confirmChangePlan} disabled={uploadingProof || (paymentRequired && !proof)}>
               {busyAction === "subscribe" || busyAction === "change" ? <Loader2 className="size-4 animate-spin" /> : <ChevronRight className="size-4" />}
               {needsSubscribe ? "Confirmar activação" : "Confirmar mudança"}
             </Button>

@@ -65,6 +65,15 @@ async function postSubscribe(app: Hono, body: unknown) {
   return { status: res.status, json: (await res.json()) as Record<string, unknown> };
 }
 
+async function postChangePlan(app: Hono, body: unknown) {
+  const res = await app.request("/api/v1/subscriptions/current/change-plan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, json: (await res.json()) as Record<string, unknown> };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getOrgRole.mockResolvedValue("owner");
@@ -134,6 +143,39 @@ describe("POST /api/v1/subscriptions/current/subscribe", () => {
     expect(status).toBe(400);
     expect(json).toMatchObject({ success: false, error: expect.objectContaining({ code: "PROOF_REQUIRED" }) });
     expect(mocks.billing.createSubscription).not.toHaveBeenCalled();
+  });
+
+  it("upgrade sem comprovativo responde 400 PROOF_REQUIRED", async () => {
+    mocks.billing.findSubscriptionForScope.mockResolvedValue({ id: "sub-1", status: "active", planId: "plan-free" });
+    mocks.billing.findPlanById.mockImplementation(async (id: string) =>
+      id === "plan-trust" ? { ...PLAN, priceMzn: 3500 } : { ...PLAN, id: "plan-free", priceMzn: 0 },
+    );
+    const { status, json } = await postChangePlan(buildApp(), { organizationId: "org-1", planId: "plan-trust" });
+    expect(status).toBe(400);
+    expect(json).toMatchObject({ success: false, error: expect.objectContaining({ code: "PROOF_REQUIRED" }) });
+  });
+
+  it("upgrade com comprovativo responde 200 e regista pagamento", async () => {
+    mocks.billing.findSubscriptionForScope.mockResolvedValue({
+      id: "sub-1",
+      status: "active",
+      planId: "plan-free",
+      currentPeriodStart: new Date("2026-01-01"),
+      currentPeriodEnd: new Date("2026-02-01"),
+    });
+    mocks.billing.findPlanById.mockImplementation(async (id: string) =>
+      id === "plan-trust" ? { ...PLAN, priceMzn: 3500 } : { ...PLAN, id: "plan-free", priceMzn: 0 },
+    );
+    const { status, json } = await postChangePlan(buildApp(), {
+      organizationId: "org-1",
+      planId: "plan-trust",
+      payment: { method: "bank_transfer", fileId: "file-1", url: "https://cdn/x.pdf" },
+    });
+    expect(status).toBe(200);
+    expect(json).toMatchObject({ success: true });
+    expect(mocks.billing.createManualPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ amountMzn: 3500 }),
+    );
   });
 
   it("plano pago com comprovativo responde 201 e regista pagamento", async () => {

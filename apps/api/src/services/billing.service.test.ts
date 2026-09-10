@@ -319,6 +319,51 @@ describe("billingService.subscribeMySubscriptionPlan", () => {
     expect(result.pendingPayment).toBeNull();
   });
 
+  it("subir de plano sem comprovativo responde 400 PROOF_REQUIRED", async () => {
+    mocks.billing.findSubscriptionForScope.mockResolvedValue({ id: "sub-1", status: "active", planId: "plan-free" });
+    mocks.billing.findPlanById.mockImplementation(async (id: string) =>
+      id === "plan-trust" ? PLAN_PAID : { ...PLAN_MONTHLY, id: "plan-free", priceMzn: 0 },
+    );
+    await expect(
+      billingService.changeMySubscriptionPlan("u1", "org-1", { planId: "plan-trust", prorate: true }),
+    ).rejects.toMatchObject({ status: 400, code: "PROOF_REQUIRED" });
+    expect(mocks.billing.updateSubscription).not.toHaveBeenCalled();
+  });
+
+  it("subir de plano com comprovativo muda o plano e regista pagamento", async () => {
+    mocks.billing.findSubscriptionForScope.mockResolvedValue({
+      id: "sub-1",
+      status: "active",
+      planId: "plan-free",
+      currentPeriodStart: new Date("2026-01-01"),
+      currentPeriodEnd: new Date("2026-02-01"),
+    });
+    mocks.billing.findPlanById.mockImplementation(async (id: string) =>
+      id === "plan-trust" ? PLAN_PAID : { ...PLAN_MONTHLY, id: "plan-free", priceMzn: 0 },
+    );
+    const result = await billingService.changeMySubscriptionPlan("u1", "org-1", { planId: "plan-trust", prorate: true, payment: PROOF });
+    expect(mocks.billing.updateSubscription).toHaveBeenCalledWith("sub-1", { planId: "plan-trust" });
+    expect(mocks.billing.createInvoice).toHaveBeenCalledWith(expect.objectContaining({ totalMzn: 3500 }));
+    expect(mocks.billing.createManualPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "u1", amountMzn: 3500 }),
+    );
+    expect(mocks.emailInvoice).toHaveBeenCalled();
+    expect(result).toMatchObject({ payment: { id: "pay-1" } });
+  });
+
+  it("descer de plano não exige comprovativo nem cria pagamento", async () => {
+    mocks.billing.findSubscriptionForScope.mockResolvedValue({ id: "sub-1", status: "active", planId: "plan-trust" });
+    mocks.billing.findPlanById.mockImplementation(async (id: string) =>
+      id === "plan-free" ? { ...PLAN_MONTHLY, id: "plan-free", priceMzn: 0 } : PLAN_PAID,
+    );
+    const before = mocks.billing.createInvoice.mock.calls.length;
+    const result = await billingService.changeMySubscriptionPlan("u1", "org-1", { planId: "plan-free", prorate: true });
+    expect(mocks.billing.updateSubscription).toHaveBeenCalledWith("sub-1", { planId: "plan-free" });
+    expect(mocks.billing.createInvoice.mock.calls.length).toBe(before);
+    expect(mocks.billing.createManualPayment).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ payment: null, invoice: null });
+  });
+
   it("permite âmbito pessoal sem verificação de papel", async () => {
     await billingService.subscribeMySubscriptionPlan("u1", null, { planId: "plan-trust" });
     expect(mocks.getOrgRole).not.toHaveBeenCalled();
