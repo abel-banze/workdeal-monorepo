@@ -32,11 +32,18 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 function getPool(): Pool {
   if (_pool) return _pool;
+
+  const isProd = env.NODE_ENV === "production";
+
   _pool = new Pool({
     connectionString: env.DATABASE_URL,
-    max: 20,
+    // Prod: pool mais conservador — menos connections = menos chances de connections
+    // stale. Dev: pool maior para hot-reload e tooling não bloquear.
+    max: isProd ? 10 : 20,
     connectionTimeoutMillis: 10_000,
-    idleTimeoutMillis: 30_000,
+    // idleTimeoutMillis abaixo do timeout típico de NAT/firewall AWS (~300s) para
+    // o pool do cliente descartar connections antes de o firewall as matar silenciosamente.
+    idleTimeoutMillis: isProd ? 60_000 : 30_000,
     // query_timeout é client-side (nunca vai como startup parameter) — safa o request
     // de uma query presa. NÃO usar statement_timeout: o `pg` envia-o como startup
     // parameter na conexão e o PgBouncer (pool_mode=transaction sem whitelist) rejeita
@@ -46,12 +53,26 @@ function getPool(): Pool {
     prepareThreshold: 0,
     keepAlive: true,
     keepAliveInitialDelayMillis: 10_000,
-  } as ConstructorParameters<typeof Pool>[0] & { prepareThreshold?: number; keepAlive?: boolean; keepAliveInitialDelayMillis?: number });
-  _pool.on("error", (err) => {
-    console.error("[db] Pool error:", err.message);
+    // Permite ao pool libertar connections idle quando não há tráfego — reduz footprint
+    allowExitOnIdle: true,
+    // Application name visível no pg_stat_activity e nos logs do PgBouncer para debug
+    application_name: isProd ? "workdeal-prod" : "workdeal-dev",
+  } as ConstructorParameters<typeof Pool>[0] & {
+    prepareThreshold?: number;
+    keepAlive?: boolean;
+    keepAliveInitialDelayMillis?: number;
+    allowExitOnIdle?: boolean;
+    application_name?: string;
   });
-  _pool.on("connect", () => {
-    // Evita "Connection terminated unexpectedly" em idle longo (NAT/firewall fecha TCP)
+  _pool.on("error", (err) => {
+    console.error("[db] Pool idle connection error:", err.message);
+  });
+  _pool.on("connect", (client) => {
+    // Registra o momento da connection para debugging de idle timeouts
+    client.removeAllListeners("error");
+    client.on("error", (err) => {
+      console.error("[db] Client connection error:", err.message);
+    });
   });
   return _pool;
 }
