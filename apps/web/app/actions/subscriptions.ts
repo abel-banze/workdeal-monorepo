@@ -105,9 +105,9 @@ export async function subscribeMyPlan(organizationId: string, planId: string, pa
   })
 }
 
-export async function changeMyPlan(organizationId: string, planId: string) {
+export async function changeMyPlan(organizationId: string, planId: string, payment?: SubscribePayment) {
   await requireAuth()
-  const data = changeMySubscriptionPlanSchema.parse({ organizationId, planId })
+  const data = changeMySubscriptionPlanSchema.parse({ organizationId, planId, payment })
   const token = await getAuthToken()
   return apiFetchWithAuth("/api/v1/subscriptions/current/change-plan", token, {
     method: "POST",

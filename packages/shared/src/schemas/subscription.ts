@@ -251,6 +251,8 @@ export const changeMySubscriptionPlanSchema = z.object({
   organizationId: z.string().min(1).optional(),
   planId: z.string().min(1, "Plano obrigatório"),
   prorate: z.boolean().default(true),
+  // Comprovativo obrigatório ao subir para um plano mais caro (mesmo formato da activação).
+  payment: verificationPaymentProofSchema.optional(),
 });
 export type ChangeMySubscriptionPlanInput = z.infer<typeof changeMySubscriptionPlanSchema>;
 

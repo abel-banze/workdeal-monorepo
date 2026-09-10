@@ -2,7 +2,7 @@ import { billingRepository, type PlanRow } from "../repositories/billing.reposit
 import { affiliateService } from "./affiliate.service.js";
 import { AppError } from "../lib/errors.js";
 import { getOrgRole } from "@workdeal/auth";
-import type { CancelSubscriptionInput, ChangeSubscriptionPlanInput, SubscribeMySubscriptionInput, AdminUpdateSubscriptionStatusInput, AdminValidatePaymentInput, AdminNotifyCompanyInput, PlanCreateInput, PlanFeatureUpsertInput, PlanUpdateInput, PlanInterval } from "@workdeal/shared";
+import type { CancelSubscriptionInput, ChangeSubscriptionPlanInput, ChangeMySubscriptionPlanInput, SubscribeMySubscriptionInput, AdminUpdateSubscriptionStatusInput, AdminValidatePaymentInput, AdminNotifyCompanyInput, PlanCreateInput, PlanFeatureUpsertInput, PlanUpdateInput, PlanInterval } from "@workdeal/shared";
 import { CODEBAZ_BILLING_ISSUER, PLAN_INTERVAL_LABELS_PT, VERIFICATION_TRUST_PAYMENT } from "@workdeal/shared";
 import { sendSubscriptionInvoiceEmail, sendSubscriptionReceiptEmail, sendSubscriptionNoticeEmail } from "./email.service.js";
 
@@ -394,6 +394,34 @@ class BillingService {
     if (!proof) return { subscription, payment: null, invoice: null, invoiceEmail: null };
 
     const subscriptionId = (subscription as { id?: string } | null)?.id ?? null;
+    const recorded = await this.recordPlanPayment({
+      userId,
+      organizationId,
+      subscriptionId,
+      plan,
+      proof,
+      periodStart: now,
+      periodEnd: currentPeriodEnd,
+    });
+    return { subscription, ...recorded };
+  }
+
+  /**
+   * Regista o pagamento de um plano pago com comprovativo: factura + linha,
+   * pagamento `pending` ligado à factura e envio da factura por email
+   * (best-effort). Partilhado pela activação e pelo upgrade.
+   */
+  private async recordPlanPayment(args: {
+    userId: string;
+    organizationId: string | null;
+    subscriptionId: string | null;
+    plan: Pick<PlanRow, "id" | "name" | "priceMzn" | "interval">;
+    proof: { method?: string; fileId: string; url: string; name?: string | null; reference?: string | null };
+    periodStart: Date;
+    periodEnd: Date;
+  }) {
+    const { userId, organizationId, subscriptionId, plan, proof, periodStart, periodEnd } = args;
+    const now = new Date();
     const invoiceNumber = await uniqueDocumentNumber("FT", (n) => billingRepository.findInvoiceByNumber(n));
     const dueDate = new Date(now);
     dueDate.setDate(dueDate.getDate() + 7);
@@ -406,8 +434,8 @@ class BillingService {
       discountMzn: 0,
       taxMzn: 0,
       totalMzn: plan.priceMzn,
-      periodStart: now,
-      periodEnd: currentPeriodEnd,
+      periodStart,
+      periodEnd,
       dueDate,
       metadata: { kind: "subscription_activation", planId: plan.id },
     });
@@ -459,21 +487,45 @@ class BillingService {
       });
       invoiceEmail = sent.ok ? { ok: true } : { ok: false, error: sent.error };
     }
-    return { subscription, payment, invoice, invoiceEmail };
+    return { payment, invoice, invoiceEmail };
   }
 
-  async changeMySubscriptionPlan(userId: string, organizationId: string | null, input: ChangeSubscriptionPlanInput) {
+  /**
+   * Mudança de plano self-service. Subir para um plano mais caro exige
+   * comprovativo (400 PROOF_REQUIRED sem ele) e gera factura + pagamento
+   * `pending` com envio da factura por email; a mudança aplica-se na hora
+   * e mantém o estado actual. Descer de plano não exige pagamento.
+   */
+  async changeMySubscriptionPlan(userId: string, organizationId: string | null, input: ChangeMySubscriptionPlanInput) {
     const sub = await this.requireOwnedSubscription(userId, organizationId);
     if (["cancelled", "expired"].includes(sub.status)) {
       throw new AppError(409, "ALREADY_CANCELLED", "Subscrição cancelada ou expirada — renove para mudar de plano");
     }
-    if (sub.planId === input.planId) return sub;
+    if (sub.planId === input.planId) return { subscription: sub, payment: null, invoice: null, invoiceEmail: null };
 
     const plan = await billingRepository.findPlanById(input.planId);
     if (!plan || !plan.isActive || !plan.isPublic) {
       throw new AppError(404, "NOT_FOUND", "Plano não disponível");
     }
-    return billingRepository.updateSubscription(sub.id, { planId: input.planId });
+    const currentPlan = await billingRepository.findPlanById(sub.planId);
+    const currentPrice = currentPlan?.priceMzn ?? 0;
+    const isUpgrade = plan.priceMzn > currentPrice;
+    const proof = input.payment && input.payment.fileId && input.payment.url ? input.payment : null;
+    if (isUpgrade && !proof) {
+      throw new AppError(400, "PROOF_REQUIRED", "Subir de plano exige comprovativo de pagamento");
+    }
+    const subscription = await billingRepository.updateSubscription(sub.id, { planId: input.planId });
+    if (!isUpgrade || !proof) return { subscription, payment: null, invoice: null, invoiceEmail: null };
+    const recorded = await this.recordPlanPayment({
+      userId,
+      organizationId,
+      subscriptionId: sub.id,
+      plan,
+      proof,
+      periodStart: sub.currentPeriodStart,
+      periodEnd: sub.currentPeriodEnd,
+    });
+    return { subscription, ...recorded };
   }
 
   async cancelMySubscription(userId: string, organizationId: string | null, input: CancelSubscriptionInput) {
