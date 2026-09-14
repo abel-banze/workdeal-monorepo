@@ -990,6 +990,62 @@ export const taskBid = pgTable(
   ],
 );
 
+// ── Negociação de propostas (chat entre solicitante e fornecedor) ──
+
+export const negotiationStatusEnum = pgEnum("negotiation_status", ["open", "closed"]);
+export const negotiationMessageKindEnum = pgEnum("negotiation_message_kind", ["text", "offer", "system"]);
+export const negotiationSenderSideEnum = pgEnum("negotiation_sender_side", ["requester", "provider"]);
+
+export const negotiationThread = pgTable(
+  "negotiation_thread",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    taskProposalId: text("task_proposal_id")
+      .notNull()
+      .unique()
+      .references(() => taskProposal.id, { onDelete: "cascade" }),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+    status: negotiationStatusEnum("status").notNull().default("open"),
+    messageCount: integer("message_count").notNull().default(0),
+    lastMessageAt: timestamp("last_message_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("negotiation_thread_task_idx").on(table.taskId),
+    index("negotiation_thread_last_message_idx").on(table.lastMessageAt),
+  ],
+);
+
+export const negotiationMessage = pgTable(
+  "negotiation_message",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => negotiationThread.id, { onDelete: "cascade" }),
+    senderUserId: text("sender_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    senderProfileId: text("sender_profile_id").references(() => profile.id, { onDelete: "set null" }),
+    senderSide: negotiationSenderSideEnum("sender_side").notNull(),
+    kind: negotiationMessageKindEnum("kind").notNull().default("text"),
+    body: text("body").notNull().default(""),
+    priceMzn: integer("price_mzn"),
+    estimatedDays: integer("estimated_days"),
+    seenByRequester: boolean("seen_by_requester").notNull().default(false),
+    seenByProvider: boolean("seen_by_provider").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("negotiation_message_thread_idx").on(table.threadId, table.createdAt)],
+);
+
 // ── Eventos ────────────────────────────────────────────────────────
 
 export const eventStatusEnum = pgEnum("event_status", ["draft", "published", "cancelled", "ended"]);

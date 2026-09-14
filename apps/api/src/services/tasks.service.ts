@@ -16,6 +16,7 @@ import { hasOrgPermission } from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 import { tasksRepository } from "../repositories/tasks.repository.js";
 import { tagsRepository } from "../repositories/tags.repository.js";
+import { negotiationsService } from "./negotiations.service.js";
 
 type ProposalListQuery = { status?: ProposalStatus; page?: number; limit?: number };
 
@@ -261,9 +262,12 @@ async listTasks(query: TaskListQuery) {
     }
     const updated = await tasksRepository.updateProposalStatus(proposalId, status);
     // Se deixou de haver propostas em análise, a tarefa volta a "open"
-    if (status === "rejected" && taskRow.status === "in_review") {
-      const remaining = await tasksRepository.listProposals(taskId, "submitted", 1, 1);
-      if (remaining.total === 0) await tasksRepository.update(taskId, { status: "open" });
+    if (status === "rejected") {
+      await negotiationsService.closeByProposal(proposalId, user, "rejected");
+      if (taskRow.status === "in_review") {
+        const remaining = await tasksRepository.listProposals(taskId, "submitted", 1, 1);
+        if (remaining.total === 0) await tasksRepository.update(taskId, { status: "open" });
+      }
     }
     return updated;
   },
@@ -298,7 +302,11 @@ async listTasks(query: TaskListQuery) {
     await tasksRepository.updateProposalStatus(proposalId, "accepted");
     // Rejeita as restantes propostas em análise
     const otherIds = await tasksRepository.listProposalIdsForTaskExcluding(taskId, proposalId);
-    for (const pid of otherIds) await tasksRepository.updateProposalStatus(pid, "rejected");
+    for (const pid of otherIds) {
+      await tasksRepository.updateProposalStatus(pid, "rejected");
+      await negotiationsService.closeByProposal(pid, user, "rejected");
+    }
+    await negotiationsService.closeByProposal(proposalId, user, "accepted");
     await tasksRepository.update(taskId, { status: "in_progress" });
     return bid;
   },

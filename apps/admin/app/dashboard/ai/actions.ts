@@ -12,18 +12,18 @@ import {
 export type SaveResult = { ok: boolean; provider?: string; model?: string; message?: string; latencyMs?: number };
 export type CredentialResult = { ok: boolean; message: string };
 
-export function saveAiSettings(input: AiSettingsUpdateInput) {
+export async function saveAiSettings(input: AiSettingsUpdateInput) {
   return saveAiSettingsAction(input);
 }
 
-export function upsertAiCredential(input: AiCredentialUpsertInput) {
+export async function upsertAiCredential(input: AiCredentialUpsertInput) {
   return upsertAiCredentialAction(input);
 }
 
-export function deleteAiCredential(provider: string) {
+export async function deleteAiCredential(provider: string) {
   return deleteAiCredentialAction(provider);
 }
 
-export function testAiConnection(): Promise<ApiEnvelope<unknown>> {
+export async function testAiConnection(): Promise<ApiEnvelope<unknown>> {
   return testAiConnectionAction();
 }

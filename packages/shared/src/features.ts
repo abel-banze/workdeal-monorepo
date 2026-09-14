@@ -26,6 +26,7 @@ export const FEATURE_KEYS = [
   "org_membership",
   "receive_contacts",
   "respond_opportunities",
+  "negotiation_chat",
   // Workdeal Trust
   "verification_identity",
   "verification_nuit",
@@ -104,6 +105,7 @@ export const FEATURE_CATALOG: readonly FeatureDefinition[] = [
   { key: "org_membership", valueType: "boolean", kind: "plan", label: "Associação a organizações e instituições", description: "Fazer parte de organizações e instituições." },
   { key: "receive_contacts", valueType: "boolean", kind: "plan", label: "Recepção de contactos e interesse", description: "Receber pedidos de contacto e manifestações de interesse." },
   { key: "respond_opportunities", valueType: "boolean", kind: "plan", label: "Resposta a oportunidades públicas", description: "Responder/olhar a oportunidades públicas." },
+  { key: "negotiation_chat", valueType: "boolean", kind: "plan", label: "Negociação de propostas (chat)", description: "Chat de negociação por proposta com contra-ofertas." },
   // ── Workdeal Trust ──────────────────────────────────────────────────────
   { key: "verification_identity", valueType: "boolean", kind: "plan", label: "Verificação da identidade empresarial", description: "Validar a identidade legal da empresa." },
   { key: "verification_nuit", valueType: "boolean", kind: "plan", label: "Verificação do NUIT", description: "Validação do Número Único de Identificação Tributária." },

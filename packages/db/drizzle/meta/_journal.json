@@ -316,6 +316,20 @@
       "when": 1789412315531,
       "tag": "0044_bumpy_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1789418422057,
+      "tag": "0045_boring_justin_hammer",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1789418817554,
+      "tag": "0046_familiar_stardust",
+      "breakpoints": true
     }
   ]
 }

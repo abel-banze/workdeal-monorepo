@@ -46,6 +46,7 @@ import { subscriptionsRoute } from "./routes/subscriptions.route.js";
 import { affiliateRoute } from "./routes/affiliate.route.js";
 import { featuresRoute } from "./routes/features.route.js";
 import { agentsRoute } from "./routes/agents.route.js";
+import { negotiationsRoute } from "./routes/negotiations.route.js";
 
 const app = new Hono();
 
@@ -482,6 +483,7 @@ app.route("/api/v1/subscriptions", subscriptionsRoute);
 app.route("/api/v1/affiliate", affiliateRoute);
 app.route("/api/v1/features", featuresRoute);
 app.route("/api/v1/ai", agentsRoute);
+app.route("/api/v1/negotiations", negotiationsRoute);
 
 app.notFound(() => {
   throw new AppError(404, "NOT_FOUND", "Rota não encontrada");
