@@ -7,6 +7,7 @@ import { AppError } from "../lib/errors.js";
 import { profilesRepository } from "../repositories/profiles.repository.js";
 import type { ProfileWithCategories } from "../repositories/profiles.repository.js";
 import { searchService } from "./search.service.js";
+import { featuresService } from "./features.service.js";
 
 type ProfileExtras = { distanceKm?: number | null; province?: string | null; district?: string | null; badges?: ProfileBadgeLite[] };
 
@@ -47,6 +48,13 @@ class ProfilesService {
       this.fetchContactVerifications(row.id),
     ]);
 
+    // Assistente IA — gate via plano da organização dona do perfil.
+    // `findSubscriptionForScope` ignora userId quando organizationId é definido;
+    // userId "__public__" é sentinela para endpoints não autenticados.
+    const assistantEnabled = row.organizationId
+      ? await featuresService.hasFeature({ userId: "__public__", organizationId: row.organizationId }, "ai_assistant")
+      : false;
+
     return {
       ...profileView,
       location: locations,
@@ -55,6 +63,7 @@ class ProfilesService {
       reviews: reviewStats,
       services,
       contactVerifications,
+      assistantEnabled,
     };
   }
 

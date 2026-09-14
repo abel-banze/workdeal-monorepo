@@ -4,6 +4,7 @@ import { cookies } from "next/headers"
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies"
 import { apiFetchWithAuth, apiFetch } from "@/lib/api"
 import { requireAuth } from "@/lib/auth"
+import { requireFeature } from "@/lib/features"
 import { z } from "zod"
 
 async function getAuthToken(): Promise<string> {
@@ -20,22 +21,26 @@ export async function listPortfolio(profileId: string) {
   return apiFetch(`/api/v1/portfolio/${encodeURIComponent(profileId)}`, { cache: "no-store" })
 }
 
-export async function createPortfolioItem(input: { profileId: string; title: string; description?: string | null; imageUrl?: string | null }) {
+export async function createPortfolioItem(input: { profileId: string; title: string; description?: string | null; imageUrl?: string | null }, organizationId: string) {
   await requireAuth()
+  // Pré-check amigável (a API Hono mantém-se o ponto único de enforcement).
+  await requireFeature(organizationId, "multimedia_content")
   const data = createSchema.parse(input)
   const token = await getAuthToken()
   return apiFetchWithAuth("/api/v1/portfolio", token, { method: "POST", body: JSON.stringify(data) })
 }
 
-export async function updatePortfolioItem(id: string, input: { title?: string; description?: string | null; imageUrl?: string | null }) {
+export async function updatePortfolioItem(id: string, input: { title?: string; description?: string | null; imageUrl?: string | null }, organizationId: string) {
   await requireAuth()
+  await requireFeature(organizationId, "multimedia_content")
   const data = updateSchema.parse(input)
   const token = await getAuthToken()
   return apiFetchWithAuth(`/api/v1/portfolio/${encodeURIComponent(id)}`, token, { method: "PATCH", body: JSON.stringify(data) })
 }
 
-export async function deletePortfolioItem(id: string) {
+export async function deletePortfolioItem(id: string, organizationId: string) {
   await requireAuth()
+  await requireFeature(organizationId, "multimedia_content")
   const token = await getAuthToken()
   return apiFetchWithAuth(`/api/v1/portfolio/${encodeURIComponent(id)}`, token, { method: "DELETE" })
 }

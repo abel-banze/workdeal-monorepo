@@ -1,4 +1,5 @@
 import { can, type Actor, type DomainPermission, type ResourceAccess } from "./permissions.js";
+import type { FeatureKey } from "./features.js";
 
 // ── Entitlements (subscrição + plano + RBAC) ────────────────────────────
 // Lógica pura e reutilizável para garantir que uma empresa só faz o que lhe
@@ -35,7 +36,8 @@ export type EntitlementCheck =
 export type EntitlementRequirement =
   | { type: "subscription"; excludeTrial?: boolean }
   | { type: "limit"; kind: ResourceLimitKind; count?: number }
-  | { type: "permission"; actor: Actor; resource: ResourceAccess; permission: DomainPermission };
+  | { type: "permission"; actor: Actor; resource: ResourceAccess; permission: DomainPermission }
+  | { type: "feature"; key: FeatureKey; available: boolean };
 
 export type ResourceLimitKind =
   | "profiles"
@@ -89,11 +91,13 @@ export type EntitlementResult =
       | { check: "subscription" }
       | { check: "limit"; kind: ResourceLimitKind; used: number; max: number | null }
       | { check: "permission"; permission: DomainPermission }
+      | { check: "feature"; key: FeatureKey }
     ))
   | ({ ok: false } & (
       | { check: "subscription"; code: EntitlementCheck; message: string }
       | { check: "limit"; kind: ResourceLimitKind; used: number; max: number | null; message: string }
       | { check: "permission"; permission: DomainPermission; message: string }
+      | { check: "feature"; key: FeatureKey; message: string }
     ));
 
 // ── Status da subscrição ─────────────────────────────────────────────────
@@ -260,7 +264,19 @@ export function evaluateRequirement(
     }
     case "permission":
       return evaluatePermission(requirement);
+    case "feature":
+      return evaluateFeature(requirement);
   }
+}
+
+export function evaluateFeature(requirement: Extract<EntitlementRequirement, { type: "feature" }>): EntitlementResult {
+  if (requirement.available) return { ok: true, check: "feature", key: requirement.key };
+  return {
+    ok: false,
+    check: "feature",
+    key: requirement.key,
+    message: "Funcionalidade indisponível para a sua subscrição",
+  };
 }
 
 function evaluatePlanLimit(plan: PlanEntitlements, kind: ResourceLimitKind, used: number, count: number): EntitlementResult {

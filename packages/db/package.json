@@ -15,7 +15,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/seed.ts",
     "db:seed:comprehensive": "tsx src/seed-comprehensive.ts",
-    "db:seed:plans": "tsx src/seed-plans.ts"
+    "db:seed:plans": "tsx src/seed-plans.ts",
+    "db:seed:flags": "tsx src/seed-flags.ts"
   },
   "dependencies": {
     "@workdeal/shared": "workspace:*",

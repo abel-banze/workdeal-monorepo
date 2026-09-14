@@ -146,6 +146,18 @@ describe("evaluateRequirement", () => {
     if (!res.ok) expect(res.check).toBe("permission");
   });
 
+  it("feature disponível passa", () => {
+    const res = evaluateRequirement({ type: "feature", key: "ai_assistant", available: true }, ctx);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.check).toBe("feature");
+  });
+
+  it("feature indisponível bloqueia", () => {
+    const res = evaluateRequirement({ type: "feature", key: "ai_assistant", available: false }, ctx);
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.check).toBe("feature");
+  });
+
   it("admin do sistema bypassa permissões de organização", () => {
     const actor: Actor = { systemRole: "admin" };
     const resource: ResourceAccess = { type: "organization", orgRole: null };

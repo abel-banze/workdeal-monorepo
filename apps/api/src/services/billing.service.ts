@@ -1,4 +1,5 @@
 import { billingRepository, type PlanRow } from "../repositories/billing.repository.js";
+import { featuresRepository } from "../repositories/features.repository.js";
 import { affiliateService } from "./affiliate.service.js";
 import { AppError } from "../lib/errors.js";
 import { getOrgRole } from "@workdeal/auth";
@@ -80,7 +81,9 @@ class BillingService {
       metadata: input.metadata ?? null,
       sortOrder: input.sortOrder,
     };
-    return billingRepository.createPlan(data);
+    const plan = await billingRepository.createPlan(data);
+    await featuresRepository.invalidatePlanGraphCache();
+    return plan;
   }
 
   async updatePlan(id: string, input: PlanUpdateInput) {
@@ -111,7 +114,9 @@ class BillingService {
       metadata: input.metadata === undefined ? undefined : input.metadata ?? null,
       sortOrder: input.sortOrder,
     };
-    return billingRepository.updatePlan(id, data);
+    const updated = await billingRepository.updatePlan(id, data);
+    await featuresRepository.invalidatePlanGraphCache();
+    return updated;
   }
 
   async removePlan(id: string) {
@@ -127,13 +132,17 @@ class BillingService {
       throw new AppError(409, "PLAN_HAS_INHERITORS", "Existem planos a herdar deste. Reatribua a herança antes de eliminar.");
     }
 
-    return billingRepository.deletePlan(id);
+    const deleted = await billingRepository.deletePlan(id);
+    await featuresRepository.invalidatePlanGraphCache();
+    return deleted;
   }
 
   async togglePlanActive(id: string) {
     const existing = await billingRepository.findPlanById(id);
     if (!existing) throw new AppError(404, "NOT_FOUND", "Plano não encontrado");
-    return billingRepository.updatePlan(id, { isActive: !existing.isActive });
+    const updated = await billingRepository.updatePlan(id, { isActive: !existing.isActive });
+    await featuresRepository.invalidatePlanGraphCache();
+    return updated;
   }
 
   async upsertFeatures(planId: string, input: PlanFeatureUpsertInput) {
@@ -145,11 +154,14 @@ class BillingService {
       label: f.label ?? null,
     }));
     await billingRepository.replaceFeatures(planId, features);
-    return billingRepository.listFeatures(planId);
+    const updated = await billingRepository.listFeatures(planId);
+    await featuresRepository.invalidatePlanGraphCache();
+    return updated;
   }
 
   // Resolve as features do próprio plano + cadeia de herança (Enterprise → Premium → Trust → Free).
-  // As features do próprio plano têm prioridade sobre as herdadas.
+  // As features do próprio plano têm prioridade sobre as herdadas — primeiro
+  // encontrado na caminhada (próprio → pai → avô) é o que vence.
   async resolveOwnAndInheritedFeatureKeys(planId: string): Promise<{ featureKey: string; featureValue: string | null; label: string | null }[]> {
     let current = await billingRepository.findPlanById(planId);
     const merged = new Map<string, { featureKey: string; featureValue: string | null; label: string | null }>();
@@ -160,6 +172,7 @@ class BillingService {
       visited.add(current.id);
       const own = await billingRepository.listFeatures(current.id);
       for (const f of own) {
+        if (merged.has(f.featureKey)) continue;
         merged.set(f.featureKey, { featureKey: f.featureKey, featureValue: f.featureValue, label: f.label });
       }
       current = current.inheritFromPlanId ? await billingRepository.findPlanById(current.inheritFromPlanId) : null;

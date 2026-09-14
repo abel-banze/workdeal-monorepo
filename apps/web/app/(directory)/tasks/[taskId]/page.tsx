@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getPublicTask } from "@/lib/directory";
 import { getCategories } from "@/lib/profiles";
 import { getServerSession } from "@/lib/auth";
+import { featureAccessible } from "@/lib/features";
 import { formatMzn, formatDeadline, formatFull } from "@/lib/dates";
 import { TASK_STATUS_LABELS_PT, TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared";
 import { TaskProposalForm } from "@/components/features/task-proposal-form";
@@ -45,6 +46,8 @@ export default async function PublicTaskPage({ params }: Props) {
 
   const deadlinePassed = task.proposalDeadlineAt ? new Date(task.proposalDeadlineAt).getTime() < Date.now() : false;
   const proposable = (task.status === "open" || task.status === "in_review") && !deadlinePassed;
+
+  const aiDraftEnabled = await featureAccessible(null, "ai_proposal_generation").catch(() => false);
 
   return (
     <div className="bg-[#F6F3EE]">
@@ -154,7 +157,7 @@ export default async function PublicTaskPage({ params }: Props) {
                     </p>
                   </div>
                 ) : (
-                  <TaskProposalForm taskId={task.id} />
+                  <TaskProposalForm taskId={task.id} aiEnabled={aiDraftEnabled} />
                 )}
               </div>
             </div>

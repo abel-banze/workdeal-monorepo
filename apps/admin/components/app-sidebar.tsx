@@ -25,6 +25,9 @@ import {
   CreditCardIcon,
   SettingsIcon,
   GiftIcon,
+  Settings2Icon,
+  BotIcon,
+  ActivityIcon,
 } from "lucide-react"
 import { NavMain, type NavMainItem } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
@@ -140,6 +143,7 @@ const groups: { label: string; items: NavMainItem[] }[] = [
           { title: "Novo plano", url: "/dashboard/plans/new" },
         ],
       },
+      { title: "Features", url: "/dashboard/features", icon: <Settings2Icon /> },
       { title: "Subscrições", url: "/dashboard/subscriptions", icon: <CreditCardIcon /> },
     ],
   },
@@ -156,6 +160,8 @@ const groups: { label: string; items: NavMainItem[] }[] = [
       },
       { title: "Moderação", url: "/dashboard/moderation", icon: <ShieldCheckIcon /> },
       { title: "Denúncias", url: "/dashboard/reports", icon: <FlagIcon /> },
+      { title: "IA — Config", url: "/dashboard/ai", icon: <BotIcon /> },
+      { title: "IA — Uso", url: "/dashboard/ai/usage", icon: <ActivityIcon /> },
       { title: "Configurações", url: "/dashboard/settings", icon: <SettingsIcon /> },
     ],
   },

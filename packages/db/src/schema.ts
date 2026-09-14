@@ -11,6 +11,7 @@ import {
   smallint,
   doublePrecision,
   integer,
+  numeric,
   primaryKey,
   customType,
   type AnyPgColumn,
@@ -1119,6 +1120,109 @@ export const planFeature = pgTable(
     primaryKey({ columns: [table.planId, table.featureKey] }),
     index("plan_feature_key_idx").on(table.featureKey),
   ],
+);
+
+// ── Feature flags (controlo operacional) ───────────────────────────────
+// Camada de operação sobre `plan_feature` (o que o plano concede): permite
+// activar/desactivar uma feature globalmente, por organização, e o kill-switch
+// de emergência. Um flag só REMOVE acesso — uma feature concedida pelo plano só
+// é acessível se o flag (quando existir) estiver ligado para o âmbito.
+export const featureFlag = pgTable(
+  "feature_flag",
+  {
+    key: text("key").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    defaultEnabled: boolean("default_enabled").notNull().default(false),
+    emergencyDisabled: boolean("emergency_disabled").notNull().default(false),
+    // Agrupamento para o painel admin (ex: "trust", "premium", "ai").
+    group: text("group"),
+    sortOrder: integer("sort_order").notNull().default(100),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("feature_flag_group_idx").on(table.group),
+    index("feature_flag_default_idx").on(table.defaultEnabled),
+  ],
+);
+
+// Sobreposição de um flag para uma organização concreta (vence o default global).
+export const featureFlagOverride = pgTable(
+  "feature_flag_override",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    flagKey: text("flag_key")
+      .notNull()
+      .references(() => featureFlag.key, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull(),
+    note: text("note"),
+    createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("feature_flag_override_unique_idx").on(table.flagKey, table.organizationId),
+    index("feature_flag_override_org_idx").on(table.organizationId),
+  ],
+);
+
+// ── Uso dos agents de IA ─────────────────────────────────────────
+// Telemetria por execução — base para quotas, billing e auditoria.
+// `status` reflecte o resultado da execução: ok | error | guardrail_blocked | rate_limited.
+export const agentUsage = pgTable(
+  "agent_usage",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "set null" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    agentKey: text("agent_key").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    estimatedCostUsd: numeric("estimated_cost_usd", { precision: 12, scale: 6 }).notNull().default("0"),
+    durationMs: integer("duration_ms").notNull().default(0),
+    status: text("status").notNull().default("ok"),
+    errorCode: text("error_code"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("agent_usage_org_created_idx").on(table.organizationId, table.createdAt),
+    index("agent_usage_agent_created_idx").on(table.agentKey, table.createdAt),
+  ],
+);
+
+// ── Configuração global de IA (gerida no admin) ──────────────────────────
+// Secreto: as chaves de API vivem em `ai_credentials` (encriptadas) e o
+// config operacional (provider ativo, modelos por tier, orçamentos) em
+// `ai_settings` (single-row). Valores nulos → fallback para env vars.
+
+export const aiSettings = pgTable(
+  "ai_settings",
+  {
+    id: text("id").primaryKey().default("default"),
+    provider: text("provider").notNull().default("mock"),
+    modelOverrides: jsonb("model_overrides").notNull().default({}),
+    budgets: jsonb("budgets").notNull().default({}),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+);
+
+export const aiCredential = pgTable(
+  "ai_credentials",
+  {
+    provider: text("provider").primaryKey(),
+    apiKeyEncrypted: text("api_key_encrypted").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
 );
 
 // ── Cupons / promoções ────────────────────────────────────────

@@ -3,6 +3,7 @@ import { hasOrgPermission, hasSelfPermission } from "@workdeal/shared";
 import type { AuthUser } from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 import { portfolioRepository } from "../repositories/portfolio.repository.js";
+import { featuresService } from "./features.service.js";
 import { db, profile } from "@workdeal/db";
 import { eq } from "drizzle-orm";
 
@@ -18,12 +19,19 @@ async function assertCanEditProfile(user: AuthUser, profileId: string) {
   throw new AppError(403, "FORBIDDEN", "Sem permissão para gerir portfólio");
 }
 
+/** Portfólio (multimédia) em perfis de empresa exige a feature `multimedia_content`. */
+async function assertMultimediaEntitlement(user: AuthUser, row: { userId: string | null; organizationId: string | null }) {
+  if (!row.organizationId) return; // perfis pessoais mantêm o comportamento actual
+  await featuresService.requireFeature({ userId: user.id, organizationId: row.organizationId }, "multimedia_content");
+}
+
 export const portfolioService = {
   async list(profileId: string) {
     return portfolioRepository.listByProfile(profileId);
   },
   async create(user: AuthUser, input: { profileId: string; title: string; description?: string | null; imageUrl?: string | null; sortOrder?: number }) {
-    await assertCanEditProfile(user, input.profileId);
+    const profileRow = await assertCanEditProfile(user, input.profileId);
+    await assertMultimediaEntitlement(user, profileRow);
     if (!input.title.trim() || input.title.trim().length < 2) throw new AppError(400, "INVALID_TITLE", "Título ≥2 caracteres");
     if (input.title.length > 80) throw new AppError(400, "TITLE_TOO_LONG", "Título máx 80");
     const count = await portfolioRepository.countByProfile(input.profileId);
@@ -46,7 +54,8 @@ export const portfolioService = {
   async update(user: AuthUser, id: string, input: { title?: string; description?: string | null; imageUrl?: string | null; sortOrder?: number }) {
     const existing = await portfolioRepository.findById(id);
     if (!existing) throw new AppError(404, "NOT_FOUND", "Item não encontrado");
-    await assertCanEditProfile(user, existing.profileId);
+    const profileRow = await assertCanEditProfile(user, existing.profileId);
+    await assertMultimediaEntitlement(user, profileRow);
     if (input.title !== undefined && (!input.title.trim() || input.title.trim().length < 2)) throw new AppError(400, "INVALID_TITLE", "Título ≥2");
     const row = await portfolioRepository.update(id, {
       ...(input.title !== undefined ? { title: input.title.trim() } : {}),
@@ -63,7 +72,8 @@ export const portfolioService = {
   async remove(user: AuthUser, id: string) {
     const existing = await portfolioRepository.findById(id);
     if (!existing) throw new AppError(404, "NOT_FOUND", "Item não encontrado");
-    await assertCanEditProfile(user, existing.profileId);
+    const profileRow = await assertCanEditProfile(user, existing.profileId);
+    await assertMultimediaEntitlement(user, profileRow);
     await portfolioRepository.delete(id);
     try {
       const { ensureProfileCompleteForProfile } = await import("./badges.job.js");

@@ -6,7 +6,17 @@ import { createPortfolioItem, updatePortfolioItem, deletePortfolioItem } from "@
 
 type Item = { id: string; title: string; description: string | null; imageUrl: string | null; sortOrder: number }
 
-export function PortfolioManager({ profileId, initial }: { profileId: string; initial: Item[] }) {
+export function PortfolioManager({
+  profileId,
+  organizationId,
+  canManage,
+  initial,
+}: {
+  profileId: string
+  organizationId: string
+  canManage: boolean
+  initial: Item[]
+}) {
   const [items, setItems] = useState<Item[]>(initial)
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -49,6 +59,10 @@ export function PortfolioManager({ profileId, initial }: { profileId: string; in
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault()
+    if (!canManage) {
+      setError("Portfólio multimédia não está incluído no teu plano.")
+      return
+    }
     if (!title.trim()) {
       setError("Título obrigatório")
       return
@@ -57,7 +71,7 @@ export function PortfolioManager({ profileId, initial }: { profileId: string; in
     setError(null)
     setMsg(null)
     try {
-      const res = await createPortfolioItem({ profileId, title: title.trim(), description: description.trim() || null, imageUrl: imageUrl.trim() || null })
+      const res = await createPortfolioItem({ profileId, title: title.trim(), description: description.trim() || null, imageUrl: imageUrl.trim() || null }, organizationId)
       const created = (res as { data: Item }).data
       setItems((prev) => [...prev, created])
       setMsg("Item adicionado — conta para perfil-completo.")
@@ -77,10 +91,14 @@ export function PortfolioManager({ profileId, initial }: { profileId: string; in
 
   async function onUpdate() {
     if (!editing) return
+    if (!canManage) {
+      setError("Portfólio multimédia não está incluído no teu plano.")
+      return
+    }
     setSaving(true)
     setError(null)
     try {
-      const res = await updatePortfolioItem(editing.id, { title: editing.title, description: editing.description, imageUrl: editing.imageUrl })
+      const res = await updatePortfolioItem(editing.id, { title: editing.title, description: editing.description, imageUrl: editing.imageUrl }, organizationId)
       const updated = (res as { data: Item }).data
       setItems((prev) => prev.map((it) => (it.id === editing.id ? updated : it)))
       setEditing(null)
@@ -93,9 +111,13 @@ export function PortfolioManager({ profileId, initial }: { profileId: string; in
   }
 
   async function onDelete(id: string) {
+    if (!canManage) {
+      setError("Portfólio multimédia não está incluído no teu plano.")
+      return
+    }
     if (!confirm("Remover este item?")) return
     try {
-      await deletePortfolioItem(id)
+      await deletePortfolioItem(id, organizationId)
       setItems((prev) => prev.filter((it) => it.id !== id))
       setMsg("Removido.")
     } catch (err) {
@@ -105,6 +127,21 @@ export function PortfolioManager({ profileId, initial }: { profileId: string; in
 
   return (
     <div className="space-y-5">
+      {!canManage && (
+        <div className="rounded-[20px] border border-[#FF3B1F]/20 bg-[#FF3B1F]/5 p-5">
+          <p className="text-sm font-black text-[#7A1A0A]">Portfólio multimédia veio no plano Premium</p>
+          <p className="mt-1 text-xs text-[#0F1A2E]/60">
+            O teu plano actual não inclui a feature <span className="font-semibold">Conteúdo multimédia no perfil</span>. Os
+            itens já publicados continuam visíveis, mas não podes adicionar, editar ou remover obras. Faz upgrade do plano
+            para desbloquear.
+          </p>
+          <a href={`/dashboard/${organizationId}/subscription`} className="mt-3 inline-flex rounded-full bg-[#0F1A2E] px-5 py-2 text-xs font-bold text-white hover:bg-black">
+            Ver planos
+          </a>
+        </div>
+      )}
+
+      {canManage && (
       <form onSubmit={onCreate} className="rounded-[20px] border border-[#D9D2C2] bg-white p-5">
         <h2 className="text-sm font-black text-[#0F1A2E]">Adicionar obra</h2>
         <p className="mt-1 text-xs text-[#0F1A2E]/60">{items.length}/12 itens · Ideal imagem 1200×800.</p>
@@ -134,6 +171,7 @@ export function PortfolioManager({ profileId, initial }: { profileId: string; in
         {error && <p className="mt-3 rounded-lg border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 px-3 py-2 text-xs text-[#7A1A0A]">{error}</p>}
         {msg && <p className="mt-3 rounded-lg border border-[#0B5E56]/20 bg-[#0B5E56]/10 px-3 py-2 text-xs text-[#0B5E56]">{msg}</p>}
       </form>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         {items.map((it) => (
@@ -157,14 +195,16 @@ export function PortfolioManager({ profileId, initial }: { profileId: string; in
                 <>
                   <h3 className="text-sm font-black leading-tight text-[#0F1A2E]">{it.title}</h3>
                   {it.description && <p className="mt-1 text-xs leading-relaxed text-[#0F1A2E]/60 line-clamp-3">{it.description}</p>}
-                  <div className="mt-3 flex gap-2">
-                    <button onClick={() => setEditing(it)} className="rounded-full border border-[#D9D2C2] bg-white px-3 py-1.5 text-xs font-semibold hover:bg-[#F6F3EE]">
-                      Editar
-                    </button>
-                    <button onClick={() => onDelete(it.id)} className="rounded-full border border-[#FF3B1F]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#7A1A0A] hover:bg-[#FF3B1F]/10">
-                      Remover
-                    </button>
-                  </div>
+                  {canManage && (
+                    <div className="mt-3 flex gap-2">
+                      <button onClick={() => setEditing(it)} className="rounded-full border border-[#D9D2C2] bg-white px-3 py-1.5 text-xs font-semibold hover:bg-[#F6F3EE]">
+                        Editar
+                      </button>
+                      <button onClick={() => onDelete(it.id)} className="rounded-full border border-[#FF3B1F]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#7A1A0A] hover:bg-[#FF3B1F]/10">
+                        Remover
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>

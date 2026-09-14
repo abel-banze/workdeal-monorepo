@@ -31,10 +31,12 @@
     "./lib/website": "./dist/lib/website.js",
     "./lib/contact-verification": "./dist/lib/contact-verification.js",
     "./lib/email-templates": "./dist/lib/email-templates.js",
+    "./lib/ranking": "./dist/lib/ranking.js",
     "./schemas/company": "./dist/schemas/company.js",
     "./schemas/tag": "./dist/schemas/tag.js",
     "./schemas/pre-register": "./dist/schemas/pre-register.js",
     "./schemas/subscription": "./dist/schemas/subscription.js",
+    "./schemas/feature": "./dist/schemas/feature.js",
     "./lib/parse-search-query": "./dist/lib/parse-search-query.js"
   }
 }

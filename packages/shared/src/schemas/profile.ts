@@ -196,6 +196,9 @@ export const publicProfileViewSchema = profileViewSchema.extend({
   reviews: publicReviewsSchema,
   services: publicServiceSchema.array(),
   contactVerifications: publicContactVerificationSchema.array(),
+  // Assistente de IA do perfil — verdade computada no servidor (plano da
+  // organização dona). Permite esconder o widget nos perfis sem o plano.
+  assistantEnabled: z.boolean(),
 });
 
 export type PublicProfileView = z.infer<typeof publicProfileViewSchema>;
