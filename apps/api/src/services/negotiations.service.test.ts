@@ -99,12 +99,7 @@ beforeEach(() => {
   mocks.tasksRepo.getUserProfileIds.mockResolvedValue([]);
   mocks.repo.findThreadById.mockResolvedValue(THREAD());
   mocks.repo.listMessages.mockResolvedValue({ items: [MSG()], total: 1 });
-  mocks.repo.attachThreadDisplay.mockImplementation(async (rows: ThreadWithContext[]) =>
-    rows.map((r) => ({ ...r, providerProfileName: null, providerProfileSlug: null, providerProfileLogo: null, requesterProfileName: null })),
-  );
   mocks.repo.unreadCounts.mockResolvedValue(new Map([["th-1", 0]]));
-  mocks.repo.findUserNames.mockResolvedValue(new Map([["u-provider", "Fornecedor Lda"]]));
-  mocks.repo.findProfileNames.mockResolvedValue(new Map([["prof-9", "Fornecedor Lda"]]));
   mocks.repo.findPersonalProfileId.mockResolvedValue(null);
   mocks.notify.mockResolvedValue(undefined);
 });
@@ -157,7 +152,6 @@ describe("negotiationsService.getThread — resolução de partes", () => {
 describe("negotiationsService.sendMessage", () => {
   it("mensagem de texto do requester persiste e notifica o lado provider", async () => {
     mocks.repo.insertMessage.mockResolvedValue(MSG({ senderUserId: "u-creator", senderSide: "requester", senderProfileId: null, kind: "text", body: "Boa tarde" }));
-    mocks.repo.findUserNames.mockResolvedValue(new Map([["u-creator", "Criador"]]));
 
     const view = await negotiationsService.sendMessage(requester, "th-1", { kind: "text", body: "Boa tarde" });
 
@@ -175,7 +169,8 @@ describe("negotiationsService.sendMessage", () => {
     expect(mocks.notify).toHaveBeenCalledWith(
       expect.objectContaining({ threadId: "th-1", recipientSide: "provider", isOffer: false }),
     );
-    expect(view.senderName).toBe("Criador");
+    expect(view.senderName).toBe("Solicitante");
+    expect(view.senderProfileId).toBeNull();
   });
 
   it("contra-oferta do provider persiste preço e prazo", async () => {
@@ -296,5 +291,66 @@ describe("negotiationsService.closeByProposal", () => {
     await negotiationsService.closeByProposal("prop-x", requester, "rejected");
     expect(mocks.repo.updateThreadStatus).not.toHaveBeenCalled();
     expect(mocks.repo.insertMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("negotiationsService — anonimato das partes", () => {
+  it("getThread nunca expõe nomes, slugs ou logos reais", async () => {
+    const detail = await negotiationsService.getThread(requester, "th-1");
+    expect(detail.thread.providerProfileSlug).toBeNull();
+    expect(detail.thread.providerProfileLogo).toBeNull();
+    expect(detail.thread.providerProfileName).toMatch(/^Fornecedor · #[0-9A-F]{4}$/);
+    expect(detail.thread.requesterProfileName).toBe("Solicitante");
+    expect(detail.thread.providerProfileName).not.toContain("Fornecedor Lda");
+  });
+
+  it("mensagens expõem só o alias do lado, sem perfil real", async () => {
+    const detail = await negotiationsService.getThread(requester, "th-1");
+    expect(detail.messages[0]!.senderName).toBe("Fornecedor");
+    expect(detail.messages[0]!.senderProfileId).toBeNull();
+  });
+
+  it("listThreads anonimiza todas as threads", async () => {
+    mocks.repo.listThreadsForRequester.mockResolvedValue({ items: [THREAD()], total: 1 });
+    mocks.repo.listManagerOrgIds.mockResolvedValue(["org-1"]);
+    const res = await negotiationsService.listThreads(requester, {});
+    expect(res.items[0]!.providerProfileSlug).toBeNull();
+    expect(res.items[0]!.providerProfileLogo).toBeNull();
+    expect(res.items[0]!.requesterProfileName).toBe("Solicitante");
+  });
+
+  it("notificação de email usa alias, nunca o nome real", async () => {
+    mocks.repo.insertMessage.mockResolvedValue(MSG({ senderUserId: "u-creator", senderSide: "requester", senderProfileId: null }));
+    await negotiationsService.sendMessage(requester, "th-1", { kind: "text", body: "Boa tarde" });
+    expect(mocks.notify).toHaveBeenCalledWith(expect.objectContaining({ senderName: "Solicitante" }));
+  });
+});
+
+describe("negotiationsService.sendMessage — bloqueio de contactos", () => {
+  it.each([
+    ["email", "fala comigo em joao@empresa.co.mz"],
+    ["link", "vê em https://empresa.co.mz o nosso trabalho"],
+    ["telefone", "liga-me no 841234567"],
+    ["whatsapp", "o meu whatsapp é 8412345"],
+  ])("bloqueia %s (400 CONTACT_SHARING_BLOCKED)", async (_label, body) => {
+    await expect(negotiationsService.sendMessage(requester, "th-1", { kind: "text", body })).rejects.toMatchObject({
+      status: 400,
+      code: "CONTACT_SHARING_BLOCKED",
+    });
+    expect(mocks.repo.insertMessage).not.toHaveBeenCalled();
+    expect(mocks.notify).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia contacto no corpo da contraproposta", async () => {
+    await expect(
+      negotiationsService.sendMessage(requester, "th-1", { kind: "offer", body: "lê em empresa.com", priceMzn: 9000 }),
+    ).rejects.toMatchObject({ status: 400, code: "CONTACT_SHARING_BLOCKED" });
+    expect(mocks.repo.insertMessage).not.toHaveBeenCalled();
+  });
+
+  it("permite contraproposta sem contacto", async () => {
+    mocks.repo.insertMessage.mockResolvedValue(MSG({ kind: "offer", body: "", priceMzn: 9000 }));
+    await negotiationsService.sendMessage(requester, "th-1", { kind: "offer", body: "", priceMzn: 9000 });
+    expect(mocks.repo.insertMessage).toHaveBeenCalledOnce();
   });
 });

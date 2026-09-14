@@ -103,7 +103,7 @@ export function TaskProposalForm({ taskId, aiEnabled = false }: { taskId: string
           placeholder="Como resolves este pedido? Experiência, prazos e método."
           className="w-full resize-none rounded-xl border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2.5 text-sm outline-none focus:border-[#0B5E56]"
         />
-        <p className="mt-1 text-[11px] text-[#0F1A2E]/45">Mínimo 20 caracteres.</p>
+        <p className="mt-1 text-[11px] text-[#0F1A2E]/45">Mínimo 20 caracteres. A avaliação é anónima: não incluas telefone, email, links nem o nome da empresa.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

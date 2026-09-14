@@ -35,3 +35,4 @@ export * from "./lib/rate-limit.js";
 export * from "./lib/company-size.js";
 export * from "./lib/ranking.js";
 export * from "./lib/website.js";
+export * from "./lib/negotiation-anonymity.js";

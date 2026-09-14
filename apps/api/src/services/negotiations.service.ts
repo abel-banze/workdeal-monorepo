@@ -1,6 +1,12 @@
 import type { AuthUser, CreateThreadInput, ProposalStatus, SendNegotiationMessageInput, SenderSide } from "@workdeal/shared";
 import { getOrgRole } from "@workdeal/auth";
-import { hasOrgPermission } from "@workdeal/shared";
+import {
+  anonymousThreadProviderName,
+  CONTACT_BLOCK_MESSAGE_PT,
+  detectContactSharing,
+  hasOrgPermission,
+  negotiationSideAlias,
+} from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 import { negotiationsRepository, type ThreadWithContext } from "../repositories/negotiations.repository.js";
 import { tasksRepository } from "../repositories/tasks.repository.js";
@@ -48,28 +54,40 @@ async function mustResolveSide(user: AuthUser, thread: ThreadWithContext): Promi
   throw new AppError(403, "FORBIDDEN", "Sem acesso a esta negociação");
 }
 
+// ── Anonimato ────────────────────────────────────────────────────
+// Enquanto a proposta está em discussão, nenhuma das partes vê a identidade
+// real da outra: nomes de utilizador/perfil nunca saem para a API — só
+// aliases genéricos. O `senderProfileId` é interno (autorização) e sai
+// sempre a null nas views; o `senderUserId` é um UUID opaco sem endpoint
+// público de resolução, mantido para correlação do lado do cliente.
+function toAnonymousMessage(m: ThreadMessageRow): MessageView {
+  return { ...m, senderProfileId: null, senderName: negotiationSideAlias(m.senderSide) };
+}
+
 async function attachMessageSender(messages: ThreadMessageRow[]): Promise<MessageView[]> {
-  if (messages.length === 0) return [];
-  const userIds = [...new Set(messages.map((m) => m.senderUserId))];
-  const profileIds = [...new Set(messages.map((m) => m.senderProfileId).filter((v): v is string => Boolean(v)))];
-  const [nameByUser, nameByProfile] = await Promise.all([
-    negotiationsRepository.findUserNames(userIds),
-    negotiationsRepository.findProfileNames(profileIds),
-  ]);
-  return messages.map((m) => ({
-    ...m,
-    senderName: m.senderProfileId ? (nameByProfile.get(m.senderProfileId) ?? nameByUser.get(m.senderUserId) ?? null) : (nameByUser.get(m.senderUserId) ?? null),
-  }));
+  return messages.map(toAnonymousMessage);
+}
+
+/** Vista pública da thread: display real substituído por aliases anónimos. */
+function anonymizeThreadDisplay(thread: ThreadWithContext): Pick<ThreadView, "providerProfileName" | "providerProfileSlug" | "providerProfileLogo" | "requesterProfileName"> {
+  return {
+    providerProfileName: anonymousThreadProviderName(thread.id),
+    providerProfileSlug: null,
+    providerProfileLogo: null,
+    requesterProfileName: negotiationSideAlias("requester"),
+  };
 }
 
 async function buildThreadView(thread: ThreadWithContext, viewerSide: SenderSide): Promise<ThreadView> {
-  const [display, unread] = await Promise.all([
-    negotiationsRepository.attachThreadDisplay([thread]),
-    negotiationsRepository.unreadCounts([thread.id], viewerSide),
-  ]);
-  const d = display[0];
-  if (!d) throw new AppError(404, "THREAD_NOT_FOUND", "Negociação não encontrada");
-  return { ...thread, ...d, unreadCount: unread.get(thread.id) ?? 0 };
+  const unread = await negotiationsRepository.unreadCounts([thread.id], viewerSide);
+  return { ...thread, ...anonymizeThreadDisplay(thread), unreadCount: unread.get(thread.id) ?? 0 };
+}
+
+/** Rejeita texto com contactos directos (telefone, email, links). */
+function assertNoContactSharing(body: string | null | undefined): void {
+  if (detectContactSharing(body) !== null) {
+    throw new AppError(400, "CONTACT_SHARING_BLOCKED", CONTACT_BLOCK_MESSAGE_PT);
+  }
 }
 
 async function latestMessages(threadId: string, limit: number) {
@@ -161,16 +179,10 @@ export const negotiationsService = {
         ? await negotiationsRepository.listThreadsForRequester(user.id, orgIds, query.status, page, limit)
         : await negotiationsRepository.listThreadsForProvider(profileIds, query.status, page, limit);
 
-    const displayed = await negotiationsRepository.attachThreadDisplay(res.items);
-    const unread = await negotiationsRepository.unreadCounts(displayed.map((t) => t.id), side);
-    const requesterUserIds = [...new Set(displayed.map((t) => t.requesterUserId))];
-    const nameByUser = await negotiationsRepository.findUserNames(requesterUserIds);
-    const items = displayed.map((t) => ({
+    const unread = await negotiationsRepository.unreadCounts(res.items.map((t) => t.id), side);
+    const items = res.items.map((t) => ({
       ...t,
-      requesterProfileName: t.requesterProfileName ?? nameByUser.get(t.requesterUserId) ?? null,
-      providerProfileName: t.providerProfileName,
-      providerProfileSlug: t.providerProfileSlug,
-      providerProfileLogo: t.providerProfileLogo,
+      ...anonymizeThreadDisplay(t),
       unreadCount: unread.get(t.id) ?? 0,
     }));
     return { items, total: res.total, page, limit };
@@ -198,6 +210,10 @@ export const negotiationsService = {
       throw new AppError(409, "PROPOSAL_NOT_NEGOTIABLE", "Esta proposta já não pode ser contra-negociada");
     }
 
+    // Nem a app nem as mensagens revelam identidades: contactos directos
+    // (telefone, email, links) são bloqueados antes de persistir.
+    assertNoContactSharing(input.kind === "text" ? input.body : (input.body ?? ""));
+
     const senderProfileId =
       side === "provider" ? thread.providerProfileId : await negotiationsRepository.findPersonalProfileId(user.id);
     const message = await negotiationsRepository.insertMessage({
@@ -218,13 +234,13 @@ export const negotiationsService = {
       providerProfileId: thread.providerProfileId,
       requesterUserId: thread.requesterUserId,
       recipientSide,
-      senderName: user.name,
+      senderName: negotiationSideAlias(side),
       body: input.kind === "offer" ? input.body ?? "" : input.body,
       isOffer: input.kind === "offer",
     });
 
     const [view] = await attachMessageSender([message]);
-    return view ?? { ...message, senderName: user.name };
+    return view ?? toAnonymousMessage(message);
   },
 
   // ── Encerramento (usado pelas acções de aceitar/recusar proposta) ──
