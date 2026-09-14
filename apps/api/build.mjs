@@ -61,9 +61,18 @@ const workdealPlugin = {
 };
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8"));
+
+// Transitivas que o esbuild NÃO pode fazer inline: contêm `require()` dinâmico
+// (ex: @vercel/oidc faz require("path") em token-util.js) e rebentam no arranque
+// com `Error: Dynamic require of "path" is not supported`. Como externas, o
+// Vercel inclui-as na função via file-tracing do `import`/`require` gerado.
+const transitiveExternals = [
+  "@vercel/oidc", // via @ai-sdk/gateway (AI SDK) — nunca fazer bundle
+];
 const externals = [
   ...Object.keys(pkg.dependencies ?? {}),
   ...Object.keys(pkg.devDependencies ?? {}),
+  ...transitiveExternals,
   "pg",
   "pg-native",
   "fs",
