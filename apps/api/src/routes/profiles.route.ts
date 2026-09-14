@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { createMiddleware } from "hono/factory";
-import { createProfileSchema, listProfilesQuerySchema, updateProfileSchema } from "@workdeal/shared";
+import { createProfileSchema, listProfilesQuerySchema, updateProfileSchema, profileAssistantChatSchema } from "@workdeal/shared";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import type { Env } from "../middlewares/auth.middleware.js";
@@ -14,6 +14,7 @@ import { AppError } from "../lib/errors.js";
 const listLimiter = createRateLimiter({ windowMs: 60_000, max: 60 });
 const writeLimiter = createRateLimiter({ windowMs: 60_000, max: 20 });
 const publicLimiter = createRateLimiter({ windowMs: 60_000, max: 100 });
+const assistantLimiter = createRateLimiter({ windowMs: 60_000, max: 20 });
 
 function rateLimit(limiter: ReturnType<typeof createRateLimiter>) {
   return async (c: Parameters<Parameters<Hono<Env>["use"]>[1]>[0], next: () => Promise<void>) => {
@@ -91,6 +92,11 @@ profilesRoute.get("/:slug", rateLimit(publicLimiter), async (c) => {
 profilesRoute.get("/:slug/public", rateLimit(publicLimiter), async (c) => {
   const { body, status } = await profilesController.getPublicBySlug(c, c.req.param("slug"));
   c.header("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=600");
+  return c.json(body, status);
+});
+
+profilesRoute.post("/:slug/assistant/chat", rateLimit(assistantLimiter), requireAuth, zValidator("json", profileAssistantChatSchema), async (c) => {
+  const { body, status } = await profilesController.chatAssistant(c.get("user"), c.req.param("slug"), c.req.valid("json"));
   return c.json(body, status);
 });
 

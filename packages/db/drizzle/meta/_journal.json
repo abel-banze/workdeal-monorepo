@@ -295,6 +295,41 @@
       "when": 1788952712164,
       "tag": "0041_wandering_solo",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1789165464235,
+      "tag": "0042_skinny_nico_minoru",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1789404203445,
+      "tag": "0043_secret_hiroim",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1789412315531,
+      "tag": "0044_bumpy_manta",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1789418422057,
+      "tag": "0045_boring_justin_hammer",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1789418817554,
+      "tag": "0046_familiar_stardust",
+      "breakpoints": true
     }
   ]
 }

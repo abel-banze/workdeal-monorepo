@@ -18,6 +18,8 @@ import { adminBadgesRoute } from "./admin-badges.route.js";
 import { adminPlansRoute } from "./admin-plans.route.js";
 import { adminSubscriptionsRoute } from "./admin-subscriptions.route.js";
 import { adminAffiliatesRoute } from "./admin-affiliates.route.js";
+import { adminFeaturesRoute } from "./admin-features.route.js";
+import { aiSettingsRoute } from "./ai-settings.route.js";
 
 export const adminRoute = new Hono<Env>();
 
@@ -172,3 +174,5 @@ adminRoute.route("/badges", adminBadgesRoute);
 adminRoute.route("/plans", adminPlansRoute);
 adminRoute.route("/subscriptions", adminSubscriptionsRoute);
 adminRoute.route("/affiliates", adminAffiliatesRoute);
+adminRoute.route("/features", adminFeaturesRoute);
+adminRoute.route("/ai-settings", aiSettingsRoute);

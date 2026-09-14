@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, exists, ilike, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, exists, ilike, inArray, isNull, sql } from "drizzle-orm";
 import { db, profile, profileCategory, category, profileLocation, profileBadge, badge, organization, companyQualification, profileContactVerification, profileTag, tag } from "@workdeal/db";
 import type { ContactVerificationPayload } from "@workdeal/shared/lib/contact-verification";
 import type { ListProfilesQuery, ProfileBadgeLite } from "@workdeal/shared";
 import { boundingBox, isValidCoordinates } from "@workdeal/shared/lib/geo";
 import { ttlCache } from "../lib/ttl-cache.js";
+import { buildRankingScoreExpr } from "../lib/ranking-sql.js";
 
 /**
  * Colunas seguras para SELECT — exclui geom (geography) e searchTsv (tsvector)
@@ -156,6 +157,11 @@ class ProfilesRepository {
 
   async findByUserId(userId: string): Promise<ProfileRow | null> {
     const [row] = await db.select(profileColumns).from(profile).where(eq(profile.userId, userId)).limit(1);
+    return row ?? null;
+  }
+
+  async findById(profileId: string): Promise<ProfileRow | null> {
+    const [row] = await db.select(profileColumns).from(profile).where(eq(profile.id, profileId)).limit(1);
     return row ?? null;
   }
 
@@ -322,12 +328,17 @@ class ProfilesRepository {
 
     const where = and(...(conditions.filter(Boolean) as unknown as Parameters<typeof and>[0][]));
 
-    const orderBy =
-      query.sort === "name"
-        ? asc(profile.name)
-        : query.sort === "distance" && nearCoords
-          ? sql`ST_Distance(${sql.raw('"profile"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC`
-          : desc(profile.updatedAt);
+    // Ordenação: sort explícito (nome/distância) respeita a escolha do utilizador;
+    // o default (recent) usa o ranking comercial (search_boost do plano + verificação
+    // + selos) com updated_at como desempate — critérios em shared/lib/ranking.ts.
+    const orderBy = await (async () => {
+      if (query.sort === "name") return asc(profile.name);
+      if (query.sort === "distance" && nearCoords) {
+        return sql`ST_Distance(${sql.raw('"profile"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC`;
+      }
+      const rankingScore = await buildRankingScoreExpr();
+      return sql`${rankingScore} DESC, ${profile.updatedAt} DESC`;
+    })();
 
     const selectColumns = nearCoords
       ? {

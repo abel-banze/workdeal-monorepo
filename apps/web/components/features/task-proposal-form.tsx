@@ -4,12 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { submitProposal } from "@/app/actions/tasks";
+import { draftProposalAction } from "@/app/actions/agents";
 
-export function TaskProposalForm({ taskId }: { taskId: string }) {
+export function TaskProposalForm({ taskId, aiEnabled = false }: { taskId: string; aiEnabled?: boolean }) {
   const [message, setMessage] = useState("");
   const [price, setPrice] = useState("");
   const [days, setDays] = useState("");
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const [done, setDone] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -33,6 +35,24 @@ export function TaskProposalForm({ taskId }: { taskId: string }) {
       toast.error(err instanceof Error ? err.message : "Falha ao enviar a proposta.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleAiDraft() {
+    const priceMzn = price.trim() === "" ? null : Number(price);
+    const estimatedDays = days.trim() === "" ? null : Number(days);
+    setAiBusy(true);
+    try {
+      const res = await draftProposalAction({ taskId, priceMzn, estimatedDays });
+      const draft = res.data?.message;
+      if (draft) {
+        setMessage(draft);
+        toast.success("Rascunho gerado — revê antes de enviar.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao gerar o rascunho.");
+    } finally {
+      setAiBusy(false);
     }
   }
 
@@ -60,9 +80,21 @@ export function TaskProposalForm({ taskId }: { taskId: string }) {
       </div>
 
       <div>
-        <label htmlFor="prop-message" className="mb-1 block text-xs font-bold text-[#0F1A2E]/70">
-          Mensagem <span className="text-[#FF3B1F]">*</span>
-        </label>
+        <div className="mb-1 flex items-center justify-between">
+          <label htmlFor="prop-message" className="block text-xs font-bold text-[#0F1A2E]/70">
+            Mensagem <span className="text-[#FF3B1F]">*</span>
+          </label>
+          {aiEnabled && (
+            <button
+              type="button"
+              onClick={handleAiDraft}
+              disabled={aiBusy}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#0B5E56]/25 bg-[#0B5E56]/5 px-3 py-1 text-[11px] font-bold text-[#0B5E56] hover:bg-[#0B5E56]/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              ✦ {aiBusy ? "A gerar…" : "Gerar rascunho com IA"}
+            </button>
+          )}
+        </div>
         <textarea
           id="prop-message"
           rows={4}
@@ -71,7 +103,7 @@ export function TaskProposalForm({ taskId }: { taskId: string }) {
           placeholder="Como resolves este pedido? Experiência, prazos e método."
           className="w-full resize-none rounded-xl border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2.5 text-sm outline-none focus:border-[#0B5E56]"
         />
-        <p className="mt-1 text-[11px] text-[#0F1A2E]/45">Mínimo 20 caracteres.</p>
+        <p className="mt-1 text-[11px] text-[#0F1A2E]/45">Mínimo 20 caracteres. A avaliação é anónima: não incluas telefone, email, links nem o nome da empresa.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

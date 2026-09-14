@@ -12,6 +12,7 @@ import { ProfilePortfolio } from "@/components/features/profile-portfolio";
 import { QuoteDialog } from "@/components/features/profile-quote-dialog";
 import { ShareProfileDialog } from "@/components/features/profile-share-dialog";
 import { BookmarkButton } from "@/components/features/profile-bookmark-button";
+import { ProfileAssistantWidget } from "@/components/features/profile-assistant-widget";
 import { Analytics } from "@/components/features/analytics";
 import { ProfileAssociations } from "@/components/features/profile-associations";
 import type { PublicProfileView } from "@workdeal/shared";
@@ -110,6 +111,15 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
     <div className="bg-[#F6F3EE] min-h-screen">
       <JsonLd profile={p} />
       <Analytics profileId={p.id} province={loc?.province ?? undefined} district={loc?.district ?? undefined} />
+      {p.assistantEnabled ? (
+        <ProfileAssistantWidget
+          slug={slug}
+          profileId={p.id}
+          profileName={p.name}
+          profileEmail={p.email}
+          whatsapp={p.whatsapp}
+        />
+      ) : null}
 
       {/* HERO — thesis: identidade + selo em relevo, não hero centrado genérico */}
       <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-6">

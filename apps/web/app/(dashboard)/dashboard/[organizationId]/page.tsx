@@ -5,6 +5,9 @@ import { getOrgRole } from "@workdeal/auth/repository"
 import { SignOutButton } from "../sign-out-button"
 import { AdvancedLocationSettings } from "../advanced-location-settings"
 import { VisitsTimeChart, OriginsChart, SizeChart, ProvinceBars, VisitorsTable } from "@/components/features/org-analytics"
+import { getFeatureAccess } from "@/lib/features"
+import { AiAssistantPanel } from "@/components/features/ai-assistant-panel"
+import { AiResponseDraft } from "@/components/features/ai-response-draft"
 
 export default async function OrgDashboardPage({
   params,
@@ -133,8 +136,12 @@ export default async function OrgDashboardPage({
     }
   }
 
-  const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
+const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
   const hasLocation = locations.length > 0
+
+  const featureAccess = await getFeatureAccess(organizationId)
+  const aiAssistant = featureAccess.get("ai_assistant")?.accessible ?? false
+  const aiResponseDraft = featureAccess.get("ai_response_support")?.accessible ?? false
 
   return (
     <div className="mx-auto w-full max-w-[1160px] space-y-5 pb-10">
@@ -426,6 +433,34 @@ export default async function OrgDashboardPage({
           </Link>
         </div>
       </div>
+
+      {aiAssistant && (
+        <AiAssistantPanel organizationId={organizationId} />
+      )}
+
+      {aiResponseDraft && (
+        <div className="rounded-[20px] border border-[#D9D2C2] bg-white p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-[#0F1A2E] text-white">✉</span>
+              <div>
+                <h2 className="text-sm font-black tracking-tight text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
+                  Respostas com IA
+                </h2>
+                <p className="text-[11px] text-[#0F1A2E]/50">Rascunhos de resposta a pedidos de orçamento e contactos.</p>
+              </div>
+            </div>
+            <AiResponseDraft
+              organizationId={organizationId}
+              trigger={
+                <button className="inline-flex h-9 items-center justify-center rounded-full bg-[#0F1A2E] px-4 text-xs font-bold text-white hover:bg-black transition-colors">
+                  Gerar resposta
+                </button>
+              }
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 rounded-[16px] border border-[#D9D2C2] bg-[#F6F3EE] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">

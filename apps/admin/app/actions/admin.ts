@@ -27,7 +27,14 @@ import type {
   AffiliateListQuery,
   AffiliateCreateInput,
   AffiliateUpdateInput,
+  FeatureFlagCreateInput,
+  FeatureFlagUpdateInput,
+  FeatureFlagOverrideUpsertInput,
+  AiSettingsUpdateInput,
+  AiCredentialUpsertInput,
+  AiUsageQueryInput,
 } from "@workdeal/shared";
+import { featureKeySchema } from "@workdeal/shared";
 import { apiFetch, apiFetchWithAuth, apiUpload } from "@/lib/api";
 import { requireSystemRole } from "@/lib/auth";
 
@@ -558,6 +565,102 @@ export async function upsertPlanFeatures(id: string, input: PlanFeatureUpsertInp
   });
 }
 
+// --- Features (flags operacionais) ---
+
+async function requireFeatureAdmin() {
+  const s = await requireSystemRole("moderator", "admin");
+  if (s.user.systemRole !== "admin") throw new Error("Só administradores podem alterar features");
+  return s;
+}
+
+export async function listAdminFlags(group?: string) {
+  await requireSystemRole("moderator", "admin");
+  const qs = group ? `?group=${encodeURIComponent(group)}` : "";
+  return apiFetch<unknown>(`/api/v1/admin/features${qs}`);
+}
+
+export async function getAdminFlag(key: string) {
+  await requireSystemRole("moderator", "admin");
+  return apiFetch<unknown>(`/api/v1/admin/features/${key}`);
+}
+
+export async function createFeatureFlag(input: FeatureFlagCreateInput) {
+  await requireFeatureAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/features`, token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateFeatureFlag(key: string, input: FeatureFlagUpdateInput) {
+  await requireFeatureAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/features/${key}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteFeatureFlag(key: string) {
+  await requireFeatureAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/features/${key}`, token, { method: "DELETE" });
+}
+
+export async function toggleFlagDefault(key: string) {
+  await requireFeatureAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/features/${key}/toggle`, token, { method: "POST" });
+}
+
+export async function toggleFlagEmergency(key: string) {
+  await requireFeatureAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/features/${key}/emergency`, token, { method: "POST" });
+}
+
+export async function setFlagOverride(key: string, organizationId: string, input: FeatureFlagOverrideUpsertInput) {
+  await requireFeatureAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/features/${key}/overrides/${organizationId}`, token, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function removeFlagOverride(key: string, organizationId: string) {
+  await requireFeatureAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth(`/api/v1/admin/features/${key}/overrides/${organizationId}`, token, { method: "DELETE" });
+}
+
+/** Auditoria de integridade — entraves que bloqueiam subscrições com plano activo. */
+export async function getFeatureEntitlementIntegrity() {
+  await requireSystemRole("moderator", "admin");
+  return apiFetch<unknown>(`/api/v1/admin/features/integrity`);
+}
+
+// Wrappers de formulário (form actions) para criar/editar flags sem JS.
+export async function createFeatureFlagFromForm(formData: FormData) {
+  const key = featureKeySchema.parse(String(formData.get("key") ?? ""));
+  const name = String(formData.get("name") ?? "");
+  const group = String(formData.get("group") ?? "") || null;
+  const description = String(formData.get("description") ?? "") || null;
+  const sortOrder = Number(formData.get("sortOrder") ?? "") || 100;
+  const defaultEnabled = formData.get("defaultEnabled") === "on";
+  return createFeatureFlag({ key, name, group, description, defaultEnabled, sortOrder });
+}
+
+export async function updateFeatureFlagFromForm(formData: FormData) {
+  const key = featureKeySchema.parse(String(formData.get("key") ?? ""));
+  const name = String(formData.get("name") ?? "");
+  const group = String(formData.get("group") ?? "") || null;
+  const description = String(formData.get("description") ?? "") || null;
+  const sortOrder = Number(formData.get("sortOrder") ?? "") || 100;
+  return updateFeatureFlag(key, { name, group, description, sortOrder });
+}
+
 // --- Subscrições ---
 
 export async function listAdminSubscriptions(query: Partial<SubscriptionListQuery> = {}) {
@@ -717,4 +820,100 @@ export async function rejectVerification(id: string, reviewNote?: string) {
     method: "POST",
     body: JSON.stringify({ reviewNote: reviewNote ?? undefined }),
   });
+}
+
+// ── Gestão de IA (provider, modelos, credenciais, budgets) ──────────────
+
+export async function getAiOverview() {
+  await requireSystemRole("moderator", "admin");
+  return apiFetch<unknown>(`/api/v1/admin/ai-settings`);
+}
+
+async function requireAiAdmin() {
+  const s = await requireSystemRole("moderator", "admin");
+  if (s.user.systemRole !== "admin") throw new Error("Só administradores podem alterar a configuração de IA");
+  return s;
+}
+
+export async function saveAiSettings(input: AiSettingsUpdateInput) {
+  await requireAiAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth<unknown>(`/api/v1/admin/ai-settings/settings`, token, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function upsertAiCredential(input: AiCredentialUpsertInput) {
+  await requireAiAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth<unknown>(`/api/v1/admin/ai-settings/credentials`, token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteAiCredential(provider: string) {
+  await requireAiAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth<unknown>(`/api/v1/admin/ai-settings/credentials/${provider}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function testAiConnection() {
+  await requireAiAdmin();
+  const token = await getAuthToken();
+  return apiFetchWithAuth<unknown>(`/api/v1/admin/ai-settings/test-connection`, token, {
+    method: "POST",
+  });
+}
+
+export async function getAiUsage(query: AiUsageQueryInput = {}) {
+  await requireSystemRole("moderator", "admin");
+  const params = new URLSearchParams();
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
+  if (query.agentKey) params.set("agentKey", query.agentKey);
+  if (query.provider) params.set("provider", query.provider);
+  const qs = params.toString();
+  return apiFetch<unknown>(`/api/v1/admin/ai-settings/usage${qs ? `?${qs}` : ""}`);
+}
+
+// Wrappers de formulário (form actions), alinhados aos schemas partilhados.
+
+export async function saveAiSettingsFromForm(formData: FormData) {
+  const provider = String(formData.get("provider") ?? "mock");
+  const parseOverride = (tier: string): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const p of ["google", "anthropic", "openai"] as const) {
+      out[p] = String(formData.get(`model_${tier}_${p}`) ?? "").trim();
+    }
+    return out;
+  };
+  const modelOverrides = {
+    flash: parseOverride("flash"),
+    pro: parseOverride("pro"),
+  };
+  const num = (name: string): number | undefined => {
+    const v = String(formData.get(name) ?? "").trim();
+    if (!v) return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  return saveAiSettings({
+    provider: provider as AiSettingsUpdateInput["provider"],
+    modelOverrides,
+    budgets: {
+      maxInputTokens: num("budget_maxInputTokens"),
+      maxOutputTokens: num("budget_maxOutputTokens"),
+      maxCostUsd: num("budget_maxCostUsd"),
+    },
+  });
+}
+
+export async function upsertAiCredentialFromForm(formData: FormData) {
+  const provider = String(formData.get("provider") ?? "");
+  const apiKey = String(formData.get("apiKey") ?? "");
+  return upsertAiCredential({ provider: provider as AiCredentialUpsertInput["provider"], apiKey });
 }

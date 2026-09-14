@@ -231,6 +231,9 @@ export function ProposalReview({
           <h2 className="text-sm font-black text-[#0F1A2E]">Propostas recebidas</h2>
           <span className="rounded-full bg-[#0F1A2E] px-2.5 py-1 text-[11px] font-bold text-white">{proposals.length}</span>
         </div>
+        <p className="mt-2 rounded-xl border border-[#0B5E56]/20 bg-[#0B5E56]/5 px-3 py-2 text-[11px] leading-relaxed text-[#0F1A2E]/60">
+          Avaliação anónima: as identidades dos fornecedores só são reveladas após a adjudicação. As mensagens com contactos (telefone, email, links) são bloqueadas automaticamente.
+        </p>
 
         {proposals.length === 0 && (
           <p className="mt-4 rounded-xl border border-dashed border-[#D9D2C2] bg-[#F6F3EE] p-5 text-center text-sm text-[#0F1A2E]/50">

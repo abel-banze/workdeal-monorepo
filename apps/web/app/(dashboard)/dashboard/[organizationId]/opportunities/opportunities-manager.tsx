@@ -75,7 +75,7 @@ export function OpportunitiesManager({
                   <div className="min-w-0">
                     <h3 className="text-[15px] font-black leading-tight text-[#0F1A2E]">{p.taskTitle ?? "Tarefa"}</h3>
                     <p className="mt-0.5 text-xs text-[#0F1A2E]/50">
-                      {p.requesterUserName ? `solicitante ${p.requesterUserName} · ` : ""}
+                      {p.requesterUserName ? `${p.requesterUserName} · ` : ""}
                       enviada {new Date(p.createdAt).toLocaleDateString("pt-MZ")}
                     </p>
                   </div>

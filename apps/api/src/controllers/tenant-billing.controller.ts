@@ -1,5 +1,6 @@
 import { ok } from "../lib/api-response.js";
 import { billingService } from "../services/billing.service.js";
+import { featuresService } from "../services/features.service.js";
 import type { AuthUser } from "@workdeal/shared";
 
 export const tenantBillingController = {
@@ -12,7 +13,9 @@ export const tenantBillingController = {
   // Subscrição actual do utilizador no âmbito indicado.
   async getCurrentSubscription(user: AuthUser, organizationId: string | null) {
     const row = await billingService.getMySubscription(user.id, organizationId);
-    return { body: ok(row), status: 200 as const };
+    // Visão de features com o flag operacional resolvido (UI reflecte; gate no backend).
+    const featureAccess = await featuresService.getFeatureAccessList({ userId: user.id, organizationId });
+    return { body: ok({ ...row, featureAccess }), status: 200 as const };
   },
 
   async subscribe(user: AuthUser, organizationId: string | null, input: Parameters<typeof billingService.subscribeMySubscriptionPlan>[2]) {

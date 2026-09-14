@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, exists, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, eq, exists, ilike, inArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, profile, profileCategory, category, profileLocation, profileBadge, badge, organization, companyQualification } from "@workdeal/db";
 import type { ProfileBadgeLite } from "@workdeal/shared";
 import { profileColumns } from "./profiles.repository.js";
 import { boundingBox } from "@workdeal/shared/lib/geo";
+import { buildRankingScoreExpr, buildSearchBoostTierExpr } from "../lib/ranking-sql.js";
 
 export interface SearchLocation {
   kind: "province" | "district" | "bairro";
@@ -188,9 +189,14 @@ export class SearchRepository {
     } else if (params.sort === "distance" && nearCoords) {
       orderBy = sql`ST_Distance(${sql.raw('"profile"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC`;
     } else if (rankQuery) {
-      orderBy = sql`ts_rank_cd(${profile.searchTsv}, ${rankQuery}) DESC, similarity(unaccent(${profile.name}), unaccent(${raw})) DESC, ${profile.updatedAt} DESC`;
+      // Relevância domina; o search_boost do plano (0-3) desempata resultados
+      // com relevância próxima — empresas pagas sobem sem destruir o relevância.
+      const boostTier = await buildSearchBoostTierExpr();
+      orderBy = sql`ts_rank_cd(${profile.searchTsv}, ${rankQuery}) DESC, ${boostTier} DESC, similarity(unaccent(${profile.name}), unaccent(${raw})) DESC, ${profile.updatedAt} DESC`;
     } else {
-      orderBy = desc(profile.updatedAt) as unknown as SQL;
+      // Listagem estruturada sem texto: ranking comercial (planos + verificação + selos)
+      const rankingScore = await buildRankingScoreExpr();
+      orderBy = sql`${rankingScore} DESC, ${profile.updatedAt} DESC`;
     }
 
     const selectColumns = {
@@ -240,7 +246,7 @@ export class SearchRepository {
           ? (asc(profile.name) as unknown as SQL)
           : params.sort === "distance" && nearCoords
             ? (sql`ST_Distance(${sql.raw('"profile"."geom"')}, ST_SetSRID(ST_MakePoint(${nearCoords.longitude}, ${nearCoords.latitude}), 4326)::geography) ASC` as unknown as SQL)
-            : (sql`greatest(similarity(unaccent(${profile.name}), unaccent(${raw})), similarity(unaccent(coalesce(${profile.description},'')), unaccent(${raw})) ) DESC, ${profile.updatedAt} DESC` as unknown as SQL);
+            : (sql`greatest(similarity(unaccent(${profile.name}), unaccent(${raw})), similarity(unaccent(coalesce(${profile.description},'')), unaccent(${raw})) ) DESC, ${await buildSearchBoostTierExpr()} DESC, ${profile.updatedAt} DESC` as unknown as SQL);
       const sel2 = db.select(selectColumns as any).from(profile).where(w as any).orderBy(fallbackOrder).limit(limit).offset(offset);
       const cnt2 = db.select({ count: sql<number>`count(*)::int` }).from(profile).where(w as any);
       const [r2, c2] = await Promise.all([sel2, cnt2]);

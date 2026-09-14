@@ -12,10 +12,17 @@ import type {
   UpdateTaskInput,
 } from "@workdeal/shared";
 import { getOrgRole } from "@workdeal/auth";
-import { hasOrgPermission } from "@workdeal/shared";
+import {
+  anonymousProviderName,
+  CONTACT_BLOCK_MESSAGE_PT,
+  detectContactSharing,
+  hasOrgPermission,
+  negotiationSideAlias,
+} from "@workdeal/shared";
 import { AppError } from "../lib/errors.js";
 import { tasksRepository } from "../repositories/tasks.repository.js";
 import { tagsRepository } from "../repositories/tags.repository.js";
+import { negotiationsService } from "./negotiations.service.js";
 
 type ProposalListQuery = { status?: ProposalStatus; page?: number; limit?: number };
 
@@ -220,6 +227,11 @@ async listTasks(query: TaskListQuery) {
     }
     const existing = await tasksRepository.findProposalByTaskAndProvider(input.taskId, input.providerProfileId);
     if (existing) throw new AppError(409, "ALREADY_PROPOSED", "Já submeteste uma proposta para esta tarefa");
+    // A mensagem da proposta é lida pelo solicitante ainda em fase anónima:
+    // contactos directos são bloqueados aqui e não só no chat.
+    if (detectContactSharing(input.message) !== null) {
+      throw new AppError(400, "CONTACT_SHARING_BLOCKED", CONTACT_BLOCK_MESSAGE_PT);
+    }
 
     const created = await tasksRepository.createProposal({
       taskId: input.taskId,
@@ -239,7 +251,16 @@ async listTasks(query: TaskListQuery) {
     if (!taskRow) throw new AppError(404, "TASK_NOT_FOUND", "Tarefa não encontrada");
     await assertCanManageTask(user, taskRow);
     const { items, total } = await tasksRepository.listProposals(taskId, query.status, page, limit);
-    return { items, total, page, limit };
+    // Fase anónima: o solicitante avalia preço/prazo/mensagem sem ver quem
+    // propôs — nome/slug/logo reais nunca saem para a API. A identidade só é
+    // revelada após a adjudicação (bid).
+    const anonymous = items.map((p) => ({
+      ...p,
+      providerProfileName: anonymousProviderName(p.id),
+      providerProfileSlug: null,
+      providerProfileLogo: null,
+    }));
+    return { items: anonymous, total, page, limit };
   },
 
   async myProposals(user: AuthUser, query: ProposalListQuery) {
@@ -247,7 +268,9 @@ async listTasks(query: TaskListQuery) {
     const limit = query.limit ?? 20;
     const profileIds = await tasksRepository.getUserProfileIds(user.id);
     const { items, total } = await tasksRepository.listProposalsByProviders(profileIds, query.status, page, limit);
-    return { items, total, page, limit };
+    // Espelho do anonimato para o fornecedor: não vê quem pediu a tarefa.
+    const anonymous = items.map((p) => ({ ...p, requesterUserName: negotiationSideAlias("requester") }));
+    return { items: anonymous, total, page, limit };
   },
 
   async updateProposalStatus(user: AuthUser, taskId: string, proposalId: string, status: "shortlisted" | "rejected") {
@@ -261,9 +284,12 @@ async listTasks(query: TaskListQuery) {
     }
     const updated = await tasksRepository.updateProposalStatus(proposalId, status);
     // Se deixou de haver propostas em análise, a tarefa volta a "open"
-    if (status === "rejected" && taskRow.status === "in_review") {
-      const remaining = await tasksRepository.listProposals(taskId, "submitted", 1, 1);
-      if (remaining.total === 0) await tasksRepository.update(taskId, { status: "open" });
+    if (status === "rejected") {
+      await negotiationsService.closeByProposal(proposalId, user, "rejected");
+      if (taskRow.status === "in_review") {
+        const remaining = await tasksRepository.listProposals(taskId, "submitted", 1, 1);
+        if (remaining.total === 0) await tasksRepository.update(taskId, { status: "open" });
+      }
     }
     return updated;
   },
@@ -298,7 +324,11 @@ async listTasks(query: TaskListQuery) {
     await tasksRepository.updateProposalStatus(proposalId, "accepted");
     // Rejeita as restantes propostas em análise
     const otherIds = await tasksRepository.listProposalIdsForTaskExcluding(taskId, proposalId);
-    for (const pid of otherIds) await tasksRepository.updateProposalStatus(pid, "rejected");
+    for (const pid of otherIds) {
+      await tasksRepository.updateProposalStatus(pid, "rejected");
+      await negotiationsService.closeByProposal(pid, user, "rejected");
+    }
+    await negotiationsService.closeByProposal(proposalId, user, "accepted");
     await tasksRepository.update(taskId, { status: "in_progress" });
     return bid;
   },

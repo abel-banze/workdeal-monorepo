@@ -14,6 +14,14 @@ import {
 
 export type PlanFeatureView = { featureKey: string; featureValue: string | null; label: string | null }
 
+export type FeatureAccessEntry = {
+  key: string
+  label: string
+  entitled: boolean
+  enabled: boolean
+  accessible: boolean
+}
+
 export type PublicPlan = {
   id: string
   slug: string

@@ -1,10 +1,11 @@
 import type { Context } from "hono";
-import type { AuthUser, CreateProfileInput, ListProfilesQuery, UpdateProfileInput } from "@workdeal/shared";
+import type { AuthUser, CreateProfileInput, ListProfilesQuery, ProfileAssistantChatInput, UpdateProfileInput } from "@workdeal/shared";
 import type { Env } from "../middlewares/auth.middleware.js";
 import { parseVerifiedContacts } from "@workdeal/shared/lib/contact-verification";
 import { env } from "../env.js";
 import { ok } from "../lib/api-response.js";
 import { profilesService } from "../services/profiles.service.js";
+import { agentsService } from "../services/agents.service.js";
 
 export const profilesController = {
   async create(user: AuthUser, input: CreateProfileInput) {
@@ -59,5 +60,10 @@ export const profilesController = {
   async getByOrganization(user: AuthUser, organizationId: string) {
     const profile = await profilesService.getOrganizationProfile(user, organizationId);
     return { body: ok(profile), status: 200 as const };
+  },
+
+  async chatAssistant(user: AuthUser, slug: string, input: ProfileAssistantChatInput) {
+    const result = await agentsService.chatWithProfileAssistant(user, slug, input.message);
+    return { body: ok(result), status: 200 as const };
   },
 };

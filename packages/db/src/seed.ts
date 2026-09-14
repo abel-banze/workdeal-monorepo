@@ -1,5 +1,6 @@
 import { db } from "./client.js";
 import { category, badge, tag } from "./schema.js";
+import { seedFeatureFlags } from "./seed-flags.js";
 
 // Taxonomia Workdeal — 8 domínios L1 + 42 subcategorias L2
 // PT-MZ, slugs estáveis, serve directório e onboarding. Preserva slugs antigos para retrocompatibilidade.
@@ -209,6 +210,10 @@ export async function seed() {
       .onConflictDoNothing();
   }
   console.log(`  ${tags.length} tags seeded`);
+
+  console.log("Seeding feature flags...");
+  await seedFeatureFlags();
+
   console.log("Seed concluído.");
 }
 

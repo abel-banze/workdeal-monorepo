@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { getOrgRole } from "@workdeal/auth/repository"
 import { hasOrgPermission } from "@workdeal/shared"
+import { getFeatureAccess } from "@/lib/features"
 import { PortfolioManager } from "./portfolio-manager"
 
 export default async function PortfolioPage({ params }: { params: Promise<{ organizationId: string }> }) {
@@ -16,6 +17,9 @@ export default async function PortfolioPage({ params }: { params: Promise<{ orga
   const orgs = await listUserOrganizations(session.user.id)
   const org = orgs.find((o) => o.id === organizationId)
   if (!org) notFound()
+
+  const featureAccess = await getFeatureAccess(organizationId)
+  const canManageMultimedia = featureAccess.get("multimedia_content")?.accessible ?? false
 
   let profile: { id: string; slug: string; name: string } | null = null
   let items: { id: string; title: string; description: string | null; imageUrl: string | null; sortOrder: number }[] = []
@@ -55,7 +59,7 @@ export default async function PortfolioPage({ params }: { params: Promise<{ orga
           Até 12 itens. Cada um com título, descrição e imagem. Conta para o selo <span className="font-semibold text-[#0F1A2E]">perfil-completo</span> (precisa ≥1).
         </p>
       </div>
-      <PortfolioManager profileId={profile.id} initial={items} />
+      <PortfolioManager profileId={profile.id} organizationId={organizationId} canManage={canManageMultimedia} initial={items} />
     </div>
   )
 }

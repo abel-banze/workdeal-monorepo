@@ -74,6 +74,19 @@ export const envSchema = z.object({
   PAYMENT_PROVIDER_WEBHOOK_SECRET: z.string().optional(),
   // Moeda funcional dos valores monetários guardados em integer nos serviços
   PAYMENT_CURRENCY: z.string().min(3).max(3).default("MZN"),
+  // ── Agents de IA ──────────────────────────────────────────────────
+  // AI_PROVIDER="mock" para dev/CI sem chaves de API (respostas determinísticas).
+  AI_PROVIDER: z.enum(["mock", "google", "anthropic", "openai"]).default("mock"),
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  // Guardrails por defeito (podem ser apertados por pedido no motor)
+  AI_MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(8000),
+  AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(2000),
+  AI_MAX_COST_USD: z.coerce.number().positive().default(0.05),
+  // Chave-mestra para encriptar credenciais de IA na BD (ai_credentials).
+  // AES-256-GCM com IV por valor. Obrigatória se existirem credenciais na BD.
+  AI_CREDENTIALS_MASTER_KEY: z.string().min(16, "AI_CREDENTIALS_MASTER_KEY deve ter ≥16 caracteres").optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

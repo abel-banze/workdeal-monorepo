@@ -20,6 +20,7 @@ const PLAN_FEATURE_LABELS: Readonly<Record<string, string>> = {
   org_membership: "Associação a organizações e instituições",
   receive_contacts: "Recepção de contactos e interesse",
   respond_opportunities: "Resposta a oportunidades públicas",
+  negotiation_chat: "Negociação de propostas (chat)",
   // Workdeal Trust
   verification_identity: "Verificação da identidade empresarial",
   verification_nuit: "Verificação do NUIT",
@@ -122,6 +123,7 @@ export const PLANS_SEED: PlanSeed[] = [
       ["org_membership"],
       ["receive_contacts"],
       ["respond_opportunities"],
+      ["negotiation_chat"],
     ],
   },
   {
