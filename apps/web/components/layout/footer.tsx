@@ -68,8 +68,9 @@ export function Footer() {
           <div>
             <p className="text-[11px] font-bold tracking-[0.16em] text-white/40">WORKDEAL</p>
             <ul className="mt-3 space-y-2 text-sm text-white/70">
-              <li><span className="text-white/40">Termos (breve)</span></li>
-              <li><span className="text-white/40">Privacidade (breve)</span></li>
+              <li><Link href="/terms" className="hover:text-white">Termos e Condições</Link></li>
+              <li><Link href="/privacy" className="hover:text-white">Política de Privacidade</Link></li>
+              <li><Link href="/manifesto" className="hover:text-white">Manifesto</Link></li>
               <li className="pt-2 text-xs leading-relaxed text-white/35">Ecossistema global de negócios — 100% digital.</li>
             </ul>
           </div>
