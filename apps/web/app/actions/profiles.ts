@@ -4,7 +4,7 @@ import { cookies } from "next/headers"
 import { revalidateTag } from "next/cache"
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies"
 import { createProfileSchema, updateProfileSchema } from "@workdeal/shared"
-import type { CreateProfileInput, UpdateProfileInput } from "@workdeal/shared"
+import type { CreateProfileInput, PublicProfileView, UpdateProfileInput } from "@workdeal/shared"
 import { apiFetchWithAuth, apiFetch } from "@/lib/api"
 import { requireAuth } from "@/lib/auth"
 
@@ -92,4 +92,16 @@ export async function getMyProfile() {
 export async function hasProfile(): Promise<boolean> {
   const p = await getMyProfile()
   return p !== null && p !== undefined
+}
+
+/** Ficha pública de um perfil (para a sheet de decisão — a autorização vive na API). */
+export async function getPublicProfileAction(slug: string): Promise<PublicProfileView | null> {
+  await requireAuth()
+  const clean = slug?.trim()
+  if (!clean) throw new Error("Perfil em falta")
+  const token = await getAuthToken()
+  const res = await apiFetchWithAuth<PublicProfileView>(`/api/v1/profiles/${encodeURIComponent(clean)}/public`, token, {
+    method: "GET",
+  })
+  return res.data ?? null
 }

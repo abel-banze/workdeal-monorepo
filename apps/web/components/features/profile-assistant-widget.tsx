@@ -72,7 +72,12 @@ export function ProfileAssistantWidget({ slug, profileId, profileName, profileEm
         suggest: res.data?.suggest ?? "none",
       }]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao contactar o assistente.");
+      const raw = err instanceof Error ? err.message : "Falha ao contactar o assistente.";
+      toast.error(
+        /timeout/i.test(raw)
+          ? "O assistente está a demorar mais do que o esperado. Tente novamente."
+          : raw,
+      );
     } finally {
       setBusy(false);
     }
