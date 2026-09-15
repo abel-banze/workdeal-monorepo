@@ -24,7 +24,10 @@ type Props = {
 
 export function ProfileAssistantWidget({ slug, profileId, profileName, profileEmail, whatsapp }: Props) {
   const router = useRouter();
-  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [authed, setAuthed] = useState(false);
+  // Padrão = anónimo, visível logo no SSR. O efeito abaixo apenas actualiza
+  // para autenticado quando (e se) a sessão resolver — nunca deixa a UI refém
+  // do ciclo `authClient.getSession()` quando ele atrasa ou falha.
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
