@@ -1,0 +1,3 @@
+﻿npm warn Unknown project config "public-hoist-pattern". This will stop working in the next major version of npm.
+npm warn Unknown project config "confirmModulesPurge". This will stop working in the next major version of npm.
+apps/web/components/layout/dashboard-agent-button.tsx(33,26): error TS2339: Property 'reply' does not exist on type 'ApiEnvelope<{ reply: string; }>'.

@@ -306,46 +306,35 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
               </div>
             </section>
 
-            {/* credibilidade — selo circular PNG + duas famílias distintas */}
+            {/* credibilidade — carimbo de registo + livro de selos */}
             <section className="overflow-hidden rounded-[22px] border border-[#D9D2C2] bg-white">
-              <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[#D9D2C2] bg-[#F6F3EE]/60 px-6 py-4 sm:px-7">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#D9D2C2] bg-[#F6F3EE]/60 px-6 py-4 sm:px-7">
                 <div>
                   <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-[#0B5E56]">Credibilidade</p>
                   <h2 className="mt-1 text-[18px] font-black tracking-[-0.02em] text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
                     Selo & pertença
                   </h2>
                 </div>
-                <span className={`rounded-full px-3 py-1 font-mono text-[11px] font-bold tracking-[0.08em] text-white ${verifiedBadge ? "bg-[#0B5E56]" : legalizingBadge ? "bg-[#1F5C99]" : "bg-[#0F1A2E]/40"}`}>
-                  {verifiedBadge ? "Certificado Workdeal · 1º grau" : legalizingBadge ? "Em processo de legalização · 2º grau" : "Sem certificação Workdeal"}
+                <span className={`rotate-[-3deg] rounded-[6px] border-2 px-3 py-1 font-mono text-[11px] font-black uppercase tracking-[0.12em] ${verifiedBadge ? "border-[#0B5E56] text-[#0B5E56]" : legalizingBadge ? "border-[#1F5C99] text-[#1F5C99]" : "border-[#0F1A2E]/30 text-[#0F1A2E]/45"}`}>
+                  {verifiedBadge ? "Certificado · 1º grau" : legalizingBadge ? "Em legalização · 2º grau" : "Sem certificação"}
                 </span>
               </div>
 
-              <div className="flex flex-col gap-6 p-6 sm:p-7">
-                {/* 1ª linha — selo de validação Workdeal (só se a DB confirmar badge "verified" ou "in-legalization") */}
+              <div className="space-y-7 p-6 sm:p-7">
+                {/* selo de validação Workdeal (só se a DB confirmar badge "verified" ou "in-legalization") */}
                 {(verifiedBadge || legalizingBadge) ? (
-                  <div className="flex flex-col items-center text-center">
-                    <div className="relative size-[148px] shrink-0 sm:size-[168px]">
-                      <div className="absolute inset-0 overflow-hidden rounded-full border border-[#D9D2C2] bg-[#0F1A2E] shadow-[0_8px_24px_rgba(15,26,46,0.18)]" aria-hidden>
-                        <div
-                          aria-hidden
-                          className="absolute inset-0 rounded-full opacity-[0.06]"
-                          style={{
-                            backgroundImage: `linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)`,
-                            backgroundSize: "22px 22px",
-                          }}
-                        />
-                        <div aria-hidden className="pointer-events-none absolute -right-8 -top-8 size-[120px] rounded-full bg-[#FF3B1F]/25 blur-[30px]" />
-                        <div aria-hidden className="pointer-events-none absolute -left-8 -bottom-8 size-[120px] rounded-full bg-[#0B5E56]/30 blur-[30px]" />
-                      </div>
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                    <div className="relative size-[132px] shrink-0 sm:size-[148px]">
+                      <div className="absolute inset-0 rounded-full bg-[#0F1A2E] ring-1 ring-inset ring-white/25" aria-hidden />
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src="/seal-workdeal.png"
                         alt="Selo Workdeal Verificado — selo circular"
-                        width={168}
-                        height={168}
+                        width={148}
+                        height={148}
                         className="relative size-full rounded-full object-cover p-1.5"
                       />
-                      <div className={`pointer-events-none absolute inset-[11px] flex flex-col items-center justify-center rounded-full border-[1.5px] ${verifiedBadge ? "border-[#0B5E56]/30" : "border-[#1F5C99]/40"} bg-[#0F1A2E]/20 text-center`}>
+                      <div className={`pointer-events-none absolute inset-[10px] flex flex-col items-center justify-center rounded-full border text-center ${verifiedBadge ? "border-[#0B5E56]/40" : "border-[#1F5C99]/50"} bg-[#0F1A2E]/20`}>
                         <span className={`font-mono text-[9px] font-black uppercase tracking-[0.22em] ${verifiedBadge ? "text-[#4FD1C5]" : "text-[#7FB8E0]"}`}>Workdeal</span>
                         <span className="mt-0.5 font-black tracking-[-0.04em] text-white text-[15px] leading-none" style={{ fontFamily: "var(--font-display)" }}>
                           {verifiedBadge ? "VERIFICADO" : "EM LEGALIZAÇÃO"}
@@ -355,46 +344,44 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                           {new Date((verifiedBadge ?? legalizingBadge)!.awardedAt).getFullYear()} · {displayProvince ? displayProvince.toUpperCase() : "MOÇAMBIQUE"}
                         </span>
                       </div>
-                      <span className={`pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-white shadow ${verifiedBadge ? "bg-[#0B5E56]" : "bg-[#1F5C99]"}`}>
-                        {verifiedBadge ? "✓ Verificado" : "2º grau"}
-                      </span>
                     </div>
-                    <p className="mt-4 font-mono text-[11px] leading-relaxed text-[#0F1A2E]/50">
-                      {verifiedBadge
-                        ? "Selo de validação Workdeal · verificação de identidade"
-                        : "Empresa em processo de legalização · verificação de identidade"}
-                    </p>
-                    <Link href="/dashboard/profile/edit" className="mt-2 text-xs font-bold text-[#0B5E56] hover:underline">
-                      Ver dossiê →
-                    </Link>
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-black tracking-tight text-[#0F1A2E]">
+                        {verifiedBadge ? "Selo de validação Workdeal" : "Empresa em processo de legalização"}
+                      </p>
+                      <p className="mt-1 font-mono text-[11px] leading-relaxed text-[#0F1A2E]/50">
+                        {verifiedBadge
+                          ? "Verificação de identidade concluída pela equipa Workdeal."
+                          : "Verificação de identidade em curso — selo provisório."}
+                      </p>
+                      <Link href="/dashboard/profile/edit" className="mt-2 inline-block text-xs font-bold text-[#0B5E56] hover:underline">
+                        Ver dossiê →
+                      </Link>
+                    </div>
                   </div>
                 ) : null}
 
-                {/* 2ª linha — selos de qualidade e conformidade */}
+                {/* selos de qualidade e conformidade */}
                 {p.badges.filter((b) => ["trust", "quality", "specialization", "performance"].includes(b.type)).length > 0 && (
                 <div>
-                  <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/60">
-                    <span className="size-1.5 rounded-full bg-[#0B5E56]" aria-hidden /> Qualidade & conformidade
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/60">
+                    Qualidade & conformidade
                   </p>
-                  <ul className="mt-3 grid gap-2.5 sm:grid-cols-3">
+                  <ul className="mt-1 divide-y divide-[#D9D2C2] border-y border-[#D9D2C2]">
                     {p.badges.filter((b) => ["trust", "quality", "specialization", "performance"].includes(b.type)).map((s) => (
-                      <li
-                        key={s.id}
-                        className={`flex gap-3 rounded-2xl border p-3.5 ${s.status === "active" ? "border-[#0B5E56]/15 bg-[#F6F3EE]" : "border-[#D9D2C2] bg-white"}`}
-                      >
-                        <span className={`mt-1 size-2 shrink-0 rounded-full ${s.status === "active" ? "bg-[#0B5E56]" : "bg-[#FF3B1F]"}`} aria-hidden />
+                      <li key={s.id} className="flex items-baseline gap-3 py-3">
+                        <span className={`font-black ${s.status === "active" ? "text-[#0B5E56]" : "text-[#FF3B1F]"}`} aria-hidden>
+                          {s.status === "active" ? "✓" : "!"}
+                        </span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold leading-none text-[#0F1A2E]">{s.name}</p>
-                          {s.description ? <p className="mt-1 text-xs leading-snug text-[#0F1A2E]/55">{s.description}</p> : null}
-                          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#0F1A2E]/40">
-                            {new Date(s.awardedAt).getFullYear()} · {s.type}
+                          <p className="text-sm font-bold leading-tight text-[#0F1A2E]">
+                            {s.name}
+                            {s.status !== "active" ? <span className="ml-2 font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[#FF3B1F]">por revalidar</span> : <span className="sr-only"> (activo)</span>}
                           </p>
+                          {s.description ? <p className="mt-0.5 text-xs leading-snug text-[#0F1A2E]/55">{s.description}</p> : null}
                         </div>
-                        <span
-                          className={`ml-auto flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${s.status === "active" ? "bg-[#0B5E56] text-white" : "bg-[#FF3B1F] text-white"}`}
-                          aria-label={s.status === "active" ? "Activo" : "Revogado"}
-                        >
-                          {s.status === "active" ? "✓" : "…"}
+                        <span className="ml-auto shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] text-[#0F1A2E]/40">
+                          {new Date(s.awardedAt).getFullYear()} · {s.type}
                         </span>
                       </li>
                     ))}
@@ -402,30 +389,28 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                 </div>
                 )}
 
-                {/* 3ª linha — membro de */}
+                {/* membro de */}
                 {p.badges.filter((b) => ["network", "commercial", "reputation"].includes(b.type)).length > 0 && (
                 <div>
-                  <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/60">
-                    <span className="size-1.5 rounded-full bg-[#0F1A2E]" aria-hidden /> Membro de
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/60">
+                    Membro de
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-[#0F1A2E]/45">Câmaras e associações sectoriais</p>
-                  <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                  <ul className="mt-1 divide-y divide-[#D9D2C2] border-y border-[#D9D2C2]">
                     {p.badges.filter((b) => ["network", "commercial", "reputation"].includes(b.type)).map((m) => (
-                      <li
-                        key={m.id}
-                        className={`flex gap-3 rounded-2xl border p-3.5 ${m.status === "active" ? "border-[#0F1A2E]/10 bg-white" : "border-[#D9D2C2] bg-[#F6F3EE]/60"}`}
-                      >
-                        <span className={`mt-1 size-2 shrink-0 rounded-full ${m.status === "active" ? "bg-[#0F1A2E]" : "bg-[#FF3B1F]"}`} aria-hidden />
+                      <li key={m.id} className="flex items-baseline gap-3 py-3">
+                        <span className={`font-black ${m.status === "active" ? "text-[#0F1A2E]" : "text-[#FF3B1F]"}`} aria-hidden>
+                          {m.status === "active" ? "✓" : "!"}
+                        </span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold leading-none text-[#0F1A2E]">{m.name}</p>
-                          {m.description ? <p className="mt-1 line-clamp-2 text-xs leading-snug text-[#0F1A2E]/55">{m.description}</p> : null}
-                          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#0F1A2E]/40">desde {new Date(m.awardedAt).getFullYear()}</p>
+                          <p className="text-sm font-bold leading-tight text-[#0F1A2E]">
+                            {m.name}
+                            {m.status !== "active" ? <span className="ml-2 font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[#FF3B1F]">por revalidar</span> : <span className="sr-only"> (activo)</span>}
+                          </p>
+                          {m.description ? <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-[#0F1A2E]/55">{m.description}</p> : null}
                         </div>
-                        <span
-                          className={`ml-auto flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${m.status === "active" ? "bg-[#0F1A2E] text-white" : "bg-[#FF3B1F] text-white"}`}
-                          aria-label={m.status === "active" ? "Activa" : "Pendente"}
-                        >
-                          {m.status === "active" ? "✓" : "…"}
+                        <span className="ml-auto shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] text-[#0F1A2E]/40">
+                          desde {new Date(m.awardedAt).getFullYear()}
                         </span>
                       </li>
                     ))}
@@ -436,7 +421,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
 
               <div className="border-t border-[#D9D2C2] bg-[#0F1A2E] px-6 py-3 sm:px-7">
                 <p className="text-xs leading-relaxed text-white/85">
-                  <span className="font-bold text-white">Como verificamos:</span> equipa Workdeal valida documentação e pertença via Balcão Único, INAGE e secretarias das associações. Selos a vermelho voltam a verde em até 48h após envio de comprovativo.
+                  <span className="font-bold text-white">Como verificamos:</span> equipa Workdeal valida documentação e pertença via Balcão Único, INAGE e secretarias das associações. Selos por revalidar voltam ao verde em até 48h após envio de comprovativo.
                 </p>
               </div>
             </section>

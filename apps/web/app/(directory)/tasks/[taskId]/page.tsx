@@ -49,6 +49,12 @@ export default async function PublicTaskPage({ params }: Props) {
 
   const aiDraftEnabled = await featureAccessible(null, "ai_proposal_generation").catch(() => false);
 
+  const sendableProfiles = session
+    ? await import("@/app/actions/tasks")
+        .then((m) => m.listSendableProfiles())
+        .catch(() => [])
+    : [];
+
   return (
     <div className="bg-[#F6F3EE]">
       <section className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-8">
@@ -157,7 +163,7 @@ export default async function PublicTaskPage({ params }: Props) {
                     </p>
                   </div>
                 ) : (
-                  <TaskProposalForm taskId={task.id} aiEnabled={aiDraftEnabled} />
+                  <TaskProposalForm taskId={task.id} aiEnabled={aiDraftEnabled} profiles={sendableProfiles} />
                 )}
               </div>
             </div>

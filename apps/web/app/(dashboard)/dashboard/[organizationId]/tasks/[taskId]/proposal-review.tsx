@@ -232,7 +232,7 @@ export function ProposalReview({
           <span className="rounded-full bg-[#0F1A2E] px-2.5 py-1 text-[11px] font-bold text-white">{proposals.length}</span>
         </div>
         <p className="mt-2 rounded-xl border border-[#0B5E56]/20 bg-[#0B5E56]/5 px-3 py-2 text-[11px] leading-relaxed text-[#0F1A2E]/60">
-          Avaliação anónima: as identidades dos fornecedores só são reveladas após a adjudicação. As mensagens com contactos (telefone, email, links) são bloqueadas automaticamente.
+          Vês a identidade de cada fornecedor. Por segurança, mensagens e notas com contactos (telefone, email, links) são bloqueadas automaticamente.
         </p>
 
         {proposals.length === 0 && (
