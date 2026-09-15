@@ -1,4 +1,6 @@
 import Link from "next/link"
+import type { ReactNode } from "react"
+import { FiLock } from "react-icons/fi"
 import { notFound, redirect } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { getOrgRole } from "@workdeal/auth/repository"
@@ -8,6 +10,54 @@ import { VisitsTimeChart, OriginsChart, SizeChart, ProvinceBars, VisitorsTable }
 import { getFeatureAccess } from "@/lib/features"
 import { AiAssistantPanel } from "@/components/features/ai-assistant-panel"
 import { AiResponseDraft } from "@/components/features/ai-response-draft"
+
+function LockedOverlay({ unlockHref, compact = false }: { unlockHref: string; compact?: boolean }) {
+  return (
+    <div className="absolute inset-0 z-10 flex items-center justify-center p-4">
+      <div className={`w-full ${compact ? "max-w-[230px]" : "max-w-[340px]"} rounded-[18px] border border-white/15 bg-[#0F1A2E] ${compact ? "px-4 py-3" : "px-6 py-5"} text-center shadow-[0_16px_48px_rgba(15,26,46,0.35)]`}>
+        <span className={`mx-auto flex items-center justify-center rounded-full bg-[#0B5E56] text-white ${compact ? "size-8" : "size-10"}`}>
+          <FiLock className={compact ? "size-4" : "size-5"} aria-hidden />
+        </span>
+        <p className={`mt-2 font-black tracking-tight text-white ${compact ? "text-[13px]" : "text-[15px]"}`}>Analytics Premium</p>
+        {!compact && (
+          <p className="mt-1 text-xs leading-relaxed text-white/65">Vê quem visita o teu perfil, de onde vem e o que faz a seguir.</p>
+        )}
+        <Link
+          href={unlockHref}
+          className={`mt-3 inline-flex items-center justify-center rounded-full bg-[#0B5E56] font-bold text-white transition-colors hover:bg-[#094d46] ${compact ? "h-8 px-4 text-xs" : "h-10 px-5 text-sm"}`}
+        >
+          Desbloquear Analytics
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+// Secção analítica com gate premium: bloqueada → chamariz desfocado (sem
+// dados reais no DOM, pois o fetch é saltado) + CTA; desbloqueada → conteúdo.
+function AnalyticsZone({
+  locked,
+  unlockHref,
+  overlay,
+  className,
+  children,
+}: {
+  locked: boolean
+  unlockHref: string
+  overlay?: "compact"
+  className?: string
+  children: ReactNode
+}) {
+  if (!locked) return <>{children}</>
+  return (
+    <div className={`relative ${className ?? ""}`}>
+      <div aria-hidden className="pointer-events-none select-none blur-[6px]">
+        {children}
+      </div>
+      <LockedOverlay unlockHref={unlockHref} compact={overlay === "compact"} />
+    </div>
+  )
+}
 
 export default async function OrgDashboardPage({
   params,
@@ -89,7 +139,16 @@ export default async function OrgDashboardPage({
     grande: "Grande Empresa",
   }
 
-  // Fetch real analytics from API
+  const featureAccess = await getFeatureAccess(organizationId)
+  const aiAssistant = featureAccess.get("ai_assistant")?.accessible ?? false
+  const aiResponseDraft = featureAccess.get("ai_response_support")?.accessible ?? false
+  // Analytics é premium: sem acesso, a API responderia 403 e os zeros do
+  // fallback fingiriam "sem tráfego" — em vez disso, secções desfocadas com CTA.
+  const analyticsLocked =
+    !featureAccess.get("analytics_visits_contacts")?.accessible && !featureAccess.get("analytics_advanced")?.accessible
+  const unlockHref = `/dashboard/${organizationId}/subscription`
+
+  // Fetch real analytics from API (saltado quando bloqueado: sem dados reais no HTML)
   type AnalyticsData = {
     days: { date: string; label: string; visitas: number; unicos: number }[]
     origins: { origin: string; value: number; fill: string }[]
@@ -103,7 +162,7 @@ export default async function OrgDashboardPage({
     quotesCount: number
   }
   let analytics: AnalyticsData | null = null
-  if (profileId) {
+  if (profileId && !analyticsLocked) {
     try {
       const { apiFetch } = await import("@/lib/api")
       const aRes = await apiFetch<AnalyticsData>(`/api/v1/analytics/${profileId}/dashboard`, { cache: "no-store" })
@@ -111,7 +170,7 @@ export default async function OrgDashboardPage({
     } catch {}
   }
 
-  // Fallback: empty analytics when no profile or no data yet
+  // Fallback: zeros quando não há perfil nem dados — e chamariz desfocado quando bloqueado
   if (!analytics) {
     const emptyDays = Array.from({ length: 90 }, (_, i) => {
       const d = new Date(); d.setDate(d.getDate() - (89 - i))
@@ -138,10 +197,6 @@ export default async function OrgDashboardPage({
 
 const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
   const hasLocation = locations.length > 0
-
-  const featureAccess = await getFeatureAccess(organizationId)
-  const aiAssistant = featureAccess.get("ai_assistant")?.accessible ?? false
-  const aiResponseDraft = featureAccess.get("ai_response_support")?.accessible ?? false
 
   return (
     <div className="mx-auto w-full max-w-[1160px] space-y-5 pb-10">
@@ -214,7 +269,8 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
             </div>
           </div>
 
-          {/* visits summary — vault */}
+          {/* visits summary — vault (desfocado com CTA quando premium bloqueado) */}
+          <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref}>
           <div className="border-t border-[#D9D2C2] bg-[#F6F3EE] p-5 sm:p-6 lg:border-l lg:border-t-0">
             <p className="text-[11px] font-bold tracking-[0.12em] text-[#0B5E56]">VISITAS · ÚLTIMOS 30 DIAS</p>
             <div className="mt-3 flex items-baseline gap-3">
@@ -249,6 +305,7 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
               </div>
             </div>
           </div>
+          </AnalyticsZone>
         </div>
       </div>
 
@@ -262,6 +319,7 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
             <div className="bg-[#0B5E56]" style={{ width: isProfilePublished ? "92%" : "18%" }} />
           </div>
         </div>
+        <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} overlay="compact">
         <div className="rounded-[18px] border border-[#D9D2C2] bg-[#0F1A2E] p-4 text-white">
           <p className="text-[11px] font-bold tracking-[0.1em] text-white/50">PERFORMANCE</p>
           <div className="mt-2 flex items-baseline gap-2">
@@ -272,6 +330,8 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
           </div>
           <p className="mt-1 text-xs text-white/50">Visitantes que voltam para contactar.</p>
         </div>
+        </AnalyticsZone>
+        <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} overlay="compact">
         <div className="rounded-[18px] border border-[#D9D2C2] bg-[#F6F3EE] p-4">
           <p className="text-[11px] font-bold tracking-[0.1em] text-[#0F1A2E]/50">CONVERSÃO {analytics.realQuotesCount > 0 ? "REAL" : "EST."}</p>
           <p className="mt-2 text-sm font-bold text-[#0F1A2E]">
@@ -283,6 +343,7 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
             {analytics.realQuotesCount > 0 ? "Cotações via /api/v1/quotes" : "Cliques em WhatsApp/telefone/email"}
           </p>
         </div>
+        </AnalyticsZone>
         <div className="rounded-[18px] border border-[#D9D2C2] bg-white p-4">
           <p className="text-[11px] font-bold tracking-[0.1em] text-[#0F1A2E]/50">TERRITÓRIO</p>
           <p className="mt-2 text-sm font-bold text-[#0F1A2E]">{locations.length} sede(s) activas</p>
@@ -292,7 +353,8 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
         </div>
       </div>
 
-      {/* ── Main chart ── */}
+      {/* ── Analytics premium — desfocado com CTA quando bloqueado ── */}
+      <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} className="space-y-4">
       <VisitsTimeChart days={analytics.days} />
 
       {/* ── Secondary charts — distinct treatments ── */}
@@ -302,13 +364,19 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
         <ProvinceBars data={analytics.provinces} />
       </div>
 
-      {/* ── Visitors table — real analytics data */}
-      <p className="text-xs text-[#0F1A2E]/40">
-        {analytics.total30 > 0
-          ? `${analytics.total30} visitas nos últimos 30d · ${analytics.unicos30} visitantes únicos.`
-          : "Sem visitas registadas ainda — os dados aparecem quando utilizadores visitarem o vosso perfil."}
-      </p>
       <VisitorsTable rows={analytics.visitors} />
+      </AnalyticsZone>
+
+      {/* ── Visitors caption — nunca finge "sem tráfego" quando bloqueado ── */}
+      {analyticsLocked ? (
+        <p className="text-xs text-[#0F1A2E]/40">Detalhe de visitas, origens e visitantes disponível no plano Analytics.</p>
+      ) : (
+        <p className="text-xs text-[#0F1A2E]/40">
+          {analytics.total30 > 0
+            ? `${analytics.total30} visitas nos últimos 30d · ${analytics.unicos30} visitantes únicos.`
+            : "Sem visitas registadas ainda — os dados aparecem quando utilizadores visitarem o vosso perfil."}
+        </p>
+      )}
 
       {/* ── Operations row — qualification + locations + shortcuts ── */}
       <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
