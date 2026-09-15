@@ -13,7 +13,6 @@ import type {
 } from "@workdeal/shared";
 import { getOrgRole } from "@workdeal/auth";
 import {
-  anonymousProviderName,
   CONTACT_BLOCK_MESSAGE_PT,
   detectContactSharing,
   hasOrgPermission,
@@ -143,7 +142,15 @@ async listTasks(query: TaskListQuery) {
         page,
         limit,
       });
-    return { items, total, page, limit };
+    // Vista pública: a identidade de quem publicou a tarefa nunca é exposta
+    // (nome/slug/logo do solicitante ficam a null).
+    const publicItems = items.map((i) => ({
+      ...i,
+      requesterProfileName: null,
+      requesterProfileSlug: null,
+      requesterProfileLogo: null,
+    }));
+    return { items: publicItems, total, page, limit };
   },
 
   async listMyTasks(user: AuthUser, query: TaskListQuery) {
@@ -169,7 +176,8 @@ async listTasks(query: TaskListQuery) {
   async getTask(id: string): Promise<TaskRow> {
     const row = await tasksRepository.findById(id);
     if (!row) throw new AppError(404, "TASK_NOT_FOUND", "Tarefa não encontrada");
-    return row;
+    // Vista pública: oculta a identidade de quem publicou a tarefa.
+    return { ...row, requesterProfileName: null, requesterProfileSlug: null, requesterProfileLogo: null };
   },
 
   async updateTask(user: AuthUser, id: string, input: UpdateTaskInput) {
@@ -251,16 +259,10 @@ async listTasks(query: TaskListQuery) {
     if (!taskRow) throw new AppError(404, "TASK_NOT_FOUND", "Tarefa não encontrada");
     await assertCanManageTask(user, taskRow);
     const { items, total } = await tasksRepository.listProposals(taskId, query.status, page, limit);
-    // Fase anónima: o solicitante avalia preço/prazo/mensagem sem ver quem
-    // propôs — nome/slug/logo reais nunca saem para a API. A identidade só é
-    // revelada após a adjudicação (bid).
-    const anonymous = items.map((p) => ({
-      ...p,
-      providerProfileName: anonymousProviderName(p.id),
-      providerProfileSlug: null,
-      providerProfileLogo: null,
-    }));
-    return { items: anonymous, total, page, limit };
+    // A identidade do proponente é visível para quem gere a tarefa
+    // (nome/slug/logo reais) — só a identidade de quem publicou a tarefa
+    // permanece oculta (vistas públicas e vistas do fornecedor).
+    return { items, total, page, limit };
   },
 
   async myProposals(user: AuthUser, query: ProposalListQuery) {
@@ -355,6 +357,11 @@ async listTasks(query: TaskListQuery) {
   },
 
   async updateBid(user: AuthUser, id: string, status: BidStatus, reviewNote?: string | null) {
+    // A nota é visível às duas partes — contactos directos (telefone, email,
+    // links) são bloqueados antes de qualquer leitura à BD.
+    if (detectContactSharing(reviewNote ?? null) !== null) {
+      throw new AppError(400, "CONTACT_SHARING_BLOCKED", CONTACT_BLOCK_MESSAGE_PT);
+    }
     const bid = await tasksRepository.findBidById(id);
     if (!bid) throw new AppError(404, "BID_NOT_FOUND", "Adjudicação não encontrada");
     if (!(await isBidParty(user, bid))) throw new AppError(403, "FORBIDDEN", "Sem permissão para esta adjudicação");

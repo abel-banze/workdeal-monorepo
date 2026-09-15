@@ -18,6 +18,8 @@ import {
 } from "@workspace/ui/components/sidebar"
 import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon } from "lucide-react"
 import { DashboardVerificationButton } from "@/components/layout/dashboard-verification-button"
+import { DashboardNotificationsButton } from "@/components/layout/dashboard-notifications-button"
+import { DashboardAgentButton } from "@/components/layout/dashboard-agent-button"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAuth()
@@ -120,6 +122,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </Breadcrumb>
           </div>
           <div className="flex items-center gap-2 px-4">
+            <DashboardNotificationsButton />
+            <DashboardAgentButton />
             <DashboardVerificationButton />
           </div>
         </header>

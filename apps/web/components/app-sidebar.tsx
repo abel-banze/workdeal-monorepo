@@ -14,7 +14,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@workspace/ui/components/sidebar"
-import { GalleryVerticalEndIcon, Settings2Icon, LayoutDashboardIcon, Building2Icon, ListChecksIcon, BriefcaseIcon, CalendarDaysIcon, BookmarkIcon, FrameIcon, GiftIcon } from "lucide-react"
+import { GalleryVerticalEndIcon, Settings2Icon, LayoutDashboardIcon, Building2Icon, HouseIcon, ListChecksIcon, StoreIcon, BriefcaseIcon, CalendarDaysIcon, BookmarkIcon, GiftIcon } from "lucide-react"
 
 function buildNavGroups(activeId: string | null) {
   const base = activeId ? `/dashboard/${activeId}` : "/dashboard"
@@ -107,7 +107,9 @@ function buildNavGroups(activeId: string | null) {
 
 function buildProjects() {
   return [
-    { name: "Página inicial", url: "/", icon: <FrameIcon /> },
+    { name: "Página inicial", url: "/", icon: <HouseIcon /> },
+    { name: "Empresas", url: "/companies", icon: <StoreIcon /> },
+    { name: "Requisições", url: "/tasks", icon: <ListChecksIcon /> },
   ]
 }
 

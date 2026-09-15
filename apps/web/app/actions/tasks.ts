@@ -75,12 +75,42 @@ export async function acceptProposal(input: z.infer<typeof createBidSchema> & { 
   })
 }
 
-export async function submitProposal(input: { taskId: string; message: string; priceMzn?: number | null; estimatedDays?: number | null }) {
+export type SendableProfile = { id: string; name: string; kind: "personal" | "company" };
+
+/** Perfis em nome dos quais o utilizador pode propor: pessoal + empresas onde é membro. */
+export async function listSendableProfiles(): Promise<SendableProfile[]> {
+  const session = await requireAuth()
+  const out: SendableProfile[] = []
+  const me = await apiFetch<{ id: string; name: string } | null>("/api/v1/profiles/me", { cache: "no-store" }).catch(
+    () => ({ data: null }) as never,
+  )
+  if (me?.data) out.push({ id: me.data.id, name: me.data.name, kind: "personal" })
+  const { listUserOrganizations } = await import("@workdeal/auth/repository")
+  const orgs = await listUserOrganizations(session.user.id).catch(() => [])
+  for (const org of orgs) {
+    const p = await apiFetch<{ id: string; name: string } | null>(
+      `/api/v1/profiles/by-organization/${encodeURIComponent(org.id)}`,
+      { cache: "no-store" },
+    ).catch(() => null)
+    if (p?.data) out.push({ id: p.data.id, name: p.data.name ?? org.name, kind: "company" })
+  }
+  return [...new Map(out.map((p) => [p.id, p])).values()]
+}
+
+export async function submitProposal(input: {
+  taskId: string
+  providerProfileId: string
+  message: string
+  priceMzn?: number | null
+  estimatedDays?: number | null
+}) {
   await requireAuth()
-  const me = await apiFetch<{ id: string } | null>("/api/v1/profiles/me", { cache: "no-store" })
-  const providerProfileId = me?.data?.id
-  if (!providerProfileId) throw new Error("Cria primeiro o teu perfil antes de propores a uma tarefa.")
-  const data = createProposalSchema.parse({ ...input, providerProfileId })
+  const allowed = await listSendableProfiles()
+  if (allowed.length === 0) throw new Error("Cria primeiro o teu perfil antes de propores a uma tarefa.")
+  if (!allowed.some((p) => p.id === input.providerProfileId)) {
+    throw new Error("Escolhe um dos teus perfis para enviar a proposta.")
+  }
+  const data = createProposalSchema.parse(input)
   const token = await getAuthToken()
   return apiFetchWithAuth(`/api/v1/tasks/${encodeURIComponent(data.taskId)}/proposals`, token, {
     method: "POST",

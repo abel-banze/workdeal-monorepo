@@ -26,10 +26,10 @@ export async function chatWithAssistant(input: z.infer<typeof assistantChatSchem
 }
 
 /** Rascunho de proposta preenchido num formulário (o utilizador revê e envia). */
-export async function draftProposalAction(input: Omit<z.infer<typeof proposalDraftSchema>, "providerProfileId">) {
+export async function draftProposalAction(input: Omit<z.infer<typeof proposalDraftSchema>, "providerProfileId"> & { providerProfileId?: string }) {
   await requireAuth()
   await requireFeature(input.organizationId ?? null, "ai_proposal_generation")
-  const providerProfileId = await resolveProviderProfileId()
+  const providerProfileId = input.providerProfileId ?? (await resolveProviderProfileId())
   const data = proposalDraftSchema.parse({ ...input, providerProfileId })
   const token = await getAuthToken()
   return apiFetchWithAuth<{ message: string }>("/api/v1/ai/proposals/draft", token, { method: "POST", body: JSON.stringify(data) })

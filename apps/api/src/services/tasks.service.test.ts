@@ -6,12 +6,15 @@ const mocks = vi.hoisted(() => ({
   getOrgRole: vi.fn(),
   tasksRepo: {
     findById: vi.fn(),
+    list: vi.fn(),
     getUserProfileIds: vi.fn(),
     findProposalByTaskAndProvider: vi.fn(),
     createProposal: vi.fn(),
     update: vi.fn(),
     listProposals: vi.fn(),
     listProposalsByProviders: vi.fn(),
+    findBidById: vi.fn(),
+    updateBid: vi.fn(),
   },
   tagsRepo: {
     ensureTagsBySlugs: vi.fn(),
@@ -88,6 +91,22 @@ describe("submitProposal — anti auto-proposta", () => {
     expect(mocks.tasksRepo.createProposal).toHaveBeenCalledOnce();
   });
 
+  it("bloqueia perfil que não pertence ao utilizador (403 PROFILE_REQUIRED)", async () => {
+    mocks.tasksRepo.getUserProfileIds.mockResolvedValue(["prof-outro"]);
+    await expect(tasksService.submitProposal(outsider, proposalInput as never)).rejects.toMatchObject({
+      status: 403,
+      code: "PROFILE_REQUIRED",
+    });
+    expect(mocks.tasksRepo.createProposal).not.toHaveBeenCalled();
+  });
+
+  it("permite propor com o perfil da empresa do utilizador", async () => {
+    mocks.tasksRepo.getUserProfileIds.mockResolvedValue(["prof-pessoal", "prof-empresa"]);
+    const res = await tasksService.submitProposal(outsider, { ...proposalInput, providerProfileId: "prof-empresa" } as never);
+    expect(res).toMatchObject({ id: "prop-1" });
+    expect(mocks.tasksRepo.createProposal).toHaveBeenCalledWith(expect.objectContaining({ providerProfileId: "prof-empresa" }));
+  });
+
   it("permite membro propor em tarefa pessoal de outro utilizador", async () => {
     mocks.tasksRepo.findById.mockResolvedValue({ ...orgTask, requesterOrganizationId: null });
     const res = await tasksService.submitProposal(colleague, proposalInput as never);
@@ -107,8 +126,8 @@ describe("submitProposal — anti auto-proposta", () => {
   });
 });
 
-describe("listProposals/myProposals — anonimato em discussão", () => {
-  it("solicitante vê aliases, nunca nome/slug/logo reais", async () => {
+describe("listProposals/myProposals — visibilidade de identidades", () => {
+  it("solicitante vê a identidade real do proponente (nome/slug/logo)", async () => {
     mocks.tasksRepo.listProposals.mockResolvedValue({
       items: [
         {
@@ -122,10 +141,9 @@ describe("listProposals/myProposals — anonimato em discussão", () => {
       total: 1,
     });
     const res = await tasksService.listProposals(creator, "t1", {});
-    expect(res.items[0]!.providerProfileSlug).toBeNull();
-    expect(res.items[0]!.providerProfileLogo).toBeNull();
-    expect(res.items[0]!.providerProfileName).toMatch(/^Fornecedor · #[0-9A-F]{4}$/);
-    expect(res.items[0]!.providerProfileName).not.toContain("Fornecedor Lda");
+    expect(res.items[0]!.providerProfileName).toBe("Fornecedor Lda");
+    expect(res.items[0]!.providerProfileSlug).toBe("fornecedor-lda");
+    expect(res.items[0]!.providerProfileLogo).toBe("https://img/logo.png");
   });
 
   it("fornecedor não vê o nome real do solicitante nas suas propostas", async () => {
@@ -135,5 +153,63 @@ describe("listProposals/myProposals — anonimato em discussão", () => {
     });
     const res = await tasksService.myProposals(outsider, {});
     expect(res.items[0]!.requesterUserName).toBe("Solicitante");
+  });
+});
+
+describe("vistas públicas — identidade do criador oculta", () => {
+  it("getTask não expõe nome/slug/logo do solicitante", async () => {
+    mocks.tasksRepo.findById.mockResolvedValue({
+      ...orgTask,
+      requesterProfileName: "Criador",
+      requesterProfileSlug: "criador",
+      requesterProfileLogo: "https://img/criador.png",
+      tags: [],
+    });
+    const res = await tasksService.getTask("t1");
+    expect(res.id).toBe("t1");
+    expect((res as unknown as Record<string, unknown>).requesterProfileName).toBeNull();
+    expect((res as unknown as Record<string, unknown>).requesterProfileSlug).toBeNull();
+    expect((res as unknown as Record<string, unknown>).requesterProfileLogo).toBeNull();
+  });
+
+  it("listTasks não expõe nome/slug/logo do solicitante", async () => {
+    mocks.tasksRepo.list.mockResolvedValue({
+      items: [{ id: "t1", requesterProfileName: "Criador", requesterProfileSlug: "criador", requesterProfileLogo: null }],
+      total: 1,
+    });
+    const res = await tasksService.listTasks({} as never);
+    expect(res.items[0]!.requesterProfileName).toBeNull();
+    expect(res.items[0]!.requesterProfileSlug).toBeNull();
+  });
+});
+
+describe("updateBid — bloqueio de contactos na nota", () => {
+  it.each([
+    ["email", "bom trabalho, escreve para joao@empresa.co.mz"],
+    ["telefone", "liga 841234567 para combinar"],
+    ["link", "detalhes em https://empresa.co.mz"],
+  ])("bloqueia nota com %s (400 CONTACT_SHARING_BLOCKED)", async (_label, reviewNote) => {
+    await expect(tasksService.updateBid(creator, "b1", "in_progress", reviewNote)).rejects.toMatchObject({
+      status: 400,
+      code: "CONTACT_SHARING_BLOCKED",
+    });
+    expect(mocks.tasksRepo.findBidById).not.toHaveBeenCalled();
+    expect(mocks.tasksRepo.updateBid).not.toHaveBeenCalled();
+  });
+
+  it("permite nota limpa e persiste na adjudicação", async () => {
+    mocks.tasksRepo.findBidById.mockResolvedValue({
+      id: "b1",
+      taskId: "t1",
+      providerProfileId: "prof-9",
+      requesterUserId: "u-creator",
+      status: "awarded",
+    });
+    mocks.tasksRepo.updateBid.mockResolvedValue({ id: "b1", status: "in_progress" });
+    await tasksService.updateBid(creator, "b1", "in_progress", "Bom trabalho, dentro do prazo.");
+    expect(mocks.tasksRepo.updateBid).toHaveBeenCalledWith(
+      "b1",
+      expect.objectContaining({ status: "in_progress", reviewNote: "Bom trabalho, dentro do prazo." }),
+    );
   });
 });
