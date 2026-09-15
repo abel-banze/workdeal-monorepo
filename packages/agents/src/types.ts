@@ -49,6 +49,8 @@ export interface AgentRunResult {
   providerId: AiProviderId;
   status: AgentRunStatus;
   errorCode: string | null;
+  /** Mensagem original do provider/SDK (truncada) — para diagnóstico no admin. */
+  errorDetail?: string | null;
   usage: AgentUsageRecord;
   durationMs: number;
 }

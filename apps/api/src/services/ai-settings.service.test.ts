@@ -3,6 +3,7 @@ import { MODEL_TIERS } from "@workdeal/agents";
 import { encryptSecret } from "../lib/crypto.js";
 
 const mocks = vi.hoisted(() => ({
+  runAgent: vi.fn(),
   env: {
     AI_PROVIDER: "mock",
     GOOGLE_GENERATIVE_AI_API_KEY: undefined as string | undefined,
@@ -29,6 +30,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../env.js", () => ({ env: mocks.env }));
 vi.mock("../repositories/ai-settings.repository.js", () => ({ aiSettingsRepository: mocks.repo }));
+vi.mock("@workdeal/agents", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@workdeal/agents")>();
+  return { ...actual, runAgent: mocks.runAgent };
+});
 
 import { aiSettingsService, __setRuntimeConfigOverride } from "./ai-settings.service.js";
 import type { AiCredentialRow, AiSettingsRow } from "../repositories/ai-settings.repository.js";
@@ -165,6 +170,27 @@ describe("aiSettingsService.testConnection", () => {
     const res = await aiSettingsService.testConnection();
     expect(res.ok).toBe(false);
     expect(res.message).toContain("Sem API key");
+  });
+
+  it("falha do provider expõe o detalhe do erro na mensagem", async () => {
+    mocks.env.AI_PROVIDER = "openai";
+    mocks.env.OPENAI_API_KEY = "sk-test";
+    mocks.runAgent.mockResolvedValue({
+      text: "",
+      output: undefined,
+      model: "gpt-5-mini",
+      providerId: "openai",
+      status: "error",
+      errorCode: "AI_ERROR",
+      errorDetail: "401 - Incorrect API key provided",
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, estimatedCostUsd: 0 },
+      durationMs: 115,
+    });
+    const res = await aiSettingsService.testConnection();
+    expect(res.ok).toBe(false);
+    expect(res.message).toContain("AI_ERROR");
+    expect(res.message).toContain("Incorrect API key");
+    mocks.env.OPENAI_API_KEY = undefined;
   });
 });
 

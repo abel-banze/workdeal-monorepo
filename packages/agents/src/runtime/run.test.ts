@@ -90,6 +90,14 @@ describe("runAgent", () => {
     expect(result.errorCode).toBe("PROVIDER_ERROR");
   });
 
+  it("keeps the provider message in errorDetail for diagnosis", async () => {
+    mocks.generateText.mockRejectedValue(new Error("AI_APICallError: 404 - models/gemini-3.1-flash is not found for API version v1beta"));
+    const result = await runAgent(fakeModel(), BASE);
+    expect(result.status).toBe("error");
+    expect(result.errorCode).toBe("AI_ERROR");
+    expect(result.errorDetail).toContain("gemini-3.1-flash is not found");
+  });
+
   it("classifies rate limit errors to rate_limited status", async () => {
     mocks.generateText.mockRejectedValue(new Error("HTTP 429 Too Many Requests"));
     const result = await runAgent(fakeModel(), BASE);

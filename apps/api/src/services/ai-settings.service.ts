@@ -256,7 +256,10 @@ export const aiSettingsService = {
         ok: result.status === "ok",
         provider,
         model,
-        message: result.status === "ok" ? "Ligação OK" : `Falha: ${result.errorCode ?? result.status}`,
+        message:
+          result.status === "ok"
+            ? "Ligação OK"
+            : `Falha: ${result.errorCode ?? result.status}${result.errorDetail ? ` — ${result.errorDetail}` : ""}`,
         latencyMs: Date.now() - started,
       };
     } catch (err) {
