@@ -46,6 +46,12 @@ type RawResult = {
   cost?: unknown;
 };
 
+/** Mensagem do SDK numa linha, truncada — o código vai para `errorCode`. */
+function truncateSdkMessage(err: unknown, max = 300): string | null {
+  const msg = (err instanceof Error ? err.message : String(err)).replace(/\s+/g, " ").trim();
+  return msg ? msg.slice(0, max) : null;
+}
+
 function runGuard(options: RunAgentOptions, guard: { code: string; message: string }, now: number): AgentRunResult {
   return {
     text: "",
@@ -97,6 +103,7 @@ export async function runAgent(model: LanguageModel, options: RunAgentOptions): 
       providerId: options.providerId,
       status,
       errorCode: code,
+      errorDetail: truncateSdkMessage(err),
       usage: ZERO_USAGE,
       durationMs: Date.now() - startedAt,
     };

@@ -7,13 +7,13 @@ export const AI_PROVIDERS = ["google", "anthropic", "openai", "mock"] as const;
 export const MODEL_TIERS = {
   /** Rápido e barato — suficiente para a maioria dos agentes. */
   flash: {
-    google: "gemini-3.8-flash",
+    google: "gemini-3.1-flash",
     anthropic: "claude-haiku-4-5",
     openai: "gpt-5-mini",
   },
   /** Qualidade superior — para tarefas que exigem mais cuidado. */
   pro: {
-    google: "gemini-3.8-pro",
+    google: "gemini-3.5-flash",
     anthropic: "claude-sonnet-4-5",
     openai: "gpt-5",
   },
