@@ -1,9 +1,12 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { FiMapPin } from "react-icons/fi"
 import { requireAuth } from "@/lib/auth"
+import { featureAccessible } from "@/lib/features"
 import { getOrgRole } from "@workdeal/auth/repository"
 import { hasOrgPermission, TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared"
-import { ProposalReview } from "./proposal-review"
+import { AiAssistantPanel } from "@/components/features/ai-assistant-panel"
+import { ProposalsWorkspace } from "./proposals-workspace"
 
 type ProposalItem = {
   id: string
@@ -114,9 +117,11 @@ export default async function TaskDetailPage({
 
   const catName = categories.find((c) => c.id === task.categoryId)?.name ?? null
   const isRequester = task.requesterUserId === session.user.id
+  const aiScope = isPersonal ? null : organizationId
+  const aiEnabled = await featureAccessible(aiScope, "ai_assistant").catch(() => false)
 
   return (
-    <div className="mx-auto w-full max-w-[900px] space-y-5 pb-10">
+    <div className="mx-auto w-full max-w-[1024px] space-y-5 pb-10">
       <div className="flex items-center gap-2 text-xs text-[#0F1A2E]/50">
         <Link href={`/dashboard/${organizationId}/tasks`} className="font-bold text-[#0B5E56] hover:underline">
           ← Tarefas
@@ -138,7 +143,9 @@ export default async function TaskDetailPage({
           {catName && <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 font-semibold text-[#0B5E56]">{catName}</span>}
           {task.contractType && <span className="rounded-full border border-[#0B5E56]/25 bg-[#0B5E56]/5 px-2.5 py-1 font-semibold text-[#0B5E56]">{TASK_CONTRACT_TYPE_LABELS_PT[task.contractType as keyof typeof TASK_CONTRACT_TYPE_LABELS_PT] ?? task.contractType}</span>}
           {[task.province, task.district, task.address].filter(Boolean).join(" · ") && (
-            <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[#0F1A2E]/70">📍 {[task.province, task.district, task.address].filter(Boolean).join(" · ")}</span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[#0F1A2E]/70">
+              <FiMapPin className="size-3.5" aria-hidden /> {[task.province, task.district, task.address].filter(Boolean).join(" · ")}
+            </span>
           )}
           {task.dueAt && <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[#0F1A2E]/70">prazo {new Date(task.dueAt).toLocaleString("pt-MZ", { dateStyle: "short", timeStyle: "short" })}</span>}
           {task.proposalDeadlineAt && (
@@ -161,8 +168,19 @@ export default async function TaskDetailPage({
 
       {error && <p className="rounded-lg border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 px-3 py-2 text-xs text-[#7A1A0A]">{error}</p>}
 
+      {aiEnabled && <AiAssistantPanel organizationId={aiScope} />}
+
       {isRequester ? (
-        <ProposalReview taskId={task.id} initialStatus={task.status} initialProposals={proposals} initialBid={bid} canManage={canManage} />
+        <ProposalsWorkspace
+          taskId={task.id}
+          taskTitle={task.title}
+          initialStatus={task.status}
+          initialProposals={proposals}
+          initialBid={bid}
+          canManage={canManage}
+          budgetMin={task.priceMinMzn}
+          budgetMax={task.priceMaxMzn}
+        />
       ) : (
         <div className="rounded-[20px] border border-dashed border-[#D9D2C2] bg-white p-6 text-sm text-[#0F1A2E]/60">
           Não és o solicitante desta tarefa — só o utilizador que a publicou gere as propostas.

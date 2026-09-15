@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
 import { env } from "@/lib/env";
+import { AI_API_TIMEOUT_MS, DEFAULT_API_TIMEOUT_MS, resolveApiTimeoutMs } from "./api-timeout";
 
 export interface ApiEnvelope<T> {
   success: boolean;
@@ -30,14 +31,21 @@ export function getWebOrigin(): string {
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
 
+export { AI_API_TIMEOUT_MS, DEFAULT_API_TIMEOUT_MS };
+export type { WithTimeoutMs } from "./api-timeout";
+
 const TAG = "[apiFetch]";
+
+export type ApiFetchInit = RequestInit & { timeoutMs?: number };
+
+const resolveTimeoutMs = resolveApiTimeoutMs;
 
 /**
  * Server-side fetch directo para a API Hono (env.API_URL).
  * Encaminha todos os cookies para a API — o auth middleware decide
  * se usa JWT ou sessão better-auth.
  */
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<ApiEnvelope<T>> {
+export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<ApiEnvelope<T>> {
   const cookieStore = await cookies();
   const allCookies = cookieStore.getAll();
   const cookieHeader = allCookies.map((c) => `${c.name}=${c.value}`).join("; ");
@@ -47,19 +55,22 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<Api
   const url = `${base}${path}`;
   console.log(`${TAG} → ${init?.method ?? "GET"} ${url} (hasJwt=${hasJwt}, cookieCount=${allCookies.length})`);
   const t0 = Date.now();
+  const timeoutMs = resolveTimeoutMs(init);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
+    const fetchInit: RequestInit = { ...init };
+    delete (fetchInit as Partial<ApiFetchInit>).timeoutMs;
     res = await fetch(url, {
-      ...init,
+      ...fetchInit,
       headers: { "Content-Type": "application/json", Cookie: cookieHeader, ...(init?.headers ?? {}) },
       signal: controller.signal,
     });
   } catch (e) {
     clearTimeout(timeout);
     if (e instanceof DOMException && e.name === "AbortError") {
-      throw new Error(`API timeout 5s: ${path}`);
+      throw new Error(`API timeout ${Math.round(timeoutMs / 1000)}s: ${path}`);
     }
     throw e;
   }
@@ -75,7 +86,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<Api
 }
 
 /** Variante para Server Actions que já têm o JWT em mãos */
-export async function apiFetchWithAuth<T>(path: string, token: string | null, init?: RequestInit): Promise<ApiEnvelope<T>> {
+export async function apiFetchWithAuth<T>(path: string, token: string | null, init?: ApiFetchInit): Promise<ApiEnvelope<T>> {
   const cookieStore = await cookies();
   const allCookies = cookieStore.getAll();
   const cookieHeader = allCookies.map((c) => `${c.name}=${c.value}`).join("; ");
@@ -85,19 +96,22 @@ export async function apiFetchWithAuth<T>(path: string, token: string | null, in
   const url = `${base}${path}`;
   console.log(`${TAG} → ${init?.method ?? "GET"} ${url} (hasJwt=${!!token})`);
   const t0 = Date.now();
+  const timeoutMs = resolveTimeoutMs(init);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
+    const fetchInit: RequestInit = { ...init };
+    delete (fetchInit as Partial<ApiFetchInit>).timeoutMs;
     res = await fetch(url, {
-      ...init,
+      ...fetchInit,
       headers: { "Content-Type": "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}), ...authHeaders, ...(init?.headers ?? {}) },
       signal: controller.signal,
     });
   } catch (e) {
     clearTimeout(timeout);
     if (e instanceof DOMException && e.name === "AbortError") {
-      throw new Error(`API timeout 5s: ${path}`);
+      throw new Error(`API timeout ${Math.round(timeoutMs / 1000)}s: ${path}`);
     }
     throw e;
   }
