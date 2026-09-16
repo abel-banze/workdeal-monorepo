@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  TASK_PROPOSALS_FETCH_LIMIT,
   countActiveFilters,
   countProposalsByStatus,
   filterAndSortProposals,
@@ -112,6 +113,11 @@ describe("proposals-filter", () => {
     const { provinces, badges } = proposalFacets(SAMPLE);
     expect(provinces).toEqual(["Maputo", "Nampula", "Sofala"]);
     expect(badges.map((b) => b.slug).sort()).toEqual(["premium", "verificada"]);
+  });
+
+  it("respeita o tecto da API (limit <= 50) — regressão do erro Too big", () => {
+    expect(TASK_PROPOSALS_FETCH_LIMIT).toBeLessThanOrEqual(50);
+    expect(Number.isInteger(TASK_PROPOSALS_FETCH_LIMIT)).toBe(true);
   });
 
   it("conta filtros avançados activos", () => {

@@ -6,6 +6,7 @@ import { getOrgRole } from "@workdeal/auth/repository"
 import { hasOrgPermission, TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared"
 import { TaskAgentSheet } from "@/components/features/task-agent-sheet"
 import { ProposalsWorkspace } from "./proposals-workspace"
+import { TASK_PROPOSALS_FETCH_LIMIT } from "./proposals-filter"
 import { TaskBrief } from "./task-brief"
 
 type ProviderBadgeLite = { slug: string; name: string; type: string }
@@ -99,7 +100,7 @@ export default async function TaskDetailPage({
 
     const isRequester = taskRow.requesterUserId === session.user.id
     if (isRequester) {
-      const pRes = await apiFetch<ProposalItem[]>(`/api/v1/tasks/${encodeURIComponent(taskId)}/proposals?limit=100`, { cache: "no-store" })
+      const pRes = await apiFetch<ProposalItem[]>(`/api/v1/tasks/${encodeURIComponent(taskId)}/proposals?limit=${TASK_PROPOSALS_FETCH_LIMIT}`, { cache: "no-store" })
       proposals = (pRes.data ?? []).map((p) => ({
         ...p,
         providerProvince: p.providerProvince ?? null,

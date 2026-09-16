@@ -41,6 +41,13 @@ export interface ProposalQuery {
   badgeSlugs: string[];
 }
 
+/**
+ * Tecto de propostas por pedido — a API rejeita `limit` acima de 50
+ * (`Too big: expected number to be <=50`). A paginação seguinte é feita
+ * no cliente (Mostrar mais).
+ */
+export const TASK_PROPOSALS_FETCH_LIMIT = 50;
+
 export const DEFAULT_PROPOSAL_QUERY: ProposalQuery = {
   q: "",
   status: "all",
