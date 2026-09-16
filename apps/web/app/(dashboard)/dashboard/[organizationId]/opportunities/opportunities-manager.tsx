@@ -2,7 +2,9 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { FiMessageCircle } from "react-icons/fi"
 import { updateBidStatus } from "@/app/actions/tasks"
+import { NegotiationSheet } from "@/components/features/negotiation-sheet"
 import type { ProposalSentItem, BidWonItem } from "./page"
 
 const PROPOSAL_STYLES: Record<string, { label: string; cls: string }> = {
@@ -38,6 +40,7 @@ export function OpportunitiesManager({
   const [bids, setBids] = useState<BidWonItem[]>(initialBids)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [negotiation, setNegotiation] = useState<{ proposalId: string; taskTitle: string } | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
   async function onBidStatus(bid: BidWonItem, status: string) {
@@ -86,11 +89,34 @@ export function OpportunitiesManager({
                 </div>
                 {p.estimatedDays != null && <p className="mt-1 text-xs text-[#0F1A2E]/55">Entrega em ~{p.estimatedDays} dias</p>}
                 <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-[#0F1A2E]/60">{p.message}</p>
+                {(p.status === "submitted" || p.status === "shortlisted" || p.status === "accepted") && (
+                  <div className="mt-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setNegotiation({ proposalId: p.id, taskTitle: p.taskTitle ?? "Tarefa" })}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[#0B5E56]/25 bg-white px-3.5 py-1.5 text-xs font-bold text-[#0B5E56] hover:bg-[#0B5E56]/10"
+                    >
+                      <FiMessageCircle className="size-3.5" aria-hidden /> Negociação
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
       )}
+
+      <NegotiationSheet
+        key={negotiation?.proposalId ?? "none"}
+        open={negotiation !== null}
+        onOpenChange={(o) => {
+          if (!o) setNegotiation(null)
+        }}
+        proposalId={negotiation?.proposalId ?? null}
+        providerName={null}
+        taskTitle={negotiation?.taskTitle ?? "Tarefa"}
+        viewerSide="provider"
+      />
 
       {activeTab === "bids" && (
         <div className="space-y-3">

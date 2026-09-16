@@ -303,6 +303,9 @@ export default async function DirectoryPage({ searchParams }: Props) {
             <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#D9D2C2] bg-white px-4 py-2 text-xs font-semibold text-[#0F1A2E]/60">
               <span className="size-1.5 rounded-full bg-[#FF3B1F]" /> Plataforma global. Pensada para quem faz.
             </div>
+            <div className="mt-4">
+              <Link href="/manifesto" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0B5E56] underline decoration-[#0B5E56]/30 underline-offset-4 hover:decoration-[#0B5E56]">Ler o manifesto <span aria-hidden>→</span></Link>
+            </div>
           </div>
 
           <div className="grid gap-4">

@@ -29,6 +29,8 @@ type Props = {
   proposalId: string | null;
   providerName: string | null;
   taskTitle: string;
+  /** Lado de quem vê: solicitante (mesa de decisão) ou proponente (oportunidades). */
+  viewerSide?: "requester" | "provider";
 };
 
 function fmtDate(v: string | Date): string {
@@ -38,7 +40,8 @@ function fmtDate(v: string | Date): string {
 }
 
 /** Chat de negociação de uma proposta — vive em sheet para não perder o contexto de decisão. */
-export function NegotiationSheet({ open, onOpenChange, proposalId, providerName, taskTitle }: Props) {
+export function NegotiationSheet({ open, onOpenChange, proposalId, providerName, taskTitle, viewerSide = "requester" }: Props) {
+  const counterpart = viewerSide === "requester" ? (providerName ?? "Fornecedor") : "Solicitante";
   const [thread, setThread] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,7 +161,7 @@ export function NegotiationSheet({ open, onOpenChange, proposalId, providerName,
       <SheetContent side="right" className="flex w-[94vw] flex-col bg-white p-0 sm:max-w-md">
         <SheetHeader className="border-b border-[#D9D2C2] px-5 pb-4 pt-6 text-left">
           <SheetTitle className="text-base font-black tracking-tight text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
-            Negociar com {providerName ?? "fornecedor"}
+            Negociar com {viewerSide === "requester" ? (providerName ?? "fornecedor") : "o solicitante"}
           </SheetTitle>
           <SheetDescription className="mt-0.5 truncate text-xs text-[#0F1A2E]/55">
             {taskTitle}
@@ -203,7 +206,7 @@ export function NegotiationSheet({ open, onOpenChange, proposalId, providerName,
                     </p>
                   );
                 }
-                const mine = m.senderSide === "requester";
+                const mine = m.senderSide === viewerSide;
                 return (
                   <div key={m.id} className={mine ? "flex justify-end" : "flex justify-start"}>
                     <div
@@ -229,7 +232,7 @@ export function NegotiationSheet({ open, onOpenChange, proposalId, providerName,
                         </p>
                       )}
                       <p className={`mt-1 font-mono text-[10px] ${mine ? "text-white/50" : "text-[#0F1A2E]/40"}`}>
-                        {mine ? "Tu" : (providerName ?? "Fornecedor")} · {fmtDate(m.createdAt)}
+                        {mine ? "Tu" : counterpart} · {fmtDate(m.createdAt)}
                       </p>
                     </div>
                   </div>
