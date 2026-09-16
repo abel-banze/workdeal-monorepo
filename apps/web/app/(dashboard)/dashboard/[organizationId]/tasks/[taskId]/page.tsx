@@ -175,7 +175,7 @@ export default async function TaskDetailPage({
 
       {error && <p className="rounded-lg border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 px-3 py-2 text-xs text-[#7A1A0A]">{error}</p>}
 
-      {aiEnabled && <TaskAgentSheet organizationId={aiScope} />}
+      {aiEnabled && <TaskAgentSheet organizationId={aiScope} taskRef={{ id: task.id, title: task.title }} />}
 
       {isRequester ? (
         <ProposalsWorkspace

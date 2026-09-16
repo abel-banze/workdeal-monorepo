@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composeFollowUp, composeGuidedPrompt } from "../components/layout/agent-prompt";
+import { composeFollowUp, composeGuidedPrompt, withTaskContext } from "../components/layout/agent-prompt";
 
 describe("agent-prompt", () => {
   it("compõe pesquisa de empresas com área e província", () => {
@@ -23,6 +23,13 @@ describe("agent-prompt", () => {
     expect(composeGuidedPrompt("free", { q: "  como   apresento  a empresa? ", province: "" })).toBe(
       "como apresento a empresa?",
     );
+  });
+
+  it("withTaskContext prefixa a tarefa actual", () => {
+    expect(withTaskContext("qual a melhor proposta?", { id: "t1", title: "Fuga" })).toBe(
+      'Estou na página da tarefa "Fuga" (t1). qual a melhor proposta?',
+    );
+    expect(withTaskContext("olá", null)).toBe("olá");
   });
 
   it("follow-up sem histórico passa directo", () => {

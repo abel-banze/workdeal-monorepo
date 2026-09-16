@@ -139,8 +139,14 @@ describe("agent-tools — task_proposals_summary (RBAC)", () => {
 });
 
 describe("agent-tools — my_activity", () => {
-  it("devolve só contagens", async () => {
-    mocks.tasksRepo.listByRequester.mockResolvedValue({ total: 2, items: [] });
+  it("devolve contagens mais a lista de tarefas abertas (para encadear tools)", async () => {
+    mocks.tasksRepo.listByRequester.mockResolvedValue({
+      total: 2,
+      items: [
+        { id: "t1", title: "Fuga", description: "x", requesterUserId: "u1" },
+        { id: "t2", title: "Pintura", description: "y", requesterUserId: "u1" },
+      ],
+    });
     mocks.tasksRepo.listProposalsByProviders.mockResolvedValue({ total: 5, items: [] });
     mocks.tasksRepo.getUserProfileIds.mockResolvedValue(["prof-9"]);
     mocks.negotiationsRepo.listThreadsForRequester.mockResolvedValue({ total: 1, items: [] });
@@ -148,6 +154,10 @@ describe("agent-tools — my_activity", () => {
     const res = await tool("my_activity").execute({});
     expect(res).toEqual({
       openTasks: 2,
+      openTaskList: [
+        { id: "t1", title: "Fuga" },
+        { id: "t2", title: "Pintura" },
+      ],
       proposalsSent: 5,
       negotiationsOpenAsRequester: 1,
       negotiationsOpenAsProvider: 3,

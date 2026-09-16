@@ -189,11 +189,11 @@ export function buildAssistantTools(scope: AgentToolsScope): AgentTool[] {
 
   const myActivity: AgentTool = {
     name: "my_activity",
-    description: "Resumo da actividade do utilizador: tarefas publicadas (abertas), propostas enviadas e negociações abertas por lado. Sem detalhes — só contagens.",
+    description: "Resumo da actividade do utilizador: tarefas publicadas (abertas, com id e título para usar noutras ferramentas), propostas enviadas e negociações abertas por lado.",
     inputSchema: z.object({}),
     execute: async () => {
       const [openTasks, sent, profileIds, managerOrgIds] = await Promise.all([
-        tasksRepository.listByRequester(user.id, "open", 1, 1),
+        tasksRepository.listByRequester(user.id, "open", 1, 10),
         tasksRepository.listProposalsByProviders(await tasksRepository.getUserProfileIds(user.id), undefined, 1, 1),
         tasksRepository.getUserProfileIds(user.id),
         negotiationsRepository.listManagerOrgIds(user.id),
@@ -204,6 +204,7 @@ export function buildAssistantTools(scope: AgentToolsScope): AgentTool[] {
       ]);
       return {
         openTasks: openTasks.total,
+        openTaskList: (openTasks.items as { id: string; title: string }[]).map((t) => ({ id: t.id, title: t.title })),
         proposalsSent: sent.total,
         negotiationsOpenAsRequester: asRequester.total,
         negotiationsOpenAsProvider: asProvider.total,

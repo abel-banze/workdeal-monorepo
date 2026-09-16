@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { chatWithAssistant } from "@/app/actions/agents"
+import { MarkdownMessage } from "./markdown-message"
 
 type Turn = { role: "user" | "assistant"; content: string }
 
@@ -67,7 +68,11 @@ export function AiAssistantPanel({ organizationId }: { organizationId: string | 
                       : "max-w-[85%] rounded-2xl rounded-bl-sm border border-[#D9D2C2] bg-white px-3.5 py-2 text-[13px] leading-relaxed text-[#0F1A2E]"
                   }
                 >
-                  <p className="whitespace-pre-wrap">{t.content}</p>
+                  {t.role === "user" ? (
+                    <p className="whitespace-pre-wrap">{t.content}</p>
+                  ) : (
+                    <MarkdownMessage content={t.content} />
+                  )}
                 </div>
               </div>
             ))}
