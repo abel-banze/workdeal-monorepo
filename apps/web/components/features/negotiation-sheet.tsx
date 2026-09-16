@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from "@workspace/ui/components/sheet";
 import { getNegotiation, listNegotiationMessages, openThread, respondNegotiationOffer, sendNegotiationMessage } from "@/app/actions/negotiations";
+import { toUserNegotiationError } from "./negotiation-error";
 
 type Message = {
   id: string;
@@ -77,7 +78,7 @@ export function NegotiationSheet({ open, onOpenChange, proposalId, providerName,
         setMessages(data.messages ?? []);
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Falha ao abrir a negociação.");
+        if (!cancelled) setError(toUserNegotiationError(e));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -106,7 +107,7 @@ export function NegotiationSheet({ open, onOpenChange, proposalId, providerName,
     try {
       await load(thread.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao actualizar.");
+      setError(toUserNegotiationError(e));
     } finally {
       setRefreshing(false);
     }
@@ -120,7 +121,7 @@ export function NegotiationSheet({ open, onOpenChange, proposalId, providerName,
       await respondNegotiationOffer(thread.id, messageId, decision);
       await load(thread.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao registar a resposta.");
+      setError(toUserNegotiationError(err));
     } finally {
       setSending(false);
     }
@@ -163,7 +164,7 @@ export function NegotiationSheet({ open, onOpenChange, proposalId, providerName,
       const items = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
       setMessages(items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar.");
+      setError(toUserNegotiationError(err));
     } finally {
       setSending(false);
     }
