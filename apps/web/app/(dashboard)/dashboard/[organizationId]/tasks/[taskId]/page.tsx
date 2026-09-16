@@ -1,12 +1,14 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { FiMapPin } from "react-icons/fi"
 import { requireAuth } from "@/lib/auth"
 import { featureAccessible } from "@/lib/features"
 import { getOrgRole } from "@workdeal/auth/repository"
 import { hasOrgPermission, TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared"
-import { AiAssistantPanel } from "@/components/features/ai-assistant-panel"
+import { TaskAgentSheet } from "@/components/features/task-agent-sheet"
 import { ProposalsWorkspace } from "./proposals-workspace"
+import { TaskBrief } from "./task-brief"
+
+type ProviderBadgeLite = { slug: string; name: string; type: string }
 
 type ProposalItem = {
   id: string
@@ -15,6 +17,9 @@ type ProposalItem = {
   providerProfileName: string | null
   providerProfileSlug: string | null
   providerProfileLogo: string | null
+  providerProvince: string | null
+  providerDistrict: string | null
+  providerBadges: ProviderBadgeLite[]
   message: string
   priceMzn: number | null
   estimatedDays: number | null
@@ -94,8 +99,13 @@ export default async function TaskDetailPage({
 
     const isRequester = taskRow.requesterUserId === session.user.id
     if (isRequester) {
-      const pRes = await apiFetch<ProposalItem[]>(`/api/v1/tasks/${encodeURIComponent(taskId)}/proposals?limit=50`, { cache: "no-store" })
-      proposals = pRes.data ?? []
+      const pRes = await apiFetch<ProposalItem[]>(`/api/v1/tasks/${encodeURIComponent(taskId)}/proposals?limit=100`, { cache: "no-store" })
+      proposals = (pRes.data ?? []).map((p) => ({
+        ...p,
+        providerProvince: p.providerProvince ?? null,
+        providerDistrict: p.providerDistrict ?? null,
+        providerBadges: p.providerBadges ?? [],
+      }))
       const bRes = await apiFetch<BidItem[]>("/api/v1/tasks/bids?role=requester&limit=50", { cache: "no-store" }).catch(() => ({ data: [] as BidItem[] } as never))
       const items = (bRes.data ?? []) as BidItem[]
       bid = items.find((b) => b.taskId === taskRow.id) ?? null
@@ -130,45 +140,41 @@ export default async function TaskDetailPage({
         <span className="truncate">{task.title}</span>
       </div>
 
-      <div className="overflow-hidden rounded-[22px] border border-[#D9D2C2] bg-white p-6">
+      <div>
         <p className="text-[11px] font-bold tracking-[0.14em] text-[#0B5E56]">TAREFA · {orgName?.toUpperCase() ?? "PESSOAL"}</p>
-        <h1 className="mt-2 text-[22px] font-black leading-tight tracking-tight text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
+        <h1 className="mt-1 text-[22px] font-black leading-tight tracking-tight text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
           {task.title}
         </h1>
-        <p className="mt-2 text-[13px] leading-relaxed text-[#0F1A2E]/70">{task.description}</p>
-        <div className="mt-4 flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 font-mono font-semibold text-[#0F1A2E]">
-            {task.priceMinMzn != null ? `${task.priceMinMzn.toLocaleString("pt-MZ")} MZN` : "—"} – {task.priceMaxMzn != null ? `${task.priceMaxMzn.toLocaleString("pt-MZ")} MZN` : "—"}
-          </span>
-          {catName && <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 font-semibold text-[#0B5E56]">{catName}</span>}
-          {task.contractType && <span className="rounded-full border border-[#0B5E56]/25 bg-[#0B5E56]/5 px-2.5 py-1 font-semibold text-[#0B5E56]">{TASK_CONTRACT_TYPE_LABELS_PT[task.contractType as keyof typeof TASK_CONTRACT_TYPE_LABELS_PT] ?? task.contractType}</span>}
-          {[task.province, task.district, task.address].filter(Boolean).join(" · ") && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[#0F1A2E]/70">
-              <FiMapPin className="size-3.5" aria-hidden /> {[task.province, task.district, task.address].filter(Boolean).join(" · ")}
-            </span>
-          )}
-          {task.dueAt && <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[#0F1A2E]/70">prazo {new Date(task.dueAt).toLocaleString("pt-MZ", { dateStyle: "short", timeStyle: "short" })}</span>}
-          {task.proposalDeadlineAt && (
-            <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[#0B5E56]/80">
-              propostas até {new Date(task.proposalDeadlineAt).toLocaleString("pt-MZ", { dateStyle: "short", timeStyle: "short" })}
-            </span>
-          )}
-          <span className="rounded-full bg-[#0F1A2E] px-2.5 py-1 font-bold text-white">{task.status.replace("_", " ")}</span>
-        </div>
-        {task.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {task.tags.map((t) => (
-              <span key={t.id} className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-0.5 text-[11px] font-semibold text-[#0F1A2E]/60">
-                #{t.name}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
+
+      <TaskBrief
+        task={{
+          title: task.title,
+          description: task.description,
+          statusLabel: task.status.replace("_", " "),
+          statusCls: "bg-[#0F1A2E] text-white",
+          budgetLabel:
+            task.priceMinMzn != null || task.priceMaxMzn != null
+              ? `${task.priceMinMzn != null ? `${task.priceMinMzn.toLocaleString("pt-MZ")} MZN` : "—"} – ${task.priceMaxMzn != null ? `${task.priceMaxMzn.toLocaleString("pt-MZ")} MZN` : "—"}`
+              : null,
+          categoryName: catName,
+          contractLabel: task.contractType
+            ? (TASK_CONTRACT_TYPE_LABELS_PT[task.contractType as keyof typeof TASK_CONTRACT_TYPE_LABELS_PT] ?? task.contractType)
+            : null,
+          locationLabel: [task.province, task.district, task.address].filter(Boolean).join(" · ") || null,
+          dueLabel: task.dueAt
+            ? `prazo ${new Date(task.dueAt).toLocaleString("pt-MZ", { dateStyle: "short", timeStyle: "short" })}`
+            : null,
+          deadlineLabel: task.proposalDeadlineAt
+            ? `propostas até ${new Date(task.proposalDeadlineAt).toLocaleString("pt-MZ", { dateStyle: "short", timeStyle: "short" })}`
+            : null,
+          tags: task.tags,
+        }}
+      />
 
       {error && <p className="rounded-lg border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 px-3 py-2 text-xs text-[#7A1A0A]">{error}</p>}
 
-      {aiEnabled && <AiAssistantPanel organizationId={aiScope} />}
+      {aiEnabled && <TaskAgentSheet organizationId={aiScope} />}
 
       {isRequester ? (
         <ProposalsWorkspace

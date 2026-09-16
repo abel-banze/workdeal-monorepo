@@ -1,4 +1,4 @@
-import { db, task, taskProposal, taskBid, taskTag, tag, profile, member, user } from "@workdeal/db";
+import { db, task, taskProposal, taskBid, taskTag, tag, profile, member, user, profileLocation, profileBadge, badge } from "@workdeal/db";
 import { and, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { boundingBox } from "@workdeal/shared/lib/geo";
 import { tagsRepository } from "./tags.repository.js";
@@ -268,11 +268,39 @@ export const tasksRepository = {
     const [cntRow] = await db.select({ cnt: count() }).from(taskProposal).where(where);
     const items = await db.select().from(taskProposal).where(where).orderBy(desc(taskProposal.createdAt)).limit(limit).offset((page - 1) * limit);
     const profileMap = await fetchProfileMap(items.map((i) => i.providerProfileId));
+    // Localização primária + selos activos por proponente (2 queries extra, sem N+1)
+    // — alimentam os filtros da mesa de decisão (localização, selos).
+    const providerIds = [...new Set(items.map((i) => i.providerProfileId))];
+    const primaryLocs =
+      providerIds.length === 0
+        ? []
+        : await db
+            .select({ profileId: profileLocation.profileId, province: profileLocation.province, district: profileLocation.district })
+            .from(profileLocation)
+            .where(and(inArray(profileLocation.profileId, providerIds), eq(profileLocation.isPrimary, true)));
+    const locByProfile = new Map(primaryLocs.map((r) => [r.profileId, r]));
+    const activeBadges =
+      providerIds.length === 0
+        ? []
+        : await db
+            .select({ profileId: profileBadge.profileId, slug: badge.slug, name: badge.name, type: badge.type })
+            .from(profileBadge)
+            .innerJoin(badge, eq(profileBadge.badgeId, badge.id))
+            .where(and(inArray(profileBadge.profileId, providerIds), eq(profileBadge.status, "active")));
+    const badgesByProfile = new Map<string, { slug: string; name: string; type: string }[]>();
+    for (const b of activeBadges) {
+      const arr = badgesByProfile.get(b.profileId) ?? [];
+      arr.push({ slug: b.slug, name: b.name, type: b.type });
+      badgesByProfile.set(b.profileId, arr);
+    }
     const enriched = items.map((p) => ({
       ...p,
       providerProfileName: profileMap.get(p.providerProfileId)?.name ?? null,
       providerProfileSlug: profileMap.get(p.providerProfileId)?.slug ?? null,
       providerProfileLogo: profileMap.get(p.providerProfileId)?.logoUrl ?? null,
+      providerProvince: locByProfile.get(p.providerProfileId)?.province ?? null,
+      providerDistrict: locByProfile.get(p.providerProfileId)?.district ?? null,
+      providerBadges: badgesByProfile.get(p.providerProfileId) ?? [],
     }));
     return { items: enriched, total: cntRow?.cnt ?? 0 };
   },
