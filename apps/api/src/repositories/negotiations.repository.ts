@@ -27,6 +27,7 @@ export const messageColumns = {
   body: negotiationMessage.body,
   priceMzn: negotiationMessage.priceMzn,
   estimatedDays: negotiationMessage.estimatedDays,
+  offerStatus: negotiationMessage.offerStatus,
   seenByRequester: negotiationMessage.seenByRequester,
   seenByProvider: negotiationMessage.seenByProvider,
   createdAt: negotiationMessage.createdAt,
@@ -185,6 +186,20 @@ export const negotiationsRepository = {
   },
 
   // ── Mensagens ────────────────────────────────────────────────────
+  async findMessageById(id: string): Promise<MessageRow | null> {
+    const [row] = await db.select(messageColumns).from(negotiationMessage).where(eq(negotiationMessage.id, id)).limit(1);
+    return row ?? null;
+  },
+
+  async setMessageOfferStatus(id: string, status: "accepted" | "rejected"): Promise<MessageRow | null> {
+    const [row] = await db
+      .update(negotiationMessage)
+      .set({ offerStatus: status })
+      .where(eq(negotiationMessage.id, id))
+      .returning(messageColumns);
+    return row ?? null;
+  },
+
   async insertMessage(data: Partial<typeof negotiationMessage.$inferInsert> & { threadId: string; senderUserId: string; senderSide: SenderSide; kind: MessageKind; body: string }): Promise<MessageRow> {
     const [row] = await db.insert(negotiationMessage).values(data).returning(messageColumns);
     if (!row) throw new Error("Falha ao guardar mensagem");
@@ -224,11 +239,11 @@ export const negotiationsRepository = {
 
   /**
    * Destinatário de notificação do lado indicado (best effort).
-   * provider → quem pediu a tarefa; requester → dono do perfil do fornecedor
+   * requester → quem pediu a tarefa; provider → dono do perfil do fornecedor
    * (fallback para o email público do perfil se a conta não for resolvível).
    */
   async findNotificationRecipient(providerProfileId: string, requesterUserId: string, recipientSide: SenderSide): Promise<{ name: string | null; email: string | null } | null> {
-    if (recipientSide === "provider") {
+    if (recipientSide === "requester") {
       const [u] = await db.select({ name: user.name, email: user.email }).from(user).where(eq(user.id, requesterUserId)).limit(1);
       return u ? { name: u.name, email: u.email } : null;
     }

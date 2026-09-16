@@ -1,0 +1,2 @@
+CREATE TYPE "public"."negotiation_offer_status" AS ENUM('pending', 'accepted', 'rejected');--> statement-breakpoint
+ALTER TABLE "negotiation_message" ADD COLUMN "offer_status" "negotiation_offer_status" DEFAULT 'pending' NOT NULL;

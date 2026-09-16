@@ -8,10 +8,13 @@ const mocks = vi.hoisted(() => ({
     findProposalById: vi.fn(),
     findById: vi.fn(),
     getUserProfileIds: vi.fn(),
+    updateProposalTerms: vi.fn(),
   },
   repo: {
     createThread: vi.fn(),
     findThreadByProposal: vi.fn(),
+    findMessageById: vi.fn(),
+    setMessageOfferStatus: vi.fn(),
     findThreadById: vi.fn(),
     listThreadsForRequester: vi.fn(),
     listThreadsForProvider: vi.fn(),
@@ -30,6 +33,7 @@ const mocks = vi.hoisted(() => ({
     findUserNames: vi.fn(),
   },
   notify: vi.fn(),
+  notifyOffer: vi.fn(),
 }));
 
 vi.mock("@workdeal/auth", () => ({ getOrgRole: mocks.getOrgRole }));
@@ -37,6 +41,7 @@ vi.mock("../repositories/tasks.repository.js", () => ({ tasksRepository: mocks.t
 vi.mock("../repositories/negotiations.repository.js", () => ({ negotiationsRepository: mocks.repo }));
 vi.mock("./negotiation-notifications.service.js", () => ({
   notifyNewNegotiationMessage: mocks.notify,
+  notifyOfferResponse: mocks.notifyOffer,
 }));
 
 import { negotiationsService } from "./negotiations.service.js";
@@ -87,11 +92,22 @@ const MSG = (overrides: Partial<MessageRow> = {}): MessageRow => ({
   body: "Olá",
   priceMzn: null,
   estimatedDays: null,
+  offerStatus: "pending",
   seenByRequester: false,
   seenByProvider: true,
   createdAt: new Date(),
   ...overrides,
 });
+
+const OFFER = (overrides: Partial<MessageRow> = {}): MessageRow =>
+  MSG({
+    id: "m-offer",
+    kind: "offer",
+    body: "Faço por este valor",
+    priceMzn: 12000,
+    estimatedDays: 5,
+    ...overrides,
+  });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -102,6 +118,7 @@ beforeEach(() => {
   mocks.repo.unreadCounts.mockResolvedValue(new Map([["th-1", 0]]));
   mocks.repo.findPersonalProfileId.mockResolvedValue(null);
   mocks.notify.mockResolvedValue(undefined);
+  mocks.notifyOffer.mockResolvedValue(undefined);
 });
 
 describe("negotiationsService.getThread — resolução de partes", () => {
@@ -352,5 +369,82 @@ describe("negotiationsService.sendMessage — bloqueio de contactos", () => {
     mocks.repo.insertMessage.mockResolvedValue(MSG({ kind: "offer", body: "", priceMzn: 9000 }));
     await negotiationsService.sendMessage(requester, "th-1", { kind: "offer", body: "", priceMzn: 9000 });
     expect(mocks.repo.insertMessage).toHaveBeenCalledOnce();
+  });
+});
+
+describe("negotiationsService.respondToOffer — aceitar/recusar contraproposta", () => {
+  beforeEach(() => {
+    mocks.repo.findMessageById.mockResolvedValue(OFFER());
+    mocks.repo.setMessageOfferStatus.mockImplementation(async (id: string, status: "accepted" | "rejected") =>
+      OFFER({ id, offerStatus: status }),
+    );
+  });
+
+  it("requester aceita oferta do provider: actualiza termos, regista sistema e notifica", async () => {
+    const res = await negotiationsService.respondToOffer(requester, "th-1", "m-offer", "accepted");
+    expect(res.offerStatus).toBe("accepted");
+    expect(mocks.repo.setMessageOfferStatus).toHaveBeenCalledWith("m-offer", "accepted");
+    expect(mocks.tasksRepo.updateProposalTerms).toHaveBeenCalledWith("prop-1", { priceMzn: 12000, estimatedDays: 5 });
+    expect(mocks.repo.insertMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ threadId: "th-1", kind: "system", senderSide: "requester" }),
+    );
+    expect(mocks.notifyOffer).toHaveBeenCalledWith(
+      expect.objectContaining({ threadId: "th-1", recipientSide: "provider", decision: "accepted", priceMzn: 12000 }),
+    );
+  });
+
+  it("provider recusa oferta do requester e notifica sem tocar nos termos", async () => {
+    mocks.tasksRepo.getUserProfileIds.mockResolvedValue(["prof-9"]);
+    mocks.repo.findMessageById.mockResolvedValue(
+      OFFER({ id: "m-o2", senderUserId: "u-creator", senderProfileId: null, senderSide: "requester", priceMzn: 9000, estimatedDays: null }),
+    );
+    const res = await negotiationsService.respondToOffer(providerUser, "th-1", "m-o2", "rejected");
+    expect(res.offerStatus).toBe("rejected");
+    expect(mocks.tasksRepo.updateProposalTerms).not.toHaveBeenCalled();
+    expect(mocks.notifyOffer).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientSide: "requester", decision: "rejected" }),
+    );
+  });
+
+  it("impede responder à própria oferta (403 OWN_OFFER)", async () => {
+    mocks.tasksRepo.getUserProfileIds.mockResolvedValue(["prof-9"]);
+    await expect(negotiationsService.respondToOffer(providerUser, "th-1", "m-offer", "accepted")).rejects.toMatchObject({
+      status: 403,
+      code: "OWN_OFFER",
+    });
+    expect(mocks.repo.setMessageOfferStatus).not.toHaveBeenCalled();
+    expect(mocks.notifyOffer).not.toHaveBeenCalled();
+  });
+
+  it("rejeita mensagem que não é oferta (400 NOT_AN_OFFER)", async () => {
+    mocks.repo.findMessageById.mockResolvedValue(MSG({ kind: "text" }));
+    await expect(negotiationsService.respondToOffer(requester, "th-1", "m1", "accepted")).rejects.toMatchObject({
+      status: 400,
+      code: "NOT_AN_OFFER",
+    });
+  });
+
+  it("rejeita oferta já respondida (409 OFFER_ALREADY_ANSWERED)", async () => {
+    mocks.repo.findMessageById.mockResolvedValue(OFFER({ offerStatus: "accepted" }));
+    await expect(negotiationsService.respondToOffer(requester, "th-1", "m-offer", "rejected")).rejects.toMatchObject({
+      status: 409,
+      code: "OFFER_ALREADY_ANSWERED",
+    });
+  });
+
+  it("rejeita em thread encerrada (409 THREAD_CLOSED)", async () => {
+    mocks.repo.findThreadById.mockResolvedValue(THREAD({ status: "closed" }));
+    await expect(negotiationsService.respondToOffer(requester, "th-1", "m-offer", "accepted")).rejects.toMatchObject({
+      status: 409,
+      code: "THREAD_CLOSED",
+    });
+  });
+
+  it("404 quando a oferta não pertence à thread", async () => {
+    mocks.repo.findMessageById.mockResolvedValue(OFFER({ threadId: "th-outra" }));
+    await expect(negotiationsService.respondToOffer(requester, "th-1", "m-offer", "accepted")).rejects.toMatchObject({
+      status: 404,
+      code: "OFFER_NOT_FOUND",
+    });
   });
 });

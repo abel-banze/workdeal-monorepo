@@ -15,6 +15,13 @@ export const createThreadSchema = z.object({
   proposalId: z.string().min(1, "Proposta obrigatória"),
 });
 
+export const negotiationOfferDecisionSchema = z.enum(["accepted", "rejected"]);
+
+export const NEGOTIATION_OFFER_DECISION_LABELS_PT: Record<z.infer<typeof negotiationOfferDecisionSchema>, string> = {
+  accepted: "Aceite",
+  rejected: "Recusada",
+};
+
 export const sendNegotiationMessageSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("text"),
@@ -62,6 +69,8 @@ export const negotiationThreadViewSchema = z.object({
   unreadCount: z.number().int().min(0).optional().default(0),
 });
 
+export const negotiationOfferStatusSchema = z.enum(["pending", "accepted", "rejected"]);
+
 export const negotiationMessageViewSchema = z.object({
   id: z.string(),
   threadId: z.string(),
@@ -72,6 +81,7 @@ export const negotiationMessageViewSchema = z.object({
   body: z.string(),
   priceMzn: z.number().int().nullable().optional(),
   estimatedDays: z.number().int().nullable().optional(),
+  offerStatus: negotiationOfferStatusSchema.default("pending"),
   seenByRequester: z.boolean(),
   seenByProvider: z.boolean(),
   createdAt: z.date(),
@@ -83,6 +93,8 @@ export const negotiationThreadDetailSchema = negotiationThreadViewSchema.extend(
 });
 
 export type NegotiationStatus = z.infer<typeof negotiationStatusSchema>;
+export type NegotiationOfferDecision = z.infer<typeof negotiationOfferDecisionSchema>;
+export type NegotiationOfferStatus = z.infer<typeof negotiationOfferStatusSchema>;
 export type NegotiationMessageKind = z.infer<typeof negotiationMessageKindSchema>;
 export type SenderSide = z.infer<typeof negotiationSenderSideSchema>;
 export type CreateThreadInput = z.infer<typeof createThreadSchema>;

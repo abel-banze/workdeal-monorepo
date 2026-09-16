@@ -61,3 +61,13 @@ negotiationsRoute.post("/:threadId/messages", requireAuth, rateLimit(sendLimiter
   const { body: resBody, status } = await negotiationsController.send(c.get("user"), c.req.param("threadId"), body);
   return c.json(resBody, status);
 });
+
+negotiationsRoute.post("/:threadId/messages/:messageId/accept", requireAuth, rateLimit(sendLimiter), async (c) => {
+  const { body: resBody, status } = await negotiationsController.respondToOffer(c.get("user"), c.req.param("threadId"), c.req.param("messageId"), "accepted");
+  return c.json(resBody, status);
+});
+
+negotiationsRoute.post("/:threadId/messages/:messageId/reject", requireAuth, rateLimit(sendLimiter), async (c) => {
+  const { body: resBody, status } = await negotiationsController.respondToOffer(c.get("user"), c.req.param("threadId"), c.req.param("messageId"), "rejected");
+  return c.json(resBody, status);
+});

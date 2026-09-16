@@ -2,7 +2,8 @@
 // Motor puro (sem I/O a BD). Camada API (apps/api) compõe tools/context/metering.
 
 // ── Tipos e constantes ─────────────────────────────────────────────────────
-export type { AiProviderId, ModelTier, AgentKey, AgentRunStatus, AgentUsageRecord, AgentRunResult, RunAgentOptions, AgentConfig, StructuredOutput } from "./types.js";
+export type { AiProviderId, ModelTier, AgentKey, AgentRunStatus, AgentUsageRecord, AgentRunResult, RunAgentOptions, AgentConfig, StructuredOutput, AgentTool, AgentToolCall } from "./types.js";
+export { executeToolSafely, MAX_TOOL_STEPS } from "./runtime/run.js";
 export { AI_PROVIDERS, MODEL_TIERS, MODEL_PRICES, DEFAULT_BUDGETS } from "./models.js";
 
 // ── Provider / motor ───────────────────────────────────────────────────────

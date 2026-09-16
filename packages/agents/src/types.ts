@@ -18,6 +18,24 @@ export interface StructuredOutput {
   schema: z.ZodType<unknown>;
 }
 
+/**
+ * Ferramenta chamável pelo modelo — definição pura (sem negócio).
+ * A implementação concreta (`execute`) vive no consumidor (ex: API com DB);
+ * o motor garante que `execute` nunca rebenta a execução (ver runAgent).
+ */
+export interface AgentTool {
+  name: string;
+  description: string;
+  inputSchema: z.ZodType<unknown>;
+  execute: (input: unknown) => Promise<unknown>;
+}
+
+/** Chamada de ferramenta observada numa execução (transparência/metering). */
+export interface AgentToolCall {
+  name: string;
+  args: unknown;
+}
+
 /** Opções de uma execução do motor — puro, sem contexto de negócio. */
 export interface RunAgentOptions {
   providerId: AiProviderId;
@@ -32,6 +50,13 @@ export interface RunAgentOptions {
   /** Output estruturado (Output.object) — sem schema, devolve texto simples. */
   output?: StructuredOutput;
   temperature?: number;
+  /** Ferramentas com acesso a dados (via `execute` do consumidor). */
+  tools?: AgentTool[];
+  /**
+   * Máximo de passos do ciclo ferramenta→modelo. Sem tools vale 1
+   * (comportamento actual de tiro único); com tools, omissão 5.
+   */
+  maxSteps?: number;
 }
 
 export interface AgentUsageRecord {
@@ -53,6 +78,10 @@ export interface AgentRunResult {
   errorDetail?: string | null;
   usage: AgentUsageRecord;
   durationMs: number;
+  /** Ferramentas efectivamente chamadas (ordem de execução). */
+  toolCalls: AgentToolCall[];
+  /** Passos do ciclo ferramenta→modelo executados. */
+  steps: number;
 }
 
 /** Config declarativa de um agent — liga o motor às features/budget. */

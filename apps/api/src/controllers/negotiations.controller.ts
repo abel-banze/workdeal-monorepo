@@ -23,4 +23,8 @@ export const negotiationsController = {
     const message = await negotiationsService.sendMessage(user, threadId, body);
     return { body: ok(message), status: 201 as const };
   },
+  async respondToOffer(user: AuthUser, threadId: string, messageId: string, decision: "accepted" | "rejected") {
+    const message = await negotiationsService.respondToOffer(user, threadId, messageId, decision);
+    return { body: ok(message), status: 200 as const };
+  },
 };
