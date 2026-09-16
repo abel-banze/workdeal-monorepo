@@ -11,6 +11,8 @@ import {
   SheetTitle,
 } from "@workspace/ui/components/sheet";
 import { chatWithAssistant } from "@/app/actions/agents";
+import { composeFollowUp, withTaskContext, type AgentHistoryTurn, type AgentTaskRef } from "@/components/layout/agent-prompt";
+import { MarkdownMessage } from "./markdown-message";
 
 type Turn = { role: "user" | "assistant"; content: string };
 
@@ -21,7 +23,7 @@ const SUGGESTIONS = [
 ];
 
 /** Agente comercial da tarefa: botão flutuante que abre o chat em sheet. */
-export function TaskAgentSheet({ organizationId }: { organizationId: string | null }) {
+export function TaskAgentSheet({ organizationId, taskRef }: { organizationId: string | null; taskRef?: AgentTaskRef | null }) {
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -39,7 +41,16 @@ export function TaskAgentSheet({ organizationId }: { organizationId: string | nu
     setTurns((t) => [...t, { role: "user", content: text }]);
     setBusy(true);
     try {
-      const res = await chatWithAssistant({ message: text, organizationId });
+      const pairs: AgentHistoryTurn[] = [];
+      for (let i = 0; i + 1 < turns.length; i += 2) {
+        const qTurn = turns[i];
+        const aTurn = turns[i + 1];
+        if (qTurn?.role === "user" && aTurn?.role === "assistant") {
+          pairs.push({ question: qTurn.content, answer: aTurn.content });
+        }
+      }
+      const contextual = pairs.length > 0 ? composeFollowUp(pairs, text) : text;
+      const res = await chatWithAssistant({ message: withTaskContext(contextual, taskRef ?? null), organizationId });
       setTurns((t) => [...t, { role: "assistant", content: res.data?.reply ?? "Sem resposta." }]);
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Falha ao contactar o assistente.";
@@ -106,10 +117,14 @@ export function TaskAgentSheet({ organizationId }: { organizationId: string | nu
                   className={
                     t.role === "user"
                       ? "max-w-[85%] rounded-2xl rounded-br-sm bg-[#0F1A2E] px-3.5 py-2 text-[13px] leading-relaxed text-white"
-                      : "max-w-[85%] rounded-2xl rounded-bl-sm border border-[#D9D2C2] bg-[#F6F3EE] px-3.5 py-2 text-[13px] leading-relaxed text-[#0F1A2E]"
+                      : "max-w-[85%] rounded-2xl rounded-bl-sm border border-[#D9D2C2] bg-[#F6F3EE] px-3.5 py-2 text-[#0F1A2E]"
                   }
                 >
-                  <p className="whitespace-pre-wrap">{t.content}</p>
+                  {t.role === "user" ? (
+                    <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{t.content}</p>
+                  ) : (
+                    <MarkdownMessage content={t.content} />
+                  )}
                 </div>
               </div>
             ))}

@@ -13,8 +13,6 @@ import {
 import {
   Questionnaire,
   QuestionnaireActions,
-  QuestionnaireChoice,
-  QuestionnaireChoices,
   QuestionnaireDescription,
   QuestionnaireInput,
   QuestionnaireItem,
@@ -23,12 +21,16 @@ import {
   QuestionnaireSubmit,
   QuestionnaireTitle,
 } from "@workspace/ui/components/questionnaire"
+import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group"
 import { chatWithAssistant } from "@/app/actions/agents"
+import { MarkdownMessage } from "@/components/features/markdown-message"
 import {
   composeFollowUp,
   composeGuidedPrompt,
+  withTaskContext,
   type AgentHistoryTurn,
   type AgentIntent,
+  type AgentTaskRef,
 } from "./agent-prompt"
 
 const INTENTS: { value: AgentIntent; title: string; hint: string }[] = [
@@ -44,6 +46,8 @@ export function DashboardAgentButton() {
   const params = useParams() as Record<string, string | string[] | undefined>
   const rawOrg = typeof params.organizationId === "string" ? params.organizationId : null
   const organizationId = rawOrg === "personal" ? null : rawOrg
+  const routeTaskId = typeof params.taskId === "string" ? params.taskId : null
+  const taskRef: AgentTaskRef | null = routeTaskId ? { id: routeTaskId } : null
 
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
@@ -60,13 +64,13 @@ export function DashboardAgentButton() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [history, busy, open, step])
 
-  async function ask(message: string) {
+  async function ask(display: string, toSend?: string) {
     setBusy(true)
     setError(null)
     try {
-      const res = await chatWithAssistant({ message, organizationId })
+      const res = await chatWithAssistant({ message: withTaskContext(toSend ?? display, taskRef), organizationId })
       const reply = res?.data?.reply ?? "Sem resposta por agora."
-      setHistory((h) => [...h, { question: message, answer: reply }])
+      setHistory((h) => [...h, { question: display, answer: reply }])
       setStep(2)
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Falha ao contactar o agente."
@@ -87,7 +91,14 @@ export function DashboardAgentButton() {
       return
     }
     setError(null)
-    void ask(composeGuidedPrompt(intent, { q, province }))
+    const composed = composeGuidedPrompt(intent, { q, province })
+    const label =
+      intent === "activity"
+        ? "Resume a minha actividade"
+        : intent === "free"
+          ? q.trim()
+          : `${INTENTS.find((o) => o.value === intent)?.title ?? "Pesquisa"}: ${[q.trim(), province.trim()].filter(Boolean).join(" · ")}`;
+    void ask(label, composed)
   }
 
   function handleFollowUp(e: React.FormEvent) {
@@ -148,28 +159,28 @@ export function DashboardAgentButton() {
                     Como posso ajudar?
                   </QuestionnaireTitle>
                   <QuestionnaireDescription>Escolhe um ponto de partida — o assistente usa dados reais.</QuestionnaireDescription>
-                  <QuestionnaireChoices>
+                  <RadioGroup
+                    value={intent}
+                    onValueChange={(v) => setIntent(v as AgentIntent)}
+                    aria-label="Intenção do assistente"
+                    className="gap-2"
+                  >
                     {INTENTS.map((opt) => (
-                      <QuestionnaireChoice
+                      <label
                         key={opt.value}
-                        data-checked={intent === opt.value ? "" : undefined}
-                        className="border-[#D9D2C2] data-checked:border-[#0B5E56]/50 data-checked:bg-[#0B5E56]/5"
+                        htmlFor={`agent-intent-${opt.value}`}
+                        className={`flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2.5 text-start transition-colors hover:bg-[#F6F3EE] ${
+                          intent === opt.value ? "border-[#0B5E56]/50 bg-[#0B5E56]/5" : "border-[#D9D2C2] bg-white"
+                        }`}
                       >
-                        <input
-                          type="radio"
-                          name="intent"
-                          checked={intent === opt.value}
-                          onChange={() => setIntent(opt.value)}
-                          className="mt-1 accent-[#0B5E56]"
-                          aria-label={opt.title}
-                        />
+                        <RadioGroupItem value={opt.value} id={`agent-intent-${opt.value}`} className="mt-1" />
                         <span>
                           <span className="block text-[13px] font-bold text-[#0F1A2E]">{opt.title}</span>
                           <span className="block text-xs text-[#0F1A2E]/55">{opt.hint}</span>
                         </span>
-                      </QuestionnaireChoice>
+                      </label>
                     ))}
-                  </QuestionnaireChoices>
+                  </RadioGroup>
                   <QuestionnaireActions>
                     <QuestionnaireNext type="button" onClick={() => setStep(1)} className="rounded-full bg-[#0F1A2E] text-white hover:bg-black">
                       Continuar
@@ -230,9 +241,9 @@ export function DashboardAgentButton() {
                         </p>
                       </div>
                       <div className="flex justify-start">
-                        <p className="max-w-[95%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-[#D9D2C2] bg-[#F6F3EE] px-3.5 py-2 text-[13px] leading-relaxed text-[#0F1A2E]">
-                          {t.answer}
-                        </p>
+                        <div className="max-w-[95%] rounded-2xl rounded-bl-sm border border-[#D9D2C2] bg-[#F6F3EE] px-3.5 py-2 text-[#0F1A2E]">
+                          <MarkdownMessage content={t.answer} />
+                        </div>
                       </div>
                     </div>
                   ))}

@@ -16,6 +16,22 @@ export interface AgentHistoryTurn {
   answer: string;
 }
 
+export interface AgentTaskRef {
+  id: string;
+  title?: string | null;
+}
+
+/**
+ * Prefixo de contexto da página actual: o assistente passa a saber em que
+ * tarefa o utilizador está, sem precisar de pedir IDs.
+ */
+export function withTaskContext(message: string, taskRef: AgentTaskRef | null): string {
+  const text = clean(message);
+  if (!taskRef) return text;
+  const label = taskRef.title ? `"${taskRef.title}" (${taskRef.id})` : taskRef.id;
+  return `Estou na página da tarefa ${label}. ${text}`;
+}
+
 function clean(v: string): string {
   return v.trim().replace(/\s+/g, " ");
 }

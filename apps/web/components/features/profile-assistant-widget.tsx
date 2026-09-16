@@ -9,6 +9,7 @@ import { authClient } from "@/lib/auth-client";
 import { chatWithCompanyAssistant } from "@/app/actions/agents";
 import { toggleProfileBookmark } from "@/app/actions/bookmarks";
 import { QuoteDialog } from "./profile-quote-dialog";
+import { MarkdownMessage } from "./markdown-message";
 
 type Suggest = "none" | "quote" | "whatsapp" | "bookmark";
 
@@ -159,7 +160,11 @@ export function ProfileAssistantWidget({ slug, profileId, profileName, profileEm
                         : "max-w-[85%] rounded-2xl rounded-bl-sm border border-[#D9D2C2] bg-white px-3.5 py-2 text-[13px] leading-relaxed text-[#0F1A2E]"
                     }
                   >
-                    <p className="whitespace-pre-wrap">{t.content}</p>
+                    {t.role === "user" ? (
+                      <p className="whitespace-pre-wrap">{t.content}</p>
+                    ) : (
+                      <MarkdownMessage content={t.content} />
+                    )}
                   </div>
                 </div>
                 {/* Suggest actions */}
