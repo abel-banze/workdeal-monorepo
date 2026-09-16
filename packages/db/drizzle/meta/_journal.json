@@ -330,6 +330,13 @@
       "when": 1789418817554,
       "tag": "0046_familiar_stardust",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1789560281878,
+      "tag": "0047_negotiation_offer_status",
+      "breakpoints": true
     }
   ]
 }

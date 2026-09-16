@@ -1,8 +1,8 @@
-import { generateText, Output, type LanguageModel } from "ai";
+import { generateText, Output, stepCountIs, tool as sdkTool, type LanguageModel, type ToolSet } from "ai";
 import { z } from "zod";
 import { guardCostBudget, guardInputBudget, guardOutputBudget } from "../guardrails.js";
 import { buildUsageRecord, ZERO_USAGE } from "../usage.js";
-import type { AgentRunResult, AgentRunStatus, RunAgentOptions } from "../types.js";
+import type { AgentRunResult, AgentRunStatus, AgentTool, AgentToolCall, RunAgentOptions } from "../types.js";
 
 /** Helper tipo para `Output.object({ schema })` — evita importar `ai` no consumidor. */
 export function structuredOutput<T extends z.ZodType<unknown>>(schema: T) {
@@ -44,7 +44,58 @@ type RawResult = {
   output?: unknown;
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined;
   cost?: unknown;
+  steps?: { toolCalls?: { toolName?: string; args?: unknown }[] }[] | undefined;
 };
+
+/** Tecto de segurança: nenhuma execução com tools passa deste nº de passos. */
+export const MAX_TOOL_STEPS = 8;
+
+/** Trunca o valor devolvido por uma tool para não rebentar o contexto. */
+function truncateToolOutput(value: unknown, maxChars = 6000): unknown {
+  try {
+    const text = typeof value === "string" ? value : JSON.stringify(value);
+    if (text.length <= maxChars) return value;
+    return { truncated: true, preview: text.slice(0, maxChars) };
+  } catch {
+    return { truncated: true, preview: "[valor não serializável]" };
+  }
+}
+
+/**
+ * Envolve o `execute` de uma tool: nunca lança — devolve erro estruturado
+ * que o modelo consegue interpretar e contornar na resposta.
+ */
+export async function executeToolSafely(def: AgentTool, input: unknown): Promise<unknown> {
+  try {
+    return truncateToolOutput(await def.execute(input));
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Falha na ferramenta" };
+  }
+}
+
+function toSdkTools(tools: AgentTool[] | undefined): ToolSet | undefined {
+  if (!tools || tools.length === 0) return undefined;
+  const set: ToolSet = {};
+  for (const def of tools) {
+    set[def.name] = sdkTool({
+      description: def.description,
+      inputSchema: def.inputSchema,
+      execute: (input: unknown) => executeToolSafely(def, input),
+    }) as ToolSet[string];
+  }
+  return set;
+}
+
+function collectToolCalls(raw: RawResult): { toolCalls: AgentToolCall[]; steps: number } {
+  const steps = raw.steps ?? [];
+  const toolCalls: AgentToolCall[] = [];
+  for (const step of steps) {
+    for (const call of step.toolCalls ?? []) {
+      if (call.toolName) toolCalls.push({ name: call.toolName, args: call.args });
+    }
+  }
+  return { toolCalls, steps: steps.length };
+}
 
 /** Mensagem do SDK numa linha, truncada — o código vai para `errorCode`. */
 function truncateSdkMessage(err: unknown, max = 300): string | null {
@@ -62,38 +113,42 @@ function runGuard(options: RunAgentOptions, guard: { code: string; message: stri
     errorCode: guard.code,
     usage: ZERO_USAGE,
     durationMs: now,
+    toolCalls: [],
+    steps: 0,
   };
 }
 
 /**
- * Executa um agent num único generateText (sem streaming — MVP).
+ * Executa um agent via generateText (sem streaming — MVP).
+ * Sem tools: tiro único (comportamento actual). Com tools: ciclo
+ * ferramenta→modelo até `maxSteps` (omissão 5, tecto 8).
  * Devolve sempre um resultado tipado (inclusive em falha) para que o chamador
  * consiga registar o uso/metering com o status correcto.
  */
 export async function runAgent(model: LanguageModel, options: RunAgentOptions): Promise<AgentRunResult> {
   const startedAt = Date.now();
+  const elapsed = () => Date.now() - startedAt;
+  const emptyToolCalls = (): Pick<AgentRunResult, "toolCalls" | "steps"> => ({ toolCalls: [], steps: 0 });
 
   const inputGuard = guardInputBudget({ system: options.system, user: options.user, maxInputTokens: options.maxInputTokens });
-  if (inputGuard) return runGuard(options, inputGuard, Date.now() - startedAt);
+  if (inputGuard) return { ...runGuard(options, inputGuard, elapsed()), ...emptyToolCalls() };
+
+  const sdkTools = toSdkTools(options.tools);
+  const maxSteps = sdkTools ? Math.min(Math.max(options.maxSteps ?? 5, 1), MAX_TOOL_STEPS) : 1;
 
   let raw: RawResult;
   try {
+    const base = {
+      model,
+      system: options.system,
+      prompt: options.user,
+      temperature: options.temperature,
+      maxOutputTokens: options.maxOutputTokens,
+      ...(sdkTools ? { tools: sdkTools, stopWhen: stepCountIs(maxSteps) } : {}),
+    };
     raw = options.output
-      ? ((await generateText({
-          model,
-          system: options.system,
-          prompt: options.user,
-          temperature: options.temperature,
-          maxOutputTokens: options.maxOutputTokens,
-          output: Output.object({ schema: options.output.schema }),
-        })) as RawResult)
-      : ((await generateText({
-          model,
-          system: options.system,
-          prompt: options.user,
-          temperature: options.temperature,
-          maxOutputTokens: options.maxOutputTokens,
-        })) as RawResult);
+      ? ((await generateText({ ...base, output: Output.object({ schema: options.output.schema }) })) as RawResult)
+      : ((await generateText(base)) as RawResult);
   } catch (err) {
     const { code, status } = classifyAgentError(err);
     return {
@@ -105,10 +160,12 @@ export async function runAgent(model: LanguageModel, options: RunAgentOptions): 
       errorCode: code,
       errorDetail: truncateSdkMessage(err),
       usage: ZERO_USAGE,
-      durationMs: Date.now() - startedAt,
+      durationMs: elapsed(),
+      ...emptyToolCalls(),
     };
   }
 
+  const { toolCalls, steps } = collectToolCalls(raw);
   const inputTokens = raw.usage?.inputTokens ?? 0;
   const outputTokens = raw.usage?.outputTokens ?? 0;
   const usage = buildUsageRecord({
@@ -121,11 +178,11 @@ export async function runAgent(model: LanguageModel, options: RunAgentOptions): 
 
   const outputGuard = guardOutputBudget({ outputTokens, maxOutputTokens: options.maxOutputTokens });
   if (outputGuard) {
-    return { ...runGuard(options, outputGuard, Date.now() - startedAt), usage };
+    return { ...runGuard(options, outputGuard, elapsed()), usage, toolCalls, steps };
   }
   const costGuard = guardCostBudget({ estimatedCostUsd: usage.estimatedCostUsd, maxCostUsd: options.maxCostUsd });
   if (costGuard) {
-    return { ...runGuard(options, costGuard, Date.now() - startedAt), usage, errorCode: "COST_EXCEEDED" };
+    return { ...runGuard(options, costGuard, elapsed()), usage, errorCode: "COST_EXCEEDED", toolCalls, steps };
   }
 
   return {
@@ -136,6 +193,8 @@ export async function runAgent(model: LanguageModel, options: RunAgentOptions): 
     status: "ok",
     errorCode: null,
     usage,
-    durationMs: Date.now() - startedAt,
+    durationMs: elapsed(),
+    toolCalls,
+    steps,
   };
 }

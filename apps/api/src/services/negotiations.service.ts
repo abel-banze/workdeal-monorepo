@@ -10,7 +10,7 @@ import {
 import { AppError } from "../lib/errors.js";
 import { negotiationsRepository, type ThreadWithContext } from "../repositories/negotiations.repository.js";
 import { tasksRepository } from "../repositories/tasks.repository.js";
-import { notifyNewNegotiationMessage } from "./negotiation-notifications.service.js";
+import { notifyNewNegotiationMessage, notifyOfferResponse } from "./negotiation-notifications.service.js";
 
 type ThreadMessageRow = Awaited<ReturnType<typeof negotiationsRepository.listMessages>>["items"][number];
 type ThreadRow = Awaited<ReturnType<typeof negotiationsRepository.createThread>>;
@@ -231,6 +231,8 @@ export const negotiationsService = {
     const recipientSide: SenderSide = side === "requester" ? "provider" : "requester";
     void notifyNewNegotiationMessage({
       threadId,
+      taskId: thread.taskId,
+      requesterOrganizationId: thread.requesterOrganizationId,
       providerProfileId: thread.providerProfileId,
       requesterUserId: thread.requesterUserId,
       recipientSide,
@@ -241,6 +243,73 @@ export const negotiationsService = {
 
     const [view] = await attachMessageSender([message]);
     return view ?? toAnonymousMessage(message);
+  },
+
+  // ── Resposta a contraproposta (aceitar/recusar) ────────────────────
+  // Aceitar actualiza os termos da proposta (preço/prazo) e regista mensagem
+  // de sistema; recusar regista apenas a mensagem. Em ambos os casos o autor
+  // da oferta é notificado por email. Só o lado contrário à oferta responde.
+  async respondToOffer(
+    user: AuthUser,
+    threadId: string,
+    messageId: string,
+    decision: "accepted" | "rejected",
+  ): Promise<MessageView> {
+    const thread = await negotiationsRepository.findThreadById(threadId);
+    if (!thread) throw new AppError(404, "THREAD_NOT_FOUND", "Negociação não encontrada");
+    const side = await mustResolveSide(user, thread);
+    if (thread.status !== "open") throw new AppError(409, "THREAD_CLOSED", "Negociação encerrada — já não é possível responder a ofertas");
+
+    const offer = await negotiationsRepository.findMessageById(messageId);
+    if (!offer || offer.threadId !== threadId) throw new AppError(404, "OFFER_NOT_FOUND", "Contraproposta não encontrada");
+    if (offer.kind !== "offer") throw new AppError(400, "NOT_AN_OFFER", "Só contrapropostas podem ser aceites ou recusadas");
+    if (offer.senderSide === side) throw new AppError(403, "OWN_OFFER", "Não pode responder à sua própria contraproposta");
+    if (offer.offerStatus !== "pending") throw new AppError(409, "OFFER_ALREADY_ANSWERED", "Esta contraproposta já foi respondida");
+    if (!NEGOTIABLE_PROPOSAL_STATUSES.has(thread.proposalStatus)) {
+      throw new AppError(409, "PROPOSAL_NOT_NEGOTIABLE", "Esta proposta já não pode ser contra-negociada");
+    }
+
+    const updated = await negotiationsRepository.setMessageOfferStatus(messageId, decision);
+    if (!updated) throw new AppError(404, "OFFER_NOT_FOUND", "Contraproposta não encontrada");
+
+    if (decision === "accepted") {
+      if (offer.priceMzn == null) throw new AppError(400, "OFFER_WITHOUT_PRICE", "Contraproposta sem valor — combine os termos por mensagem");
+      await tasksRepository.updateProposalTerms(thread.taskProposalId, {
+        priceMzn: offer.priceMzn,
+        estimatedDays: offer.estimatedDays,
+      });
+    }
+
+    const systemBody =
+      decision === "accepted"
+        ? `Contraproposta aceite — ${offer.priceMzn != null ? `${offer.priceMzn.toLocaleString("pt-MZ")} MZN` : "termos acordados"}${offer.estimatedDays != null ? ` · ~${offer.estimatedDays} dias` : ""}`
+        : "Contraproposta recusada";
+    await negotiationsRepository.insertMessage({
+      threadId,
+      senderUserId: user.id,
+      senderProfileId: null,
+      senderSide: side,
+      kind: "system",
+      body: systemBody,
+    });
+    await negotiationsRepository.incrementThreadMessageCount(threadId);
+
+    // O autor da oferta é o lado contrário a quem responde.
+    const authorSide: SenderSide = side === "requester" ? "provider" : "requester";
+    void notifyOfferResponse({
+      threadId,
+      taskId: thread.taskId,
+      requesterOrganizationId: thread.requesterOrganizationId,
+      providerProfileId: thread.providerProfileId,
+      requesterUserId: thread.requesterUserId,
+      recipientSide: authorSide,
+      decision,
+      priceMzn: offer.priceMzn,
+      estimatedDays: offer.estimatedDays,
+    });
+
+    const [view] = await attachMessageSender([updated]);
+    return view ?? toAnonymousMessage(updated);
   },
 
   // ── Encerramento (usado pelas acções de aceitar/recusar proposta) ──

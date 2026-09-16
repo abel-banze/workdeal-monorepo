@@ -994,6 +994,7 @@ export const taskBid = pgTable(
 
 export const negotiationStatusEnum = pgEnum("negotiation_status", ["open", "closed"]);
 export const negotiationMessageKindEnum = pgEnum("negotiation_message_kind", ["text", "offer", "system"]);
+export const negotiationOfferStatusEnum = pgEnum("negotiation_offer_status", ["pending", "accepted", "rejected"]);
 export const negotiationSenderSideEnum = pgEnum("negotiation_sender_side", ["requester", "provider"]);
 
 export const negotiationThread = pgTable(
@@ -1039,6 +1040,7 @@ export const negotiationMessage = pgTable(
     body: text("body").notNull().default(""),
     priceMzn: integer("price_mzn"),
     estimatedDays: integer("estimated_days"),
+    offerStatus: negotiationOfferStatusEnum("offer_status").notNull().default("pending"),
     seenByRequester: boolean("seen_by_requester").notNull().default(false),
     seenByProvider: boolean("seen_by_provider").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -28,6 +28,7 @@ import { getOrgRole } from "@workdeal/auth";
 import { AppError } from "../lib/errors.js";
 import { logger } from "@workdeal/shared/lib/logger";
 import { featuresService } from "./features.service.js";
+import { buildAssistantTools } from "./agent-tools.js";
 import { agentUsageRepository } from "../repositories/agent-usage.repository.js";
 import { tasksRepository } from "../repositories/tasks.repository.js";
 import { servicesRepository } from "../repositories/services.repository.js";
@@ -128,6 +129,8 @@ export const chatAssistant = async (user: AuthUser, input: AssistantChatInput) =
       maxInputTokens: runtime.budgets.maxInputTokens,
       maxOutputTokens: AGENTS.assistant.maxOutputTokens,
       maxCostUsd: runtime.budgets.maxCostUsd,
+      tools: buildAssistantTools({ user, organizationId }),
+      maxSteps: 5,
     }),
   });
 

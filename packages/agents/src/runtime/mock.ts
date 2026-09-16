@@ -12,5 +12,7 @@ export function mockResult(reply: string): AgentRunResult {
     errorCode: null,
     usage: ZERO_USAGE,
     durationMs: 0,
+    toolCalls: [],
+    steps: 0,
   };
 }

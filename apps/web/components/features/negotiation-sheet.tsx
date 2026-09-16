@@ -9,7 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@workspace/ui/components/sheet";
-import { getNegotiation, listNegotiationMessages, openThread, sendNegotiationMessage } from "@/app/actions/negotiations";
+import { getNegotiation, listNegotiationMessages, openThread, respondNegotiationOffer, sendNegotiationMessage } from "@/app/actions/negotiations";
 
 type Message = {
   id: string;
@@ -18,10 +18,11 @@ type Message = {
   body: string | null;
   priceMzn: number | null;
   estimatedDays: number | null;
+  offerStatus?: "pending" | "accepted" | "rejected" | string;
   createdAt: string | Date;
 };
 
-type Thread = { id: string; status: "open" | "closed" | string };
+type Thread = { id: string; status: "open" | "closed" | string; proposalStatus?: string };
 
 type Props = {
   open: boolean;
@@ -111,6 +112,20 @@ export function NegotiationSheet({ open, onOpenChange, proposalId, providerName,
     }
   }
 
+  async function handleRespond(messageId: string, decision: "accepted" | "rejected") {
+    if (!thread || sending) return;
+    setSending(true);
+    setError(null);
+    try {
+      await respondNegotiationOffer(thread.id, messageId, decision);
+      await load(thread.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao registar a resposta.");
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!thread || sending) return;
@@ -155,6 +170,8 @@ export function NegotiationSheet({ open, onOpenChange, proposalId, providerName,
   }
 
   const closed = thread?.status === "closed";
+  const canRespond =
+    !closed && (thread?.proposalStatus === "submitted" || thread?.proposalStatus === "shortlisted");
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -230,6 +247,35 @@ export function NegotiationSheet({ open, onOpenChange, proposalId, providerName,
                         <p className={`whitespace-pre-wrap text-[13px] leading-relaxed ${mine ? "text-white/90" : "text-[#0F1A2E]/80"}`}>
                           {m.body}
                         </p>
+                      )}
+                      {m.kind === "offer" && (m.offerStatus === "accepted" || m.offerStatus === "rejected") && (
+                        <p className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          m.offerStatus === "accepted"
+                            ? "bg-[#0B5E56]/15 text-[#0B5E56]"
+                            : "bg-[#B91C1C]/10 text-[#B91C1C]"
+                        }`}>
+                          {m.offerStatus === "accepted" ? "Contraproposta aceite" : "Contraproposta recusada"}
+                        </p>
+                      )}
+                      {m.kind === "offer" && !mine && (m.offerStatus ?? "pending") === "pending" && canRespond && (
+                        <div className="mt-2 flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => void handleRespond(m.id, "accepted")}
+                            disabled={sending}
+                            className="rounded-full bg-[#0B5E56] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#094d47] disabled:opacity-50"
+                          >
+                            Aceitar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleRespond(m.id, "rejected")}
+                            disabled={sending}
+                            className="rounded-full border border-[#B91C1C]/30 bg-white px-3 py-1 text-[11px] font-bold text-[#B91C1C] hover:bg-[#B91C1C]/10 disabled:opacity-50"
+                          >
+                            Recusar
+                          </button>
+                        </div>
                       )}
                       <p className={`mt-1 font-mono text-[10px] ${mine ? "text-white/50" : "text-[#0F1A2E]/40"}`}>
                         {mine ? "Tu" : counterpart} · {fmtDate(m.createdAt)}

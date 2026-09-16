@@ -351,6 +351,16 @@ export const tasksRepository = {
     return row ?? null;
   },
 
+  /** Actualiza os termos acordados em negociação (contraproposta aceite). */
+  async updateProposalTerms(id: string, terms: { priceMzn: number; estimatedDays: number | null }) {
+    const [row] = await db
+      .update(taskProposal)
+      .set({ priceMzn: terms.priceMzn, estimatedDays: terms.estimatedDays, updatedAt: new Date() })
+      .where(eq(taskProposal.id, id))
+      .returning();
+    return row ?? null;
+  },
+
   async listProposalIdsForTaskExcluding(taskId: string, excludeProposalId: string) {
     const rows = await db.select({ id: taskProposal.id }).from(taskProposal).where(and(eq(taskProposal.taskId, taskId), eq(taskProposal.status, asProposalStatus("submitted"))));
     return rows.map((r) => r.id).filter((id) => id !== excludeProposalId);

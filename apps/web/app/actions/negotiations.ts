@@ -62,3 +62,16 @@ export async function sendNegotiationMessage(threadId: string, input: z.infer<ty
     body: JSON.stringify(data),
   })
 }
+
+/** Aceitar ou recusar uma contraproposta (só o lado contrário à oferta). */
+export async function respondNegotiationOffer(threadId: string, messageId: string, decision: "accepted" | "rejected") {
+  await requireAuth()
+  if (!threadId?.trim() || !messageId?.trim()) throw new Error("Negociação em falta")
+  if (decision !== "accepted" && decision !== "rejected") throw new Error("Decisão inválida")
+  const token = await getAuthToken()
+  return apiFetchWithAuth(
+    `/api/v1/negotiations/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/${decision === "accepted" ? "accept" : "reject"}`,
+    token,
+    { method: "POST" },
+  )
+}
