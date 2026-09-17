@@ -42,4 +42,26 @@ describe("markdown-message", () => {
     expect(() => html("")).not.toThrow();
     expect(() => html("**inacabado")).not.toThrow();
   });
+
+  it("recupera o bold descuidado do LLM (espaços e fecho em falta)", () => {
+    expect(html("** Codebaz**")).toContain("<strong>");
+    expect(html("**Codebaz **")).toContain("<strong>");
+    const unclosed = html("**Codebaz");
+    expect(unclosed).toContain("<strong>");
+    expect(unclosed).toContain("Codebaz");
+  });
+
+  it("recupera lista e título sem espaço depois do marcador", () => {
+    const list = html("-**Codebaz** — agro");
+    expect(list).toContain("<ul");
+    expect(list).toContain("<strong>");
+    expect(html("###Empresas")).not.toContain("###Empresas");
+  });
+
+  it("não toca em blocos de código cercados nem em literais", () => {
+    const code = html("```\n** Codebaz**\n```");
+    expect(code).not.toContain("<strong>");
+    expect(code).toContain("** Codebaz**");
+    expect(html("2 ** 3 = 8")).not.toContain("<strong>");
+  });
 });

@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { JWT_COOKIE_NAME } from "@workdeal/auth/cookies";
 import { env } from "@/lib/env";
-import { AI_API_TIMEOUT_MS, DEFAULT_API_TIMEOUT_MS, resolveApiTimeoutMs } from "./api-timeout";
+import { AI_API_TIMEOUT_MS, DEFAULT_API_TIMEOUT_MS, FEATURE_API_TIMEOUT_MS, fetchWithTimeoutRetry, isApiTimeoutError, resolveApiTimeoutMs } from "./api-timeout";
 
 export interface ApiEnvelope<T> {
   success: boolean;
@@ -31,7 +31,7 @@ export function getWebOrigin(): string {
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
 
-export { AI_API_TIMEOUT_MS, DEFAULT_API_TIMEOUT_MS };
+export { AI_API_TIMEOUT_MS, DEFAULT_API_TIMEOUT_MS, FEATURE_API_TIMEOUT_MS, fetchWithTimeoutRetry, isApiTimeoutError };
 export type { WithTimeoutMs } from "./api-timeout";
 
 const TAG = "[apiFetch]";

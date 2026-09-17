@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { AI_API_TIMEOUT_MS, DEFAULT_API_TIMEOUT_MS, resolveApiTimeoutMs } from "../lib/api-timeout";
+import { describe, expect, it, vi } from "vitest";
+import {
+  AI_API_TIMEOUT_MS,
+  DEFAULT_API_TIMEOUT_MS,
+  FEATURE_API_TIMEOUT_MS,
+  fetchWithTimeoutRetry,
+  isApiTimeoutError,
+  resolveApiTimeoutMs,
+} from "../lib/api-timeout";
 
 describe("api-timeout", () => {
   it("usa o timeout curto (5s) por omissão", () => {
@@ -24,5 +31,48 @@ describe("api-timeout", () => {
     // porque a geração LLM excede o timeout curto. Garante que o timeout
     // dedicado continua muito acima do padrão.
     expect(AI_API_TIMEOUT_MS).toBeGreaterThan(DEFAULT_API_TIMEOUT_MS * 10);
+  });
+
+  it("o gate de subscrição usa timeout intermédio (regressão: timeout 5s intermitente no chat do agente)", () => {
+    // O pré-check `requireFeature` (`/subscriptions/current`) rebentava o
+    // chat de vez em quando: leitura agregada com o timeout curto de 5s.
+    expect(FEATURE_API_TIMEOUT_MS).toBe(15000);
+    expect(FEATURE_API_TIMEOUT_MS).toBeGreaterThan(DEFAULT_API_TIMEOUT_MS);
+    expect(FEATURE_API_TIMEOUT_MS).toBeLessThan(AI_API_TIMEOUT_MS);
+  });
+});
+
+describe("fetchWithTimeoutRetry", () => {
+  const timeoutErr = () => new Error("API timeout 5s: /api/v1/subscriptions/current?organizationId=x");
+
+  it("detecta só erros de timeout do apiFetch", () => {
+    expect(isApiTimeoutError(timeoutErr())).toBe(true);
+    expect(isApiTimeoutError(new Error("Sessão expirada. Faça login novamente."))).toBe(false);
+    expect(isApiTimeoutError(new Error("fetch failed"))).toBe(false);
+    expect(isApiTimeoutError(null)).toBe(false);
+  });
+
+  it("não repete quando a primeira tentativa vence", async () => {
+    const fn = vi.fn().mockResolvedValue("ok");
+    await expect(fetchWithTimeoutRetry(fn)).resolves.toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("repete UMA vez no timeout e devolve o sucesso da segunda", async () => {
+    const fn = vi.fn().mockRejectedValueOnce(timeoutErr()).mockResolvedValueOnce("ok");
+    await expect(fetchWithTimeoutRetry(fn)).resolves.toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("não repete erros que não são timeout", async () => {
+    const fn = vi.fn().mockRejectedValue(new Error("FORBIDDEN"));
+    await expect(fetchWithTimeoutRetry(fn)).rejects.toThrow("FORBIDDEN");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("desiste após a repetição se o timeout persistir", async () => {
+    const fn = vi.fn().mockRejectedValue(timeoutErr());
+    await expect(fetchWithTimeoutRetry(fn)).rejects.toThrow("API timeout");
+    expect(fn).toHaveBeenCalledTimes(2);
   });
 });

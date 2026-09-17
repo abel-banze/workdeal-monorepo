@@ -2,7 +2,6 @@ import { z } from "zod";
 import { getOrgRole } from "@workdeal/auth";
 import { hasOrgPermission, type AuthUser } from "@workdeal/shared";
 import type { AgentTool } from "@workdeal/agents";
-import { profilesRepository } from "../repositories/profiles.repository.js";
 import { tasksRepository } from "../repositories/tasks.repository.js";
 import { negotiationsRepository } from "../repositories/negotiations.repository.js";
 import { profilesService } from "./profiles.service.js";
@@ -29,15 +28,6 @@ async function assertCanManageTask(user: AuthUser, taskRow: { requesterUserId: s
   throw new AppError(403, "FORBIDDEN", "Sem permissão para gerir esta tarefa");
 }
 
-type ProfileItem = {
-  name?: string | null;
-  slug?: string | null;
-  tagline?: string | null;
-  province?: string | null;
-  district?: string | null;
-  badges?: { name?: string | null }[] | null;
-};
-
 /**
  * Ferramentas do assistente com acesso à BD — respostas com base em dados.
  * Tudo o que é público devolve o mesmo subconjunto público do directório;
@@ -48,7 +38,8 @@ export function buildAssistantTools(scope: AgentToolsScope): AgentTool[] {
 
   const searchProfiles: AgentTool = {
     name: "search_profiles",
-    description: "Pesquisa empresas no directório público por nome/actividade, opcionalmente por província. Devolve nome, slug, slogan, província e selos.",
+    description:
+      "Pesquisa empresas no directório público (o MESMO motor da pesquisa do site /companies: texto integral + localização) por nome/actividade, opcionalmente por província. Devolve nome, slug, slogan, província e selos — confia nestes resultados, não inventes outros.",
     inputSchema: z.object({
       q: z.string().trim().min(2).max(120).describe("Texto de pesquisa"),
       province: z.string().trim().max(80).optional().describe("Província exacta"),
@@ -56,10 +47,19 @@ export function buildAssistantTools(scope: AgentToolsScope): AgentTool[] {
     }),
     execute: async (input) => {
       const args = input as { q: string; province?: string; limit?: number };
-      const res = await profilesRepository.listProfiles({ q: args.q, province: args.province, page: 1, limit: clampLimit(args.limit) });
+      // Mesmo motor do directório (/companies → profilesService.listProfiles →
+      // searchService): o repository directo ignora o `q` e não anexa
+      // província/selos, por isso nunca é usado aqui.
+      const res = await profilesService.listProfiles({
+        q: args.q,
+        province: args.province,
+        status: "active",
+        page: 1,
+        limit: clampLimit(args.limit),
+      });
       return {
         total: res.total,
-        items: (res.items as ProfileItem[]).map((p) => ({
+        items: res.items.map((p) => ({
           name: p.name,
           slug: p.slug,
           tagline: p.tagline ?? null,

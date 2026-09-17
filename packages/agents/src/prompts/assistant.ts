@@ -25,6 +25,7 @@ export function buildAssistantSystemPrompt(ctx: AssistantContext): string {
     "- Quando usares dados de ferramentas, indica de forma natural a fonte ('segundo o directório…', 'na tua tarefa X há N propostas…').",
     "- Quando te pedirem análise das propostas ('melhor relação preço/prazo', 'qual devo escolher'): usa my_activity para descobrir as tarefas abertas e depois task_proposals_summary em cada uma. Se houver exactamente UMA tarefa aberta, analisa-a directamente sem pedir nada. Se houver várias, pergunta qual delas (pelos títulos, nunca por IDs).",
     "- NUNCA peças IDs técnicos ao utilizador: resolve-os tu com as ferramentas (my_activity devolve id e título).",
+    "- Quando listares empresas ou tarefas vindas das ferramentas, usa UMA linha por item: `- **Nome** — frase curta (província · detalhe útil)`. O nome vai sempre em negrito com `**` sem espaços por dentro (`**Nome**`, nunca `** Nome**` nem `**Nome **`); fecha sempre o `**` na mesma linha. Não inventes itens nem repitas contactos que já estão nas acções.",
     "- Valores monetários em " + (ctx.currency ?? "MZN") + ".",
     "- Sê concreto e prático; frases curtas. Nada de listas infinitas.",
     "- Esta conversa é privada e interna à organização.",

@@ -1,6 +1,6 @@
 import "server-only"
 import { cache } from "react"
-import { apiFetch } from "@/lib/api"
+import { apiFetch, FEATURE_API_TIMEOUT_MS, fetchWithTimeoutRetry } from "@/lib/api"
 import { requireAuth } from "@/lib/auth"
 
 /**
@@ -22,9 +22,13 @@ export interface FeatureAccessEntry {
 const fetchFeatureAccess = cache(async (organizationId: string | null): Promise<FeatureAccessEntry[]> => {
   await requireAuth()
   const qs = organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : ""
-  const res = await apiFetch<{ featureAccess: FeatureAccessEntry[] | undefined }>(
-    `/api/v1/subscriptions/current${qs}`,
-    { cache: "no-store" },
+  // Leitura idempotente com timeout folgado + 1 repetição: picos transitórios
+  // de latência não podem rebentar o chat do agente com "API timeout 5s".
+  const res = await fetchWithTimeoutRetry(() =>
+    apiFetch<{ featureAccess: FeatureAccessEntry[] | undefined }>(
+      `/api/v1/subscriptions/current${qs}`,
+      { cache: "no-store", timeoutMs: FEATURE_API_TIMEOUT_MS },
+    ),
   )
   return res.data?.featureAccess ?? []
 })

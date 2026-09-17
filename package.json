@@ -9,7 +9,12 @@
     "format": "turbo format",
     "typecheck": "turbo typecheck",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "scrape": "pnpm --filter @workdeal/api scrape",
+    "scrape:watch": "pnpm --filter @workdeal/api scrape:watch",
+    "scrape:refetch": "pnpm --filter @workdeal/api scrape:refetch",
+    "extract:ugeas": "pnpm --filter @workdeal/api extract:ugeas",
+    "extract:ugeas-db": "pnpm --filter @workdeal/api extract:ugeas-db"
   },
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",

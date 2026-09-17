@@ -10,7 +10,12 @@
     "build:tsc": "tsc -p tsconfig.build.json",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "scrape": "tsx --env-file ../../.env src/scraper/index.ts",
+    "scrape:watch": "tsx watch --env-file ../../.env src/scraper/index.ts",
+    "scrape:refetch": "tsx --env-file ../../.env src/scraper/refetch-details.ts",
+    "extract:ugeas": "tsx --env-file ../../.env src/scraper/extract-ugeas.ts",
+    "extract:ugeas-db": "tsx --env-file ../../.env src/scraper/extract-ugeas-db.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
@@ -22,6 +27,7 @@
     "@workdeal/shared": "workspace:*",
     "@zernio/node": "^0.2.592",
     "better-auth": "1.6.26",
+    "cheerio": "^1.2.0",
     "cloudinary": "^2.7.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "0.45.2",

@@ -1636,3 +1636,104 @@ export const affiliateEarning = pgTable(
     uniqueIndex("affiliate_earning_referral_invoice_uidx").on(table.referralId, table.invoiceId),
   ],
 );
+
+// ── Concursos públicos (Tenders) — scraper UFSA ──────────────────────────
+// Espelho do conteúdo gerido no portal UFSA (Moçambique), capturado pelo
+// scraper de concursos públicos. `reference` é a chave de idempotência
+// estável do portal (referencia). Campos de detalhe só são preenchidos após
+// `detailsFetched`. `status` suporta moderação manual no painel admin antes
+// de publicar (ADR-003); o scraper grava por omissão como `published`.
+
+export const tenderSourceEnum = pgEnum("tender_source", ["ufsa"]);
+export const tenderStatusEnum = pgEnum("tender_status", ["draft", "published", "archived"]);
+
+// UGEA — Unidade Gestora de Execução de Aquisições (entidade que lança o concurso).
+export const ugea = pgTable(
+  "ugea",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull().unique(),
+    slug: text("slug").notNull().unique(),
+    description: text("description"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("ugea_name_idx").on(table.name),
+    index("ugea_slug_idx").on(table.slug),
+  ],
+);
+
+export const tender = pgTable(
+  "tender",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    source: tenderSourceEnum("source").notNull().default("ufsa"),
+    reference: text("reference").notNull().unique(),
+    ugeaId: text("ugea_id").references(() => ugea.id, { onDelete: "set null" }),
+    // Denormalizado — mantém o slug da UGEA mesmo quando a relação é apagada,
+    // para não perder o contexto histórico do concurso no directório.
+    ugeaSlug: text("ugea_slug"),
+    type: text("type"),
+    category: text("category"),
+    object: text("object"),
+    province: text("province"),
+    launchedAt: timestamp("launched_at"),
+    openedAt: timestamp("opened_at"),
+    detailsUrl: text("details_url"),
+    regime: text("regime"),
+    modality: text("modality"),
+    class: text("class"),
+    generalObject: text("general_object"),
+    currency: text("currency"),
+    estimatedValue: numeric("estimated_value", { precision: 16, scale: 2 }),
+    provisionalGuarantee: numeric("provisional_guarantee", { precision: 16, scale: 2 }),
+    awardCriteria: text("award_criteria"),
+    lotCount: text("lot_count"),
+    proposalDelivery: text("proposal_delivery"),
+    deliveryTime: text("delivery_time"),
+    openingTime: text("opening_time"),
+    observations: text("observations"),
+    publishedAt: timestamp("published_at"),
+    detailsFetched: boolean("details_fetched").notNull().default(false),
+    description: text("description"),
+    status: tenderStatusEnum("status").notNull().default("published"),
+    firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("tender_reference_idx").on(table.reference),
+    index("tender_ugea_idx").on(table.ugeaId),
+    index("tender_province_idx").on(table.province),
+    index("tender_status_idx").on(table.status),
+    index("tender_details_fetched_idx").on(table.detailsFetched),
+    index("tender_status_published_idx").on(table.status, table.publishedAt),
+    index("tender_category_idx").on(table.category),
+  ],
+);
+
+export const tenderDocument = pgTable(
+  "tender_document",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenderId: text("tender_id")
+      .notNull()
+      .references(() => tender.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    name: text("name").notNull(),
+    url: text("url").notNull(),
+    urlValid: boolean("url_valid").notNull().default(false),
+    lastCheckedAt: timestamp("last_checked_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("tender_document_tender_type_uidx").on(table.tenderId, table.type),
+    index("tender_document_tender_idx").on(table.tenderId),
+  ],
+);
