@@ -26,6 +26,7 @@ export * from "./schemas/feature.js";
 export * from "./schemas/affiliate.js";
 export * from "./schemas/ai.js";
 export * from "./schemas/negotiation.js";
+export * from "./schemas/tender.js";
 export * from "./institution-labels.js";
 export * from "./lib/geo.js";
 export * from "./lib/smart-search.js";

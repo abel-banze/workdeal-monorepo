@@ -337,6 +337,13 @@
       "when": 1789560281878,
       "tag": "0047_negotiation_offer_status",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1789638300817,
+      "tag": "0048_lush_shocker",
+      "breakpoints": true
     }
   ]
 }

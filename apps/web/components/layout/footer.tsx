@@ -51,6 +51,7 @@ export function Footer() {
               <li><Link href="/organizations" className="hover:text-white">Organizações</Link></li>
               <li><Link href="/tasks" className="hover:text-white">Requisições</Link></li>
               <li><Link href="/events" className="hover:text-white">Eventos</Link></li>
+              <li><Link href="/concursos" className="hover:text-white">Concursos Públicos</Link></li>
               <li><Link href="/#categorias" className="hover:text-white">Sectores</Link></li>
               <li><Link href="/dashboard" className="hover:text-white">Painel</Link></li>
             </ul>

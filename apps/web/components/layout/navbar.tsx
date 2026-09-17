@@ -11,6 +11,7 @@ const NAV_LINKS: NavLink[] = [
   { href: "/organizations", label: "Organizações" },
   { href: "/tasks", label: "Requisições" },
   { href: "/events", label: "Eventos" },
+  { href: "/concursos", label: "Concursos" },
 ];
 
 export async function Navbar() {

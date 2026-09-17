@@ -22,7 +22,13 @@ function renderInline(tokens: Token[] | undefined, keyPrefix: string): ReactNode
 
 function renderToken(t: Token, key: string): ReactNode {
   switch (t.type) {
-    case "text":
+    case "text": {
+      // Texto de bloco (ex: dentro de `li`) traz os tokens inline em
+      // `tokens` — sem isto, `**bold**` dentro de listas saía literal.
+      const inner = (t as { tokens?: Token[] }).tokens;
+      if (inner && inner.length > 0) return <span key={key}>{renderInline(inner, key)}</span>;
+      return <span key={key}>{(t as { text?: string }).text ?? ""}</span>;
+    }
     case "escape":
       return <span key={key}>{(t as { text?: string }).text ?? ""}</span>;
     case "strong":
@@ -133,6 +139,38 @@ function renderToken(t: Token, key: string): ReactNode {
 }
 
 /**
+ * Normaliza o markdown descuidado que o LLM por vezes emite antes de o
+ * entregar ao `marked` — só corrige casos não-ambíguos, linha a linha:
+ * - marcador de lista colado ao bold (`-**Nome**` → `- **Nome**`);
+ * - título sem espaço (`###Nome` → `### Nome`);
+ * - espaços dentro do bold (`** Nome**` / `**Nome **` → `**Nome**`);
+ * - bold aberto no início da linha e nunca fechado (`**Nome` → `**Nome**`).
+ * Tudo o resto passa intocado — blocos de código cercados (``` … ```)
+ * nunca são tocados.
+ */
+export function normalizeAssistantMarkdown(content: string): string {
+  let inFence = false;
+  return (content ?? "").split("\n").map((line) => {
+    if (/^\s*(`{3,}|~{3,})/.test(line)) inFence = !inFence;
+    if (inFence) return line;
+    let out = line;
+    // 1. Lista (`-` ou numerada) colada ao bold. O marcador `*` fica de
+    // fora de propósito: `*` + `**` é indistinguível de `***` (bold+itálico).
+    out = out.replace(/^(\s*(?:-|\d+[.)]))\*\*(?=\S)/, "$1 **");
+    // 2. Título sem espaço depois dos `#`.
+    out = out.replace(/^(\s*#{1,6})(?!#)(?=\S)/, "$1 ");
+    // 3. Espaços dentro do par de `**` na mesma linha (exige fecho, para não
+    // tocar em literais como `2 ** 3 = 8`).
+    out = out.replace(/\*\*[ \t]+([^*]+?)[ \t]*\*\*/g, "**$1**");
+    out = out.replace(/\*\*([^*]*?)[ \t]+\*\*/g, "**$1**");
+    // 4. Linha a começar em bold nunca fechado (nº ímpar de `**`).
+    const opens = (out.match(/\*\*/g) ?? []).length;
+    if (/^\s*\*\*(?!\*)/.test(out) && opens % 2 === 1) out = `${out.trimEnd()}**`;
+    return out;
+  }).join("\n");
+}
+
+/**
  * Renderiza markdown do assistente com o pkg `marked` (lexer → React).
  * Seguro por construção: tokens `html` são descartados e links restritos
  * a http/https/mailto — nunca há `dangerouslySetInnerHTML`.
@@ -140,7 +178,7 @@ function renderToken(t: Token, key: string): ReactNode {
 export function MarkdownMessage({ content, className }: { content: string; className?: string }) {
   const nodes = useMemo(() => {
     try {
-      const tokens = marked.lexer(content ?? "");
+      const tokens = marked.lexer(normalizeAssistantMarkdown(content ?? ""));
       return tokens.map((t, i) => renderToken(t, `md-${i}`));
     } catch {
       return [content];

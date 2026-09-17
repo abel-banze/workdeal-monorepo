@@ -3,7 +3,7 @@ import type { AuthUser } from "@workdeal/shared";
 
 const mocks = vi.hoisted(() => ({
   getOrgRole: vi.fn(),
-  profilesRepo: { listProfiles: vi.fn() },
+  profilesService: { getPublicProfile: vi.fn(), listProfiles: vi.fn() },
   tasksRepo: {
     findById: vi.fn(),
     list: vi.fn(),
@@ -17,12 +17,10 @@ const mocks = vi.hoisted(() => ({
     listThreadsForRequester: vi.fn(),
     listThreadsForProvider: vi.fn(),
   },
-  profilesService: { getPublicProfile: vi.fn() },
   tasksService: { getTask: vi.fn() },
 }));
 
 vi.mock("@workdeal/auth", () => ({ getOrgRole: mocks.getOrgRole }));
-vi.mock("../repositories/profiles.repository.js", () => ({ profilesRepository: mocks.profilesRepo }));
 vi.mock("../repositories/tasks.repository.js", () => ({ tasksRepository: mocks.tasksRepo }));
 vi.mock("../repositories/negotiations.repository.js", () => ({ negotiationsRepository: mocks.negotiationsRepo }));
 vi.mock("./profiles.service.js", () => ({ profilesService: mocks.profilesService }));
@@ -60,9 +58,11 @@ describe("agent-tools — catálogo", () => {
 });
 
 describe("agent-tools — search_profiles", () => {
-  it("devolve subconjunto público (sem emails nem dados internos)", async () => {
-    mocks.profilesRepo.listProfiles.mockResolvedValue({
+  it("usa o motor do directório e devolve subconjunto público (sem emails nem dados internos)", async () => {
+    mocks.profilesService.listProfiles.mockResolvedValue({
       total: 1,
+      page: 1,
+      limit: 5,
       items: [
         {
           name: "Canaliza Lda",
@@ -78,6 +78,10 @@ describe("agent-tools — search_profiles", () => {
     const res = (await tool("search_profiles").execute({ q: "canal", limit: 5 })) as {
       items: Record<string, unknown>[];
     };
+    // Mesmo motor do /companies — nunca o repository directo (que ignora o `q`).
+    expect(mocks.profilesService.listProfiles).toHaveBeenCalledWith(
+      expect.objectContaining({ q: "canal", page: 1, limit: 5, status: "active" }),
+    );
     expect(res.items[0]).toEqual({
       name: "Canaliza Lda",
       slug: "canaliza",
@@ -89,9 +93,9 @@ describe("agent-tools — search_profiles", () => {
   });
 
   it("limita resultados a 10 no máximo", async () => {
-    mocks.profilesRepo.listProfiles.mockResolvedValue({ total: 0, items: [] });
+    mocks.profilesService.listProfiles.mockResolvedValue({ total: 0, page: 1, limit: 10, items: [] });
     await tool("search_profiles").execute({ q: "ab", limit: 99 });
-    expect(mocks.profilesRepo.listProfiles).toHaveBeenCalledWith(
+    expect(mocks.profilesService.listProfiles).toHaveBeenCalledWith(
       expect.objectContaining({ page: 1, limit: 10 }),
     );
   });
