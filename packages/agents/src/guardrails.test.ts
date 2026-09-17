@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { guardInputBudget, guardOutputBudget, guardCostBudget, sanitizeUserMessage, estimateInputTokens, AgentGuardError } from "./guardrails.js";
+import { guardInputBudget, guardOutputBudget, guardCostBudget, sanitizeUserMessage, estimateInputTokens, estimatePromptTokens, AgentGuardError } from "./guardrails.js";
 
 describe("guardrails", () => {
   it("guardInputBudget passes small context", () => {
@@ -39,5 +39,33 @@ describe("guardrails", () => {
   it("estimateInputTokens is length based", () => {
     expect(estimateInputTokens("abcd")).toBe(1);
     expect(estimateInputTokens("")).toBe(0);
+  });
+
+  it("estimatePromptTokens trata texto latino como o estimador histórico", () => {
+    expect(estimatePromptTokens("")).toBe(0);
+    expect(estimatePromptTokens("abcd")).toBe(1);
+    expect(estimatePromptTokens("x".repeat(400))).toBe(100);
+  });
+
+  it("estimatePromptTokens conta CJK em separado (1 char ≈ 1+ tokens)", () => {
+    const latin = estimatePromptTokens("x".repeat(40));
+    const cjk = estimatePromptTokens("日本語".repeat(10));
+    expect(cjk).toBeGreaterThan(latin);
+  });
+
+  it("guardInputBudget conta o histórico no orçamento", () => {
+    const history = ["x".repeat(20_000), "y".repeat(20_000)];
+    const guard = guardInputBudget({ system: "sys", user: "user", history, maxInputTokens: 8000 });
+    expect(guard).toBeInstanceOf(AgentGuardError);
+    expect(guard?.code).toBe("INPUT_TOO_LARGE");
+  });
+
+  it("sanitizeUserMessage com preserveNewlines mantém parágrafos", () => {
+    expect(sanitizeUserMessage("  Olá\n\ncomo  estás?  ", 4000, { preserveNewlines: true })).toBe("Olá\n\ncomo estás?");
+    expect(sanitizeUserMessage("a\n\n\n\nb", 4000, { preserveNewlines: true })).toBe("a\n\nb");
+  });
+
+  it("sanitizeUserMessage sem a opção mantém o comportamento histórico", () => {
+    expect(sanitizeUserMessage("  a\n\n  b \t c  ", 10)).toBe("a b c");
   });
 });

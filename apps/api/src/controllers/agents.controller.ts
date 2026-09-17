@@ -8,6 +8,10 @@ export const agentsController = {
     const result = await agentsService.chatAssistant(user, input);
     return { body: ok(result), status: 200 as const };
   },
+  /** Devolve o handle de stream — a rota bombeia os deltas em SSE. */
+  async chatAssistantStream(user: AuthUser, input: AssistantChatInput) {
+    return agentsService.chatAssistantStream(user, input);
+  },
   async draftProposal(user: AuthUser, input: ProposalDraftInput) {
     const result = await agentsService.draftProposal(user, input);
     return { body: ok(result), status: 200 as const };

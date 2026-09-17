@@ -36,6 +36,12 @@ export interface AgentToolCall {
   args: unknown;
 }
 
+/** Um turno anterior de conversa (já sanitizado pelo chamador). */
+export interface AgentMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
 /** Opções de uma execução do motor — puro, sem contexto de negócio. */
 export interface RunAgentOptions {
   providerId: AiProviderId;
@@ -44,6 +50,11 @@ export interface RunAgentOptions {
   tier: ModelTier;
   system: string;
   user: string;
+  /**
+   * Histórico da conversa (turnos anteriores, do mais antigo ao mais recente).
+   * O `user` actual é sempre a última mensagem. Sem histórico, tiro único.
+   */
+  history?: AgentMessage[];
   maxInputTokens: number;
   maxOutputTokens: number;
   maxCostUsd: number;
@@ -93,4 +104,9 @@ export interface AgentConfig {
   temperature: number;
   maxOutputTokens: number;
   maxInputTokens: number;
+  /**
+   * Passos do ciclo ferramenta→modelo (só relevante com tools).
+   * Omissão = tiro único; o motor capa sempre em MAX_TOOL_STEPS.
+   */
+  maxSteps?: number;
 }

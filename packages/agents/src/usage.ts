@@ -31,3 +31,25 @@ export function buildUsageRecord(opts: {
 }
 
 export const ZERO_USAGE: AgentUsageRecord = { inputTokens: 0, outputTokens: 0, totalTokens: 0, estimatedCostUsd: 0 };
+
+/**
+ * Tecto de output comportável pelo orçamento ANTES de chamar o modelo.
+ * Devolve o `maxOutputTokens` efectivo: o pedido original quando cabe no
+ * orçamento, um valor menor quando só cabe uma resposta curta, ou 0 quando
+ * nem o input estimado cabe — nesse caso o motor bloqueia sem gastar nada.
+ */
+export function maxAffordableOutputTokens(opts: {
+  providerId: AiProviderId;
+  tier: ModelTier;
+  estimatedInputTokens: number;
+  maxOutputTokens: number;
+  maxCostUsd: number;
+}): number {
+  if (opts.providerId === "mock") return opts.maxOutputTokens;
+  const prices = MODEL_PRICES[opts.tier][opts.providerId];
+  const inputCost = (opts.estimatedInputTokens / 1_000_000) * prices.input;
+  const remaining = opts.maxCostUsd - inputCost;
+  if (remaining <= 0) return 0;
+  const affordable = Math.floor((remaining / prices.output) * 1_000_000);
+  return Math.min(opts.maxOutputTokens, affordable);
+}

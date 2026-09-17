@@ -55,6 +55,7 @@ export const FEATURE_KEYS = [
   "ai_assistant",
   "ai_proposal_generation",
   "ai_response_support",
+  "ai_profile_assistant",
   "priority_support",
   // Enterprise
   "multi_user_advanced",
@@ -134,6 +135,7 @@ export const FEATURE_CATALOG: readonly FeatureDefinition[] = [
   { key: "ai_assistant", valueType: "boolean", kind: "plan", label: "Assistente comercial (IA)", description: "Assistente com IA para apoio comercial." },
   { key: "ai_proposal_generation", valueType: "boolean", kind: "plan", label: "Geração de propostas (IA)", description: "Redacção assistida de propostas." },
   { key: "ai_response_support", valueType: "boolean", kind: "plan", label: "Apoio à preparação de respostas (IA)", description: "Apoio de IA na resposta a oportunidades." },
+  { key: "ai_profile_assistant", valueType: "boolean", kind: "plan", label: "Assistente do perfil público (IA)", description: "Assistente de IA que conversa com visitantes do perfil público da empresa." },
   { key: "priority_support", valueType: "boolean", kind: "plan", label: "Suporte prioritário", description: "Atendimento prioritário." },
   // ── Enterprise ──────────────────────────────────────────────────────────
   { key: "multi_user_advanced", valueType: "boolean", kind: "plan", label: "Multi-utilizador avançado", description: "Gestão avançada de vários utilizadores." },

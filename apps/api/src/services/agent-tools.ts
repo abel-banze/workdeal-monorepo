@@ -106,7 +106,7 @@ export function buildAssistantTools(scope: AgentToolsScope): AgentTool[] {
     execute: async (input) => {
       const args = input as { q?: string; province?: string; limit?: number };
       const res = await tasksRepository.list({
-        status: "open",
+        statuses: ["open", "in_review"],
         title: args.q || undefined,
         province: args.province,
         page: 1,

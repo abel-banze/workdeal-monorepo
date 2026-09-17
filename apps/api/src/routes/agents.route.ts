@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
 import { assistantChatSchema, proposalDraftSchema, responseDraftSchema } from "@workdeal/shared";
@@ -25,6 +26,22 @@ agentsRoute.post("/assistant/chat", requireAuth, rateLimit(createLimiter), zVali
   const body = c.req.valid("json");
   const { body: resBody, status } = await agentsController.chatAssistant(c.get("user"), body);
   return c.json(resBody, status);
+});
+
+// ── Assistente comercial em streaming (SSE: deltas + evento done/error) ──
+agentsRoute.post("/assistant/chat/stream", requireAuth, rateLimit(createLimiter), zValidator("json", assistantChatSchema), async (c) => {
+  const { deltas, completion } = await agentsController.chatAssistantStream(c.get("user"), c.req.valid("json"));
+  return streamSSE(c, async (stream) => {
+    for await (const delta of deltas) {
+      await stream.writeSSE({ data: JSON.stringify({ delta }) });
+    }
+    const result = await completion;
+    if (result.status === "ok") {
+      await stream.writeSSE({ event: "done", data: JSON.stringify({ demo: result.demo }) });
+    } else {
+      await stream.writeSSE({ event: "error", data: JSON.stringify({ code: result.errorCode ?? "AI_ERROR" }) });
+    }
+  });
 });
 
 // ── Rascunho de proposta ─────────────────────────────────────────────

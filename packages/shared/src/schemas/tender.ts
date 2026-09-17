@@ -17,6 +17,11 @@ export const tenderListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
   province: z.string().min(1).max(80).optional(),
   category: z.string().min(1).max(120).optional(),
+  // Multi-select (CSV) — usado pelos filtros do directório público
+  categories: z.string().trim().max(400).optional(),
+  types: z.string().trim().max(400).optional(),
+  // Estado temporal: "open" (abertura ainda por acontecer) | "closed" (já aberto/encerrado)
+  state: z.enum(["open", "closed"]).optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20).optional(),
 });
