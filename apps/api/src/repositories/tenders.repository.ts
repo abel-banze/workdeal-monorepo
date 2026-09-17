@@ -1,10 +1,20 @@
-import { and, count, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, isNull, lt, or, type SQL } from "drizzle-orm";
 import { db, tender, tenderDocument, ugea } from "@workdeal/db";
 import type { TenderListQuery } from "@workdeal/shared";
+
+export type TenderFacetRow = { value: string; count: number };
+
+export type TenderFacets = {
+  province: TenderFacetRow[];
+  categories: TenderFacetRow[];
+  types: TenderFacetRow[];
+  state: { open: number; closed: number };
+};
 
 export type TenderListResult = {
   items: TenderRow[];
   total: number;
+  facets: TenderFacets;
 };
 
 export type TenderRow = {
@@ -82,6 +92,90 @@ const TENDER_COLUMNS = {
   lastSeenAt: tender.lastSeenAt,
 };
 
+const splitCsv = (v?: string): string[] =>
+  (v ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+const openCond = (now: Date) => or(isNull(tender.openedAt), gte(tender.openedAt, now))!;
+const closedCond = (now: Date) => lt(tender.openedAt, now);
+
+function searchCond(q: string): SQL {
+  return or(
+    ilike(tender.object, `%${q}%`),
+    ilike(tender.generalObject, `%${q}%`),
+    ilike(tender.category, `%${q}%`),
+    ilike(tender.ugeaSlug, `%${q}%`),
+  )!;
+}
+
+type FacetColumn = typeof tender.province | typeof tender.category | typeof tender.type;
+
+async function groupFacet(conds: SQL[], col: FacetColumn): Promise<TenderFacetRow[]> {
+  const rows = await db
+    .select({ value: col, n: count() })
+    .from(tender)
+    .where(and(...conds))
+    .groupBy(col)
+    .orderBy(desc(count()));
+  return rows.filter((r): r is { value: string; n: number } => r.value != null).map((r) => ({ value: r.value, count: r.n }));
+}
+
+/**
+ * Facets por dimensão, calculados contra o conjunto filtrado SEM incluir o
+ * filtro da própria dimensão — assim seleccionar uma categoria mantém as
+ * contagens úteis nas restantes.
+ */
+async function buildFacets(f: { q?: string; province?: string; category?: string; categories?: string; types?: string; state?: string }): Promise<TenderFacets> {
+  const now = new Date();
+  const base: SQL[] = [eq(tender.status, "published")];
+  if (f.q) base.push(searchCond(f.q));
+
+  const provinceConds = [...base];
+  if (f.category) provinceConds.push(eq(tender.category, f.category));
+  const catList = splitCsv(f.categories);
+  if (catList.length > 0) provinceConds.push(inArray(tender.category, catList));
+  const typeList = splitCsv(f.types);
+  if (typeList.length > 0) provinceConds.push(inArray(tender.type, typeList));
+  if (f.state === "open") provinceConds.push(openCond(now));
+  if (f.state === "closed") provinceConds.push(closedCond(now));
+
+  const categoriesConds = [...base];
+  if (f.province) categoriesConds.push(eq(tender.province, f.province));
+  if (typeList.length > 0) categoriesConds.push(inArray(tender.type, typeList));
+  if (f.state === "open") categoriesConds.push(openCond(now));
+  if (f.state === "closed") categoriesConds.push(closedCond(now));
+
+  const typesConds = [...base];
+  if (f.province) typesConds.push(eq(tender.province, f.province));
+  if (f.category) typesConds.push(eq(tender.category, f.category));
+  if (catList.length > 0) typesConds.push(inArray(tender.category, catList));
+  if (f.state === "open") typesConds.push(openCond(now));
+  if (f.state === "closed") typesConds.push(closedCond(now));
+
+  const stateConds = [...base];
+  if (f.province) stateConds.push(eq(tender.province, f.province));
+  if (f.category) stateConds.push(eq(tender.category, f.category));
+  if (catList.length > 0) stateConds.push(inArray(tender.category, catList));
+  if (typeList.length > 0) stateConds.push(inArray(tender.type, typeList));
+
+  const [province, categories, types, openRow, closedRow] = await Promise.all([
+    groupFacet(provinceConds, tender.province),
+    groupFacet(categoriesConds, tender.category),
+    groupFacet(typesConds, tender.type),
+    db.select({ n: count() }).from(tender).where(and(...stateConds, openCond(now))),
+    db.select({ n: count() }).from(tender).where(and(...stateConds, closedCond(now))),
+  ]);
+
+  return {
+    province,
+    categories,
+    types,
+    state: { open: openRow[0]?.n ?? 0, closed: closedRow[0]?.n ?? 0 },
+  };
+}
+
 async function fetchDocuments(tenderIds: string[]): Promise<Map<string, TenderDocumentRow[]>> {
   if (tenderIds.length === 0) return new Map();
 
@@ -107,21 +201,19 @@ async function fetchDocuments(tenderIds: string[]): Promise<Map<string, TenderDo
 
 export const tendersRepository = {
   async list(query: TenderListQuery): Promise<TenderListResult> {
-    const { q, province, category, page = 1, limit = 20 } = query;
+    const { q, province, category, categories, types, state, page = 1, limit = 20 } = query;
+    const now = new Date();
 
     const conds: SQL[] = [eq(tender.status, "published")];
-    if (q) {
-      conds.push(
-        or(
-          ilike(tender.object, `%${q}%`),
-          ilike(tender.generalObject, `%${q}%`),
-          ilike(tender.category, `%${q}%`),
-          ilike(tender.ugeaSlug, `%${q}%`),
-        )!,
-      );
-    }
+    if (q) conds.push(searchCond(q));
     if (province) conds.push(eq(tender.province, province));
     if (category) conds.push(eq(tender.category, category));
+    const catList = splitCsv(categories);
+    if (catList.length > 0) conds.push(inArray(tender.category, catList));
+    const typeList = splitCsv(types);
+    if (typeList.length > 0) conds.push(inArray(tender.type, typeList));
+    if (state === "open") conds.push(openCond(now));
+    if (state === "closed") conds.push(closedCond(now));
     const where = and(...conds);
 
     const totalRow = await db.select({ n: count(tender.id) }).from(tender).where(where);
@@ -136,7 +228,9 @@ export const tendersRepository = {
       .limit(limit)
       .offset((page - 1) * limit);
 
-    return { items: rows, total };
+    const facets = await buildFacets({ q, province, category, categories, types, state });
+
+    return { items: rows, total, facets };
   },
 
   async findByIdOrReference(idOrReference: string): Promise<TenderRow | null> {

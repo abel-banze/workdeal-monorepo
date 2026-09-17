@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildUsageRecord, ZERO_USAGE, estimateCostUsd } from "./usage.js";
+import { buildUsageRecord, ZERO_USAGE, estimateCostUsd, maxAffordableOutputTokens } from "./usage.js";
 
 describe("usage", () => {
   it("ZERO_USAGE has all zero fields", () => {
@@ -48,5 +48,25 @@ describe("usage", () => {
     expect(record.inputTokens).toBe(1000);
     expect(record.outputTokens).toBe(201);
     expect(record.totalTokens).toBe(1201);
+  });
+});
+
+describe("maxAffordableOutputTokens", () => {
+  it("mantém o pedido quando cabe no orçamento", () => {
+    expect(maxAffordableOutputTokens({ providerId: "openai", tier: "flash", estimatedInputTokens: 100, maxOutputTokens: 1200, maxCostUsd: 0.05 })).toBe(1200);
+  });
+
+  it("capa o output quando o orçamento só chega para resposta curta", () => {
+    const capped = maxAffordableOutputTokens({ providerId: "openai", tier: "flash", estimatedInputTokens: 100, maxOutputTokens: 2000, maxCostUsd: 0.001 });
+    expect(capped).toBeGreaterThan(0);
+    expect(capped).toBeLessThan(2000);
+  });
+
+  it("devolve 0 quando nem o input cabe no orçamento", () => {
+    expect(maxAffordableOutputTokens({ providerId: "openai", tier: "flash", estimatedInputTokens: 500_000, maxOutputTokens: 2000, maxCostUsd: 0.0001 })).toBe(0);
+  });
+
+  it("mock nunca capa (custo zero)", () => {
+    expect(maxAffordableOutputTokens({ providerId: "mock", tier: "flash", estimatedInputTokens: 999_999, maxOutputTokens: 2000, maxCostUsd: 0 })).toBe(2000);
   });
 });

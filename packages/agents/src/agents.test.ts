@@ -24,4 +24,17 @@ describe("agents registry", () => {
     expect(AGENT_CONFIGS).toHaveLength(4);
     expect(Object.keys(AGENTS).sort()).toEqual(["assistant", "profileAssistant", "proposalWriter", "responseSupport"]);
   });
+
+  it("proposalWriter usa tier pro (qualidade acima de custo em baixo volume)", () => {
+    expect(AGENTS.proposalWriter.tier).toBe("pro");
+  });
+
+  it("assistant declara os passos do ciclo ferramenta→modelo", () => {
+    expect(AGENTS.assistant.maxSteps).toBe(5);
+  });
+
+  it("profileAssistant tem gate próprio (ai_profile_assistant)", () => {
+    expect(AGENTS.profileAssistant.featureKey).toBe("ai_profile_assistant");
+    expect(AGENTS.profileAssistant.key).toBe("ai_profile_assistant");
+  });
 });

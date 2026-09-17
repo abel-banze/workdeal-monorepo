@@ -10,12 +10,15 @@ export const AGENTS = {
     temperature: 0.7,
     maxOutputTokens: 1200,
     maxInputTokens: 8000,
+    maxSteps: 5,
   },
   proposalWriter: {
     key: "ai_proposal_generation",
     featureKey: "ai_proposal_generation",
     label: "Geração de propostas (IA)",
-    tier: "flash",
+    // Propostas exigem redacção cuidada e o volume é baixo (uma por submissão):
+    // aqui a qualidade do `pro` compensa o custo extra.
+    tier: "pro",
     temperature: 0.5,
     maxOutputTokens: 1200,
     maxInputTokens: 8000,
@@ -31,12 +34,13 @@ export const AGENTS = {
   },
   /**
    * Assistente de perfil público — conversa com visitantes autenticados sobre
-   * a empresa (serviços, garantias, contactos). Reutiliza a feature/plano do
-   * `ai_assistant` (mesmo gate), mas metering próprio para separar custos.
+   * a empresa (serviços, garantias, contactos). Gate próprio
+   * (`ai_profile_assistant`, com fallback a `ai_assistant` para planos
+   * anteriores) e metering próprio para separar custos.
    */
   profileAssistant: {
     key: "ai_profile_assistant",
-    featureKey: "ai_assistant",
+    featureKey: "ai_profile_assistant",
     label: "Assistente do perfil público (IA)",
     tier: "flash",
     temperature: 0.6,

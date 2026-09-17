@@ -7,6 +7,7 @@ import {
   mockProposalMessage,
   mockResponseMessage,
   mockProfileAssistantReply,
+  mockResult,
   proposalMessageSchema,
   responseMessageSchema,
   profileAssistantReplySchema,
@@ -19,6 +20,9 @@ import {
   buildProfileAssistantSystemPrompt,
   buildProfileAssistantUserPrompt,
   runAgent,
+  streamAgent,
+  type AgentMessage,
+  type AgentRunResult,
   type AssistantContext,
   type ProposalWriterContext,
   type ResponseSupportContext,
@@ -105,8 +109,10 @@ export const chatAssistant = async (user: AuthUser, input: AssistantChatInput) =
     currency: env.PAYMENT_CURRENCY,
   };
 
+  const history: AgentMessage[] = input.history ?? [];
+
   if (context.providerId === "mock") {
-    return { reply: mockAssistantReply(context, input.message) };
+    return { reply: mockAssistantReply(context, input.message), demo: true };
   }
 
   const model = createModel(context.providerId, AGENTS.assistant.tier, {
@@ -125,16 +131,88 @@ export const chatAssistant = async (user: AuthUser, input: AssistantChatInput) =
       tier: AGENTS.assistant.tier,
       system: buildAssistantSystemPrompt(context),
       user: buildAssistantUserPrompt(context, input.message),
+      history,
       temperature: AGENTS.assistant.temperature,
       maxInputTokens: runtime.budgets.maxInputTokens,
       maxOutputTokens: AGENTS.assistant.maxOutputTokens,
       maxCostUsd: runtime.budgets.maxCostUsd,
       tools: buildAssistantTools({ user, organizationId }),
-      maxSteps: 5,
+      maxSteps: AGENTS.assistant.maxSteps ?? 5,
     }),
   });
 
-  return { reply: result.text };
+  return { reply: result.text, demo: false };
+};
+
+/** Texto em pedaços para o stream em modo `mock` (sem metering, como o chat mock). */
+async function* chunkText(text: string, size = 32): AsyncGenerator<string> {
+  for (let i = 0; i < text.length; i += size) yield text.slice(i, i + size);
+}
+
+// ── Assistente comercial em streaming (SSE) ───────────────────────────────
+
+export const chatAssistantStream = async (user: AuthUser, input: AssistantChatInput) => {
+  const organizationId = input.organizationId ?? null;
+  await assertOrgMembership(user, organizationId);
+  await featuresService.requireFeature({ userId: user.id, organizationId }, "ai_assistant");
+
+  const runtime = await getRuntime();
+  const context: AssistantContext = {
+    providerId: runtime.activeProvider,
+    organizationName: null,
+    profileSummary: null,
+    activitySummary: null,
+    currency: env.PAYMENT_CURRENCY,
+  };
+  const history: AgentMessage[] = input.history ?? [];
+
+  if (context.providerId === "mock") {
+    const reply = mockAssistantReply(context, input.message);
+    return { deltas: chunkText(reply), completion: Promise.resolve({ ...mockResult(reply), demo: true }) };
+  }
+
+  const model = createModel(context.providerId, AGENTS.assistant.tier, {
+    modelId: runtime.modelOf(context.providerId, AGENTS.assistant.tier),
+    apiKey: runtime.apiKeyOf(context.providerId),
+  });
+  const handle = await streamAgent(model, {
+    providerId: context.providerId,
+    model: runtime.modelOf(context.providerId, AGENTS.assistant.tier),
+    tier: AGENTS.assistant.tier,
+    system: buildAssistantSystemPrompt(context),
+    user: buildAssistantUserPrompt(context, input.message),
+    history,
+    temperature: AGENTS.assistant.temperature,
+    maxInputTokens: runtime.budgets.maxInputTokens,
+    maxOutputTokens: AGENTS.assistant.maxOutputTokens,
+    maxCostUsd: runtime.budgets.maxCostUsd,
+    tools: buildAssistantTools({ user, organizationId }),
+    maxSteps: AGENTS.assistant.maxSteps ?? 5,
+  });
+
+  // Metering regista sempre (ok ou falha); a falha não lança aqui porque os
+  // headers do SSE já seguiram — o controller emite um evento `error`.
+  const record = async (result: AgentRunResult) => {
+    await agentUsageRepository.insert({
+      organizationId,
+      userId: user.id,
+      agentKey: AGENTS.assistant.key,
+      provider: context.providerId,
+      model: result.model,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      estimatedCostUsd: result.usage.estimatedCostUsd,
+      durationMs: result.durationMs,
+      status: result.status,
+      errorCode: result.errorCode,
+    });
+    if (result.status !== "ok") {
+      logger.warn("agentes: ai_assistant (stream) falhou", { runStatus: result.status, errorCode: result.errorCode, userId: user.id });
+    }
+    return { ...result, demo: false };
+  };
+
+  return { deltas: handle.deltas, completion: handle.completion.then(record) };
 };
 
 // ── Geração de proposta (rascunho) ───────────────────────────────────────
@@ -188,7 +266,7 @@ export const draftProposal = async (user: AuthUser, input: ProposalDraftInput) =
   };
 
   if (ctx.providerId === "mock") {
-    return mockProposalMessage(ctx);
+    return { ...mockProposalMessage(ctx), demo: true };
   }
 
   const model = createModel(ctx.providerId, AGENTS.proposalWriter.tier, {
@@ -220,7 +298,7 @@ export const draftProposal = async (user: AuthUser, input: ProposalDraftInput) =
     logger.warn("agentes: proposta fora do schema", { userId: user.id });
     throw new AppError(502, "AI_GENERATION_FAILED", "Não consegui gerar a proposta. Tente novamente.");
   }
-  return parsed.data;
+  return { ...parsed.data, demo: false };
 };
 
 // ── Apoio à preparação de respostas (rascunho) ──────────────────────────
@@ -244,7 +322,7 @@ export const draftResponse = async (user: AuthUser, input: ResponseDraftInput) =
   };
 
   if (ctx.providerId === "mock") {
-    return mockResponseMessage(ctx);
+    return { ...mockResponseMessage(ctx), demo: true };
   }
 
   const model = createModel(ctx.providerId, AGENTS.responseSupport.tier, {
@@ -276,12 +354,12 @@ export const draftResponse = async (user: AuthUser, input: ResponseDraftInput) =
     logger.warn("agentes: resposta fora do schema", { userId: user.id });
     throw new AppError(502, "AI_GENERATION_FAILED", "Não consegui gerar a resposta. Tente novamente.");
   }
-  return parsed.data;
+  return { ...parsed.data, demo: false };
 };
 
 // ── Assistente de perfil público (visitante autenticado) ────────────────
 
-export const chatWithProfileAssistant = async (user: AuthUser, slug: string, message: string) => {
+export const chatWithProfileAssistant = async (user: AuthUser, slug: string, message: string, history: AgentMessage[] = []) => {
   // 1. Resolve a organização dona do perfil (publicProfile não expõe orgId).
   const profileRow = await profilesRepository.findBySlug(slug);
   if (!profileRow || profileRow.status !== "active") {
@@ -293,7 +371,9 @@ export const chatWithProfileAssistant = async (user: AuthUser, slug: string, mes
   }
 
   // 2. Gate no plano da organização dona do perfil (visitor não precisa de membership).
-  await featuresService.requireFeature({ userId: user.id, organizationId }, "ai_assistant");
+  // Aceita a feature nova (`ai_profile_assistant`) ou a anterior (`ai_assistant`)
+  // para não quebrar planos concedidos antes da separação.
+  await featuresService.requireFeatureKeys({ userId: user.id, organizationId }, ["ai_assistant", "ai_profile_assistant"], { strategy: "any" });
 
   // 3. Contexto público do perfil para o prompt.
   const view = await profilesService.getPublicProfile(slug);
@@ -318,7 +398,7 @@ export const chatWithProfileAssistant = async (user: AuthUser, slug: string, mes
   };
 
   if (ctx.providerId === "mock") {
-    return mockProfileAssistantReply(ctx, message);
+    return { ...mockProfileAssistantReply(ctx, message), demo: true };
   }
 
   const model = createModel(ctx.providerId, AGENTS.profileAssistant.tier, {
@@ -337,6 +417,7 @@ export const chatWithProfileAssistant = async (user: AuthUser, slug: string, mes
       tier: AGENTS.profileAssistant.tier,
       system: buildProfileAssistantSystemPrompt(ctx),
       user: buildProfileAssistantUserPrompt(ctx, message),
+      history,
       temperature: AGENTS.profileAssistant.temperature,
       maxInputTokens: runtime.budgets.maxInputTokens,
       maxOutputTokens: AGENTS.profileAssistant.maxOutputTokens,
@@ -350,7 +431,7 @@ export const chatWithProfileAssistant = async (user: AuthUser, slug: string, mes
     logger.warn("agentes: resposta do assistente de perfil fora do schema", { userId: user.id, slug });
     throw new AppError(502, "AI_GENERATION_FAILED", "Não consegui gerar a resposta. Tente novamente.");
   }
-  return parsed.data;
+  return { ...parsed.data, demo: false };
 };
 
-export const agentsService = { chatAssistant, draftProposal, draftResponse, chatWithProfileAssistant };
+export const agentsService = { chatAssistant, chatAssistantStream, draftProposal, draftResponse, chatWithProfileAssistant };

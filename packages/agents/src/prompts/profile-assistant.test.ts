@@ -47,7 +47,7 @@ describe("profile-assistant prompt", () => {
       const r = mockProfileAssistantReply(CTX, msg);
       const parsed = profileAssistantReplySchema.safeParse(r);
       expect(parsed.success).toBe(true);
-      expect(r.reply).toContain("[modo demo");
+      expect(r.reply).not.toContain("[modo demo");
     }
     expect(mockProfileAssistantReply(CTX, "Quanto custa?").suggest).toBe("quote");
     expect(mockProfileAssistantReply(CTX, "fala por whatsapp por favor").suggest).toBe("whatsapp");

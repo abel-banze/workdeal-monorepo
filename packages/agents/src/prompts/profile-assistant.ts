@@ -88,7 +88,8 @@ export function buildProfileAssistantSystemPrompt(ctx: ProfileAssistantContext):
 }
 
 export function buildProfileAssistantUserPrompt(_ctx: ProfileAssistantContext, message: string): string {
-  const clean = sanitizeUserMessage(message, 4000);
+  // Chat: preserva parágrafos/quebras de linha do visitante.
+  const clean = sanitizeUserMessage(message, 4000, { preserveNewlines: true });
   return [
     `Visita a: ${_ctx.company.name}`,
     "",
@@ -116,7 +117,7 @@ export function mockProfileAssistantReply(ctx: ProfileAssistantContext, message:
         ? "bookmark"
         : "none";
   return {
-    reply: `[modo demo · ${ctx.providerId}] Olá! Falo sobre ${ctx.company.name} (${ctx.company.categories.join(", ") || "serviços"}). ${ctx.company.services.length ? `Tenho ${ctx.company.services.length} serviço${ctx.company.services.length !== 1 ? "s" : ""} listado${ctx.company.services.length !== 1 ? "s" : ""}.` : ""} Diz-me o que procuras e ajudo a avançar.`,
+    reply: `Olá! Falo sobre ${ctx.company.name} (${ctx.company.categories.join(", ") || "serviços"}). ${ctx.company.services.length ? `Tenho ${ctx.company.services.length} serviço${ctx.company.services.length !== 1 ? "s" : ""} listado${ctx.company.services.length !== 1 ? "s" : ""}.` : ""} Diz-me o que procuras e ajudo a avançar.`,
     suggest,
   };
 }

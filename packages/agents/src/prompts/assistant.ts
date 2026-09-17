@@ -38,11 +38,14 @@ export function buildAssistantSystemPrompt(ctx: AssistantContext): string {
 }
 
 export function buildAssistantUserPrompt(_ctx: AssistantContext, message: string): string {
-  const clean = sanitizeUserMessage(message, 4000);
-  return clean;
+  // Chat: preserva parágrafos/quebras de linha do utilizador.
+  return sanitizeUserMessage(message, 4000, { preserveNewlines: true });
 }
 
-/** Texto devolvido em modo `mock` (dev/CI) — via de demonstração sem LLM. */
+/**
+ * Texto devolvido em modo `mock` (dev/CI) — via de demonstração sem LLM.
+ * Sem etiqueta inline: o chamador (service) assinala `demo: true` na resposta.
+ */
 export function mockAssistantReply(ctx: AssistantContext, message: string): string {
-  return `[modo demo · ${ctx.providerId}] Recebi: "${message}". Assisto no contexto de ${ctx.organizationName ?? "a sua organização"} quando a integração de IA estiver ligada (AI_PROVIDER).`;
+  return `Recebi: "${message}". Assisto no contexto de ${ctx.organizationName ?? "a sua organização"}; liga a integração de IA (AI_PROVIDER) para respostas reais.`;
 }

@@ -49,6 +49,7 @@ const PLAN_FEATURE_LABELS: Readonly<Record<string, string>> = {
   ai_assistant: "Assistente comercial (IA)",
   ai_proposal_generation: "Geração de propostas (IA)",
   ai_response_support: "Apoio à preparação de respostas (IA)",
+  ai_profile_assistant: "Assistente do perfil público (IA)",
   priority_support: "Suporte prioritário",
   // Enterprise
   multi_user_advanced: "Multi-utilizador avançado",
@@ -190,6 +191,7 @@ export const PLANS_SEED: PlanSeed[] = [
       ["ai_assistant"],
       ["ai_proposal_generation"],
       ["ai_response_support"],
+      ["ai_profile_assistant"],
       ["priority_support"],
       ["search_boost", "2"],
     ],

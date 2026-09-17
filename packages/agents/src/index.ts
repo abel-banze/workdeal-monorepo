@@ -2,18 +2,20 @@
 // Motor puro (sem I/O a BD). Camada API (apps/api) compõe tools/context/metering.
 
 // ── Tipos e constantes ─────────────────────────────────────────────────────
-export type { AiProviderId, ModelTier, AgentKey, AgentRunStatus, AgentUsageRecord, AgentRunResult, RunAgentOptions, AgentConfig, StructuredOutput, AgentTool, AgentToolCall } from "./types.js";
+export type { AiProviderId, ModelTier, AgentKey, AgentRunStatus, AgentUsageRecord, AgentRunResult, RunAgentOptions, AgentConfig, StructuredOutput, AgentTool, AgentToolCall, AgentMessage } from "./types.js";
 export { executeToolSafely, MAX_TOOL_STEPS } from "./runtime/run.js";
 export { AI_PROVIDERS, MODEL_TIERS, MODEL_PRICES, DEFAULT_BUDGETS } from "./models.js";
 
 // ── Provider / motor ───────────────────────────────────────────────────────
 export { createModel, resolveModelId, AgentProviderError } from "./provider.js";
-export { runAgent, classifyAgentError, structuredOutput } from "./runtime/run.js";
+export { runAgent, classifyAgentError, structuredOutput, normalizeHistory, blockedResult } from "./runtime/run.js";
+export type { AgentStreamHandle } from "./runtime/stream.js";
+export { streamAgent } from "./runtime/stream.js";
 export { mockResult } from "./runtime/mock.js";
 
 // ── Guardrails e utilidades ────────────────────────────────────────────────
-export { AgentGuardError, guardInputBudget, guardOutputBudget, guardCostBudget, sanitizeUserMessage, estimateInputTokens } from "./guardrails.js";
-export { estimateCostUsd, buildUsageRecord, ZERO_USAGE } from "./usage.js";
+export { AgentGuardError, guardInputBudget, guardOutputBudget, guardCostBudget, sanitizeUserMessage, estimateInputTokens, estimatePromptTokens } from "./guardrails.js";
+export { estimateCostUsd, buildUsageRecord, maxAffordableOutputTokens, ZERO_USAGE } from "./usage.js";
 
 // ── Agent configs (registo declarativo) ─────────────────────────────────────
 export { AGENTS, AGENT_CONFIGS, type AgentName } from "./agents.js";

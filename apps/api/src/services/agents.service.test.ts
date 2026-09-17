@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
     AI_MAX_OUTPUT_TOKENS: 2000,
     AI_MAX_COST_USD: 0.05,
   },
-  features: { requireFeature: vi.fn() },
+  features: { requireFeature: vi.fn(), requireFeatureKeys: vi.fn() },
   usage: { insert: vi.fn() },
   tasks: { findById: vi.fn(), getUserProfileIds: vi.fn() },
   services: { listByProfile: vi.fn() },
@@ -97,6 +97,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.env.AI_PROVIDER = "mock";
   mocks.features.requireFeature.mockResolvedValue(undefined as never);
+  mocks.features.requireFeatureKeys.mockResolvedValue(undefined as never);
   mocks.tasks.getUserProfileIds.mockResolvedValue(["prof-1"]);
   mocks.profiles.findBySlug.mockResolvedValue({ id: "prof-1", status: "active", organizationId: "org-1" });
   mocks.profilesService.getPublicProfile.mockResolvedValue(COMPANY_PROFILE_VIEW as never);
@@ -115,8 +116,34 @@ beforeEach(() => {
 describe("chatAssistant", () => {
   it("em modo mock devolve resposta determinística sem tocar no motor", async () => {
     const res = await agentsService.chatAssistant(USER, { message: "Quais as minhas ofertas?", organizationId: null });
-    expect(res.reply).toContain("[modo demo");
+    expect(res.reply).toContain("Quais as minhas ofertas?");
+    expect(res.reply).not.toContain("[modo demo");
+    expect(res.demo).toBe(true);
     expect(mocks.features.requireFeature).toHaveBeenCalledWith({ userId: "u1", organizationId: null }, "ai_assistant");
+    expect(mocks.usage.insert).not.toHaveBeenCalled();
+  });
+
+  it("aceita histórico de conversa", async () => {
+    const res = await agentsService.chatAssistant(USER, {
+      message: "e depois?",
+      organizationId: null,
+      history: [
+        { role: "user", text: "primeira" },
+        { role: "assistant", text: "resposta" },
+      ],
+    });
+    expect(res.demo).toBe(true);
+    expect(res.reply).toContain("e depois?");
+  });
+
+  it("em modo mock faz stream da resposta em pedaços sem metering", async () => {
+    const { deltas, completion } = await agentsService.chatAssistantStream(USER, { message: "olá", organizationId: null });
+    const parts: string[] = [];
+    for await (const delta of deltas) parts.push(delta);
+    const result = await completion;
+    expect(parts.join("")).toContain("olá");
+    expect(result.demo).toBe(true);
+    expect(result.status).toBe("ok");
     expect(mocks.usage.insert).not.toHaveBeenCalled();
   });
 
@@ -142,6 +169,7 @@ describe("draftProposal", () => {
     expect(mocks.features.requireFeature).toHaveBeenCalledWith({ userId: "u1", organizationId: null }, "ai_proposal_generation");
     expect(res.message).toContain("Reparação de canalização");
     expect(res.message).toContain("Carla Reparos");
+    expect(res.demo).toBe(true);
   });
 
   it("rejeita tarefa inexistente", async () => {
@@ -166,15 +194,17 @@ describe("draftResponse", () => {
     const res = await agentsService.draftResponse(USER, { contextType: "quote", subject: "Pedido de orçamento para pintura", detail: "Quero pintar 3 divisões.", organizationId: null });
     expect(mocks.features.requireFeature).toHaveBeenCalledWith({ userId: "u1", organizationId: null }, "ai_response_support");
     expect(res.message).toContain("Pedido de orçamento para pintura");
+    expect(res.demo).toBe(true);
   });
 });
 
 describe("chatWithProfileAssistant", () => {
   it("devolve resposta determinística em modo mock sem metering", async () => {
     const res = await agentsService.chatWithProfileAssistant(USER, "constructora-massinga", "Quanto custa construir?");
-    expect(mocks.features.requireFeature).toHaveBeenCalledWith({ userId: "u1", organizationId: "org-1" }, "ai_assistant");
+    expect(mocks.features.requireFeatureKeys).toHaveBeenCalledWith({ userId: "u1", organizationId: "org-1" }, ["ai_assistant", "ai_profile_assistant"], { strategy: "any" });
     expect(res.suggest).toBe("quote");
-    expect(res.reply).toContain("[modo demo");
+    expect(res.reply).not.toContain("[modo demo");
+    expect(res.demo).toBe(true);
     expect(mocks.usage.insert).not.toHaveBeenCalled();
   });
 
@@ -189,7 +219,7 @@ describe("chatWithProfileAssistant", () => {
   });
 
   it("exige feature da organização dona do perfil", async () => {
-    mocks.features.requireFeature.mockRejectedValue(new AppError(403, "FEATURE_REQUIRED", "não disponível"));
+    mocks.features.requireFeatureKeys.mockRejectedValue(new AppError(403, "FEATURE_REQUIRED", "não disponível"));
     await expect(agentsService.chatWithProfileAssistant(USER, "constructora-massinga", "olá")).rejects.toMatchObject({ code: "FEATURE_REQUIRED" });
   });
 });

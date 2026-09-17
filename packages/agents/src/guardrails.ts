@@ -14,13 +14,39 @@ export class AgentGuardError extends Error {
   }
 }
 
-/** Estimativa grosseira de tokens a partir de texto (≈4 chars/token). */
+/**
+ * Estimativa grosseira de tokens a partir de texto (≈4 chars/token).
+ * Mantida por compatibilidade — para texto com CJK ou histórico de conversa
+ * prefere `estimatePromptTokens`, que conta esses casos em separado.
+ */
 export function estimateInputTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-export function guardInputBudget(opts: { system: string; user: string; maxInputTokens: number }): AgentGuardError | null {
-  const consumed = estimateInputTokens(opts.system) + estimateInputTokens(opts.user);
+/**
+ * Estimador de tokens consciente de escrita não-latina: caracteres CJK
+ * (chinês/japonês/coreano) custam ≈1 token cada nos tokenizers BPE, enquanto
+ * o texto latino segue a heurística ≈4 chars/token. A estimativa peca sempre
+ * por excesso — direcção segura para um guarda de orçamento.
+ */
+export function estimatePromptTokens(text: string): number {
+  if (!text) return 0;
+  const cjk = text.match(/[\u3000-\u9FFF\uAC00-\uD7AF\uFF00-\uFFEF]/g)?.length ?? 0;
+  const rest = text.length - cjk;
+  return Math.max(1, Math.ceil(cjk * 1.2 + rest / 4));
+}
+
+export function guardInputBudget(opts: {
+  system: string;
+  user: string;
+  /** Turnos anteriores (já sanitizados) — contam para o orçamento de contexto. */
+  history?: readonly string[];
+  maxInputTokens: number;
+}): AgentGuardError | null {
+  const consumed =
+    estimatePromptTokens(opts.system) +
+    estimatePromptTokens(opts.user) +
+    (opts.history ?? []).reduce((acc, turn) => acc + estimatePromptTokens(turn), 0);
   if (consumed > opts.maxInputTokens) {
     return new AgentGuardError("INPUT_TOO_LARGE", `Contexto demasiado grande (≈${consumed} tokens est.) — máx ${opts.maxInputTokens}`);
   }
@@ -41,7 +67,28 @@ export function guardCostBudget(opts: { estimatedCostUsd: number; maxCostUsd: nu
   return null;
 }
 
-/** Normaliza a mensagem do utilizador: tira espaços repetidos e capa o tamanho. */
-export function sanitizeUserMessage(message: string, maxChars: number = 4000): string {
-  return message.replace(/\s+/g, " ").trim().slice(0, maxChars);
+/**
+ * Normaliza a mensagem do utilizador e capa o tamanho.
+ * Por omissão colapsa todo o whitespace (comportamento histórico); com
+ * `preserveNewlines: true` mantém parágrafos/quebras de linha — indicado para
+ * chat, onde colapsar `\n` destrói formatação do utilizador.
+ */
+export function sanitizeUserMessage(
+  message: string,
+  maxChars: number = 4000,
+  opts: { preserveNewlines?: boolean } = {},
+): string {
+  if (!opts.preserveNewlines) {
+    return message.replace(/\s+/g, " ").trim().slice(0, maxChars);
+  }
+  const lines = message
+    .replace(/[^\S\n]+/g, " ")
+    .split("\n")
+    .map((line) => line.trim());
+  const collapsed: string[] = [];
+  for (const line of lines) {
+    if (line === "" && collapsed[collapsed.length - 1] === "") continue;
+    collapsed.push(line);
+  }
+  return collapsed.join("\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, maxChars);
 }

@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, type ComponentProps } from "react";
 import type { Metadata } from "next";
 import type { TenderView } from "@workdeal/shared";
-import { PROVINCES } from "@/lib/directory";
-import { getPublicTenders } from "@/lib/tenders";
+import { getPublicTenders, TENDER_CATEGORY_LABELS, TENDER_TYPE_LABELS, tenderFacetLabel } from "@/lib/tenders";
 import { TenderCard } from "@/components/features/tender-card";
 import { DirectoryCommandBar } from "@/components/features/directory-command-bar";
+
+type CommandBarSections = ComponentProps<typeof DirectoryCommandBar>["sections"];
 
 export const revalidate = 300;
 
@@ -56,6 +57,14 @@ type TendersLoaded = {
   baseQs: URLSearchParams;
 };
 
+type TenderFacetRow = { value: string; count: number };
+type TenderFacets = {
+  province?: TenderFacetRow[];
+  categories?: TenderFacetRow[];
+  types?: TenderFacetRow[];
+  state?: { open: number; closed: number };
+};
+
 async function loadTenders(searchParams: Record<string, string | undefined>, page: number, limit: number): Promise<TendersLoaded> {
   const { data, meta } = await getPublicTenders({
     ...searchParams,
@@ -67,6 +76,84 @@ async function loadTenders(searchParams: Record<string, string | undefined>, pag
   const baseQs = new URLSearchParams();
   for (const [k, v] of Object.entries(searchParams)) if (v && k !== "page") baseQs.set(k, v);
   return { data, total, baseQs };
+}
+
+/** Facets para o painel de filtros — uma página com limit=1 é suficiente para trazer as agregações. */
+async function loadFacets(searchParams: Record<string, string | undefined>): Promise<TenderFacets | null> {
+  try {
+    const { meta } = await getPublicTenders({ ...searchParams, page: "1", limit: "1" });
+    return (meta?.facets as TenderFacets | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function withActiveOptions(
+  rows: TenderFacetRow[] | undefined,
+  activeValues: string[],
+  labelOf: (v: string) => string,
+): { value: string; label: string }[] {
+  const options = (rows ?? []).map((r) => ({ value: r.value, label: `${labelOf(r.value)} (${r.count})` }));
+  for (const a of activeValues) {
+    if (a && !options.some((o) => o.value === a)) options.push({ value: a, label: `${labelOf(a)} (0)` });
+  }
+  return options;
+}
+
+function buildTenderSections(facets: TenderFacets | null, params: Record<string, string | undefined>): CommandBarSections {
+  const state = facets?.state;
+  const sections: CommandBarSections = [];
+
+  if (state) {
+    sections.push({
+      kind: "radio",
+      label: "ESTADO",
+      param: "state",
+      allLabel: "Todos os concursos",
+      options: [
+        { value: "open", label: `Abertos · a receber propostas (${state.open})` },
+        { value: "closed", label: `Encerrados (${state.closed})` },
+      ],
+    });
+  }
+
+  sections.push({
+    kind: "multi",
+    label: "CATEGORIA",
+    param: "categories",
+    allLabel: "Todas as categorias",
+    options: withActiveOptions(
+      facets?.categories,
+      (params.categories ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+      (v) => tenderFacetLabel(TENDER_CATEGORY_LABELS, v),
+    ),
+  });
+
+  sections.push({
+    kind: "multi",
+    label: "MODALIDADE",
+    param: "types",
+    allLabel: "Todas as modalidades",
+    options: withActiveOptions(
+      facets?.types,
+      (params.types ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+      (v) => tenderFacetLabel(TENDER_TYPE_LABELS, v),
+    ),
+  });
+
+  sections.push({
+    kind: "radio",
+    label: "PROVÍNCIA",
+    param: "province",
+    allLabel: "Todas as províncias",
+    options: withActiveOptions(
+      facets?.province,
+      params.province ? [params.province] : [],
+      (v) => v,
+    ),
+  });
+
+  return sections;
 }
 
 async function TendersList({ searchParams }: { searchParams: Record<string, string | undefined> }) {
@@ -130,6 +217,8 @@ async function TendersList({ searchParams }: { searchParams: Record<string, stri
 
 export default async function ConcursosPage({ searchParams }: Props) {
   const params = await searchParams;
+  const facets = await loadFacets(params);
+  const sections = buildTenderSections(facets, params);
 
   return (
     <div className="bg-[#F6F3EE]">
@@ -177,15 +266,7 @@ export default async function ConcursosPage({ searchParams }: Props) {
                 initialParams={params}
                 preserveParams={[]}
                 showCategoryQuickSelect={false}
-                sections={[
-                  {
-                    kind: "radio",
-                    label: "PROVÍNCIA",
-                    param: "province",
-                    allLabel: "Todas as províncias",
-                    options: PROVINCES.map((p) => ({ value: p, label: p })),
-                  },
-                ]}
+                sections={sections}
               />
             </div>
           </div>

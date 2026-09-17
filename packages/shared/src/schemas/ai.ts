@@ -1,9 +1,18 @@
 import { z } from "zod";
 
+// ── Histórico de conversa (turnos anteriores, mais antigo primeiro) ───────
+export const chatHistoryTurnSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  text: z.string().trim().min(1).max(4000),
+});
+
+export const chatHistorySchema = z.array(chatHistoryTurnSchema).max(20).optional();
+
 // ── Assistente (chat) ─────────────────────────────────────────────────────
 export const assistantChatSchema = z.object({
   message: z.string().trim().min(1, "Mensagem em falta").max(4000),
   organizationId: z.string().min(1).nullable().optional(),
+  history: chatHistorySchema,
 });
 
 export type AssistantChatInput = z.infer<typeof assistantChatSchema>;
@@ -37,6 +46,7 @@ export type ResponseDraftContextType = z.infer<typeof responseDraftContextTypeSc
 // ── Assistente de perfil público (chat por visita) ─────────────────────────
 export const profileAssistantChatSchema = z.object({
   message: z.string().trim().min(1, "Mensagem em falta").max(4000),
+  history: chatHistorySchema,
 });
 
 export type ProfileAssistantChatInput = z.infer<typeof profileAssistantChatSchema>;

@@ -63,7 +63,7 @@ export const profilesController = {
   },
 
   async chatAssistant(user: AuthUser, slug: string, input: ProfileAssistantChatInput) {
-    const result = await agentsService.chatWithProfileAssistant(user, slug, input.message);
+    const result = await agentsService.chatWithProfileAssistant(user, slug, input.message, input.history ?? []);
     return { body: ok(result), status: 200 as const };
   },
 };

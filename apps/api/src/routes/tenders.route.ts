@@ -12,6 +12,9 @@ tendersRoute.get("/", zValidator("query", tenderListQuerySchema), async (c) => {
     q: q.q,
     province: q.province,
     category: q.category,
+    categories: q.categories,
+    types: q.types,
+    state: q.state,
     page: q.page,
     limit: q.limit,
   });

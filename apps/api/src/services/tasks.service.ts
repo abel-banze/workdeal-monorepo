@@ -127,7 +127,10 @@ async listTasks(query: TaskListQuery) {
             .filter(Boolean)
         : undefined;
       const { items, total } = await tasksRepository.list({
-        status: query.status ?? "open",
+        // Vista pública sem filtro de estado: mostra "open" e "in_review" — ambos
+        // aceitam propostas (uma tarefa passa a in_review ao receber a 1ª proposta,
+        // ver submitProposal) e não deve desaparecer do directório por isso.
+        statuses: query.status ? [query.status] : ["open", "in_review"],
         title: query.q,
         categoryIds,
         district: query.district,

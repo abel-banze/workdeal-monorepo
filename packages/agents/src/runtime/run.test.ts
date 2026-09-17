@@ -117,6 +117,68 @@ describe("runAgent", () => {
   });
 });
 
+describe("runAgent preflight de custo", () => {
+  it("bloqueia sem chamar o modelo quando nem o input cabe no orçamento", async () => {
+    const result = await runAgent(fakeModel(), { ...BASE, maxCostUsd: 0.0000001 });
+    expect(mocks.generateText).not.toHaveBeenCalled();
+    expect(result.status).toBe("guardrail_blocked");
+    expect(result.errorCode).toBe("COST_EXCEEDED");
+    expect(result.usage.totalTokens).toBe(0);
+  });
+
+  it("capa o maxOutputTokens ao orçamento em vez de pagar e bloquear depois", async () => {
+    mocks.generateText.mockResolvedValue({ text: "ok", usage: { inputTokens: 5, outputTokens: 10 } });
+    const result = await runAgent(fakeModel(), { ...BASE, maxCostUsd: 0.001 });
+    expect(result.status).toBe("ok");
+    const callArgs = mocks.generateText.mock.calls[0][0];
+    expect(callArgs.maxOutputTokens).toBeGreaterThan(0);
+    expect(callArgs.maxOutputTokens).toBeLessThan(BASE.maxOutputTokens);
+  });
+});
+
+describe("runAgent com histórico", () => {
+  it("envia o histórico como messages e o user actual por último", async () => {
+    mocks.generateText.mockResolvedValue({ text: "ok", usage: { inputTokens: 30, outputTokens: 5 } });
+    const history = [
+      { role: "user" as const, text: "primeira pergunta" },
+      { role: "assistant" as const, text: "primeira resposta" },
+    ];
+    const result = await runAgent(fakeModel(), { ...BASE, history });
+    expect(result.status).toBe("ok");
+    const callArgs = mocks.generateText.mock.calls[0][0];
+    expect(callArgs.prompt).toBeUndefined();
+    expect(callArgs.messages).toEqual([
+      { role: "user", content: "primeira pergunta" },
+      { role: "assistant", content: "primeira resposta" },
+      { role: "user", content: "olá!" },
+    ]);
+  });
+
+  it("sem histórico mantém tiro único com prompt", async () => {
+    mocks.generateText.mockResolvedValue({ text: "ok", usage: { inputTokens: 10, outputTokens: 5 } });
+    await runAgent(fakeModel(), BASE);
+    const callArgs = mocks.generateText.mock.calls[0][0];
+    expect(callArgs.prompt).toBe("olá!");
+    expect(callArgs.messages).toBeUndefined();
+  });
+});
+
+describe("normalizeHistory", () => {
+  it("remove turnos vazios e capa turnos longos", async () => {
+    const { normalizeHistory } = await import("./run.js");
+    const out = normalizeHistory(
+      [
+        { role: "user", text: "   " },
+        { role: "assistant", text: "ok" },
+        { role: "user", text: "x".repeat(5000) },
+      ],
+      100,
+    );
+    expect(out).toHaveLength(2);
+    expect(out[1]?.text).toHaveLength(100);
+  });
+});
+
 describe("classifyAgentError", () => {
   it("maps timeout to PROVIDER_ERROR", () => {
     expect(classifyAgentError(new Error("etimedout"))).toEqual({ code: "PROVIDER_ERROR", status: "error" });

@@ -145,9 +145,9 @@ export const tasksRepository = {
     return { ...row, ...enriched.get(row.id), tags: tagMap.get(id) ?? [] } as TaskRow & RequesterEnrichment & { tags: { id: string; slug: string; name: string }[] };
   },
 
-  async list(params: { status?: string; title?: string; categoryId?: string; categoryIds?: string[]; district?: string; priceMin?: number; priceMax?: number; province?: string; contractType?: string; tag?: string; near?: string; radiusKm?: number; page: number; limit: number }) {
+  async list(params: { statuses?: string[]; title?: string; categoryId?: string; categoryIds?: string[]; district?: string; priceMin?: number; priceMax?: number; province?: string; contractType?: string; tag?: string; near?: string; radiusKm?: number; page: number; limit: number }) {
     const conds: SQL[] = [];
-    if (params.status) conds.push(eq(task.status, asTaskStatus(params.status)));
+    if (params.statuses && params.statuses.length > 0) conds.push(inArray(task.status, params.statuses.map(asTaskStatus)));
     if (params.title) conds.push(ilike(task.title, `%${params.title}%`));
     if (params.categoryId) conds.push(eq(task.categoryId, params.categoryId));
     if (params.categoryIds && params.categoryIds.length > 0) conds.push(inArray(task.categoryId, params.categoryIds));

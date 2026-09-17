@@ -30,3 +30,32 @@ export function formatTenderMoney(value: string | null | undefined): string | nu
   if (!Number.isFinite(n) || n <= 0) return null;
   return formatMzn(n);
 }
+
+// ── Labels PT-MZ para a listagem (valores crus vêm da scraper UFSA) ──
+export const TENDER_CATEGORY_LABELS: Record<string, string> = {
+  BENS: "Bens",
+  "BENS E SERVICOS": "Bens e serviços",
+  EMPREITADAS: "Empreitadas",
+  SERVICO: "Serviços",
+  SERVICOS: "Serviços",
+  CONSULTORIAS: "Consultorias",
+  "SERVICOS DE CONSULTORIA": "Serviços de consultoria",
+};
+
+export const TENDER_TYPE_LABELS: Record<string, string> = {
+  "AJUSTE DIRECTO": "Ajuste directo",
+  "CONCURSO DE PEQUENA DIMENSAO": "Concurso de pequena dimensão",
+  "CONCURSO EM DUAS ETAPAS": "Concurso em duas etapas",
+  "CONCURSO LIMITADO": "Concurso limitado",
+  "CONCURSO POR COTACOES": "Concurso por cotações",
+  "CONCURSO POR LANCES": "Concurso por lances",
+  "CONCURSO PUBLICO": "Concurso público",
+  "SELECCAO BASEADA NA QUALIDADE": "Selecção baseada na qualidade",
+  "SELECCAO BASEADA NA QUALIDADE E NO PRECO": "Selecção por qualidade e preço",
+  "SELECCAO BASEADA NAS QUALIFICACOES DO CONSULTOR": "Selecção por qualificações do consultor",
+  "SELECCAO DE PESSOA SINGULAR": "Selecção de pessoa singular",
+};
+
+export function tenderFacetLabel(maps: Record<string, string>, value: string): string {
+  return maps[value] ?? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}

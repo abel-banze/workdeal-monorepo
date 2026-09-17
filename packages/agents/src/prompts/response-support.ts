@@ -63,6 +63,6 @@ export function buildResponseUserPrompt(ctx: ResponseSupportContext): string {
 /** Rascunho de devolução em modo `mock` (dev/CI). */
 export function mockResponseMessage(ctx: ResponseSupportContext): ResponseMessage {
   return {
-    message: `Olá${ctx.fromName ? ` ${ctx.fromName}` : ""}. Agradecemos o interesse em "${ctx.subject}". A ${ctx.provider.name} está disponível para avançar e podemos alinhar os detalhes de seguida. [modo demo · ${ctx.providerId}]`,
+    message: `Olá${ctx.fromName ? ` ${ctx.fromName}` : ""}. Agradecemos o interesse em "${ctx.subject}". A ${ctx.provider.name} está disponível para avançar e podemos alinhar os detalhes de seguida.`,
   };
 }

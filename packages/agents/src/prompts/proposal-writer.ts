@@ -88,6 +88,6 @@ export function mockProposalMessage(ctx: ProposalWriterContext): ProposalMessage
     : "";
   const hs = ctx.provider.services.slice(0, 3).join(", ") || "os nossos serviços";
   return {
-    message: `Olá. Leio com atenção o pedido "${ctx.task.title}".${budget} A ${ctx.provider.name} actua em ${hs} e pode apoiar este serviço. Podemos alinhar os detalhes e prazos para apresentar uma proposta final. Obrigado pela oportunidade. [modo demo · ${ctx.providerId}]`,
+    message: `Olá. Leio com atenção o pedido "${ctx.task.title}".${budget} A ${ctx.provider.name} actua em ${hs} e pode apoiar este serviço. Podemos alinhar os detalhes e prazos para apresentar uma proposta final. Obrigado pela oportunidade.`,
   };
 }
