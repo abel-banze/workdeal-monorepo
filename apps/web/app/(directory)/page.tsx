@@ -2,10 +2,11 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import type { ProfileView } from "@workdeal/shared";
-import { getProfiles, getCategories } from "@/lib/profiles";
+import { getProfiles, getCategories, getTags, getPreRegisteredCompanies } from "@/lib/profiles";
 import { ProfileCard } from "@/components/features/profile-card";
-import { HomeSearch } from "@/components/features/home-search";
+import { CompaniesFilters } from "@/components/features/companies-filters";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
+import { SITE_KEYWORDS } from "@/lib/seo";
 
 export const revalidate = 300;
 
@@ -13,6 +14,7 @@ export async function generateMetadata() {
   return {
     description:
       "O Workdeal é o ecossistema global de negócios — uma plataforma digital onde empresas verificadas ganham visibilidade, constroem confiança e fecham negócios sem fronteiras.",
+    keywords: SITE_KEYWORDS,
     openGraph: {
       title: "Workdeal — Onde os negócios se encontram.",
       description:
@@ -108,7 +110,23 @@ export default async function DirectoryPage({ searchParams }: Props) {
   const locationParams = applyDefaultLocation(params, parseLocationCookies(await cookies()));
   const categoriesRes = await getCategories().catch(() => ({ data: [] as { id: string; name: string; slug: string }[] }));
   const categories = (categoriesRes as { data: { id: string; name: string; slug: string }[] }).data;
+  const tagsRes = await getTags().catch(() => ({ data: [] as { id: string; slug: string; name: string; category: string | null }[] }));
+  const tags = (tagsRes as { data: { id: string; slug: string; name: string; category: string | null }[] }).data;
   const displayCats = categories.length ? categories.slice(0, 8) : CATEGORY_FALLBACK;
+
+  // Contagem real de empresas — mesmo critério do directório (activas + pré-registadas).
+  let totalCompanies = 0;
+  try {
+    const [res, preRes] = await Promise.all([
+      getProfiles({ page: "1", limit: "1" }),
+      getPreRegisteredCompanies().catch(() => ({ data: [] as { id: string }[] })),
+    ]);
+    const activeTotal = typeof res.meta?.total === "number" ? (res.meta.total as number) : 0;
+    const preCount = Array.isArray(preRes.data) ? (preRes.data as { id: string }[]).length : 0;
+    totalCompanies = activeTotal + preCount;
+  } catch {
+    totalCompanies = 0;
+  }
 
   return (
     <div className="bg-[#F6F3EE]">
@@ -161,7 +179,11 @@ export default async function DirectoryPage({ searchParams }: Props) {
               </p>
 
               <div className="mt-7">
-                <HomeSearch categories={displayCats as { id: string; name: string; slug: string }[]} initialParams={params} />
+                <CompaniesFilters
+                  categories={categories as { id: string; name: string; slug: string }[]}
+                  tags={tags as { id: string; slug: string; name: string; category: string | null }[]}
+                  initialParams={params}
+                />
                 <div className="mt-3.5 flex flex-wrap items-center gap-2">
                   <span className="text-xs font-semibold text-[#0F1A2E]/45">Mais procurados:</span>
                   {["Construção", "Electricidade", "Climatização", "Transporte"].map((t) => (
@@ -187,8 +209,8 @@ export default async function DirectoryPage({ searchParams }: Props) {
               {/* proof row — business language only */}
               <div className="mt-8 flex flex-wrap gap-6 border-t border-[#0F1A2E]/10 pt-6">
                 {[
-                  { k: "3.400+", l: "empresas activas\nna comunidade" },
-                  { k: "8", l: "sectores de\nactividade" },
+                  { k: totalCompanies > 0 ? `${totalCompanies.toLocaleString("pt-MZ")}+` : "…", l: "empresas activas\nna comunidade" },
+                  { k: String(categories.length || 8), l: "sectores de\nactividade" },
                   { k: "48h", l: "tempo médio\nde resposta" },
                 ].map((s) => (
                   <div key={s.k} className="min-w-[110px] border-l-2 border-[#0B5E56]/25 pl-3">

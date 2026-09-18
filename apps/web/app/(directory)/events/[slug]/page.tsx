@@ -6,7 +6,7 @@ import { getEventBySlug } from "@/lib/directory";
 import { getServerSession } from "@/lib/auth";
 import { formatEventWhen, formatFull } from "@/lib/dates";
 import { EventRegisterButton } from "@/components/features/event-register-button";
-import { getSiteUrl } from "@/lib/seo";
+import { getSiteUrl, EVENT_DETAIL_KEYWORDS } from "@/lib/seo";
 import type { PublicEventView } from "@/lib/directory";
 
 export const revalidate = 300;
@@ -21,6 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
       title: data.title,
       description: data.description.slice(0, 160),
+      keywords: EVENT_DETAIL_KEYWORDS,
       alternates: { canonical: `/events/${slug}` },
       openGraph: data.coverImage ? { images: [data.coverImage] } : undefined,
     };

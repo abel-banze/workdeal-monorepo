@@ -16,7 +16,7 @@ import { BookmarkButton } from "@/components/features/profile-bookmark-button";
 import { ProfileAssistantWidget } from "@/components/features/profile-assistant-widget";
 import { Analytics } from "@/components/features/analytics";
 import { ProfileAssociations } from "@/components/features/profile-associations";
-import { getSiteUrl } from "@/lib/seo";
+import { getSiteUrl, companyProfileKeywords } from "@/lib/seo";
 import type { PublicProfileView } from "@workdeal/shared";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
@@ -26,6 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     return {
       title: profile.name,
       description: profile.tagline ?? profile.description?.slice(0, 160) ?? "Perfil verificado no Workdeal.",
+      keywords: companyProfileKeywords(profile),
       alternates: { canonical: `/profiles/${slug}` },
       openGraph: {
         title: profile.name,

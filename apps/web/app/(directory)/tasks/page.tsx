@@ -8,12 +8,14 @@ import { getPublicTasks, PROVINCES } from "@/lib/directory";
 import { TaskCard } from "@/components/features/task-card";
 import { DirectoryCommandBar } from "@/components/features/directory-command-bar";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
+import { TASKS_KEYWORDS } from "@/lib/seo";
 
 export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Requisições",
   description: "Encontre pedidos de serviço em Moçambique: manutenção, construção, limpeza, tecnologia e mais. Veja os detalhes e envie a sua proposta.",
+  keywords: TASKS_KEYWORDS,
   alternates: { canonical: "/tasks" },
   openGraph: { title: "Requisições", type: "website" },
 };

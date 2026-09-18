@@ -7,12 +7,16 @@ import { getPublicEvents, PROVINCES, type PublicEventView } from "@/lib/director
 import { EventCard } from "@/components/features/event-card";
 import { DirectoryCommandBar } from "@/components/features/directory-command-bar";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
+import { EVENTS_KEYWORDS } from "@/lib/seo";
 
 export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "Eventos",
   description: "Feiras, seminários, lançamentos e networking para empresas em Moçambique. Inscreva-se gratuitamente na plataforma Workdeal.",
+  keywords: EVENTS_KEYWORDS,
+  alternates: { canonical: "/events" },
+  openGraph: { title: "Eventos", type: "website" },
 };
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };

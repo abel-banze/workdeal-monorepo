@@ -1,16 +1,37 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getSiteUrl } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Manifesto",
   description:
     "Manifesto Workdeal: por um mercado empresarial moçambicano mais aberto, confiável e conectado. O que acreditamos, o nosso compromisso e o que não somos.",
+  alternates: { canonical: "/manifesto" },
   openGraph: {
     title: "Manifesto",
     description: "Por um mercado empresarial moçambicano mais aberto, confiável e conectado.",
     type: "article",
+    url: `${getSiteUrl()}/manifesto`,
+    siteName: "Workdeal",
   },
 };
+
+function ManifestoJsonLd() {
+  const json = {
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    name: "Manifesto Workdeal",
+    description: "Por um mercado empresarial moçambicano mais aberto, confiável e conectado.",
+    url: `${getSiteUrl()}/manifesto`,
+    inLanguage: "pt-MZ",
+    publisher: {
+      "@type": "Organization",
+      name: "Workdeal",
+      url: getSiteUrl(),
+    },
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(json) }} />;
+}
 
 const BELIEFS = [
   "Acreditamos que Moçambique tem empresas capazes, mas que muitas oportunidades ainda circulam por redes fechadas, grupos dispersos, contactos pessoais e processos pouco estruturados.",
@@ -43,6 +64,7 @@ const DISPLAY = { fontFamily: "var(--font-display)" } as const;
 export default function ManifestoPage() {
   return (
     <div className="mx-auto w-full max-w-[1080px] px-4 pb-20 pt-12 sm:px-6">
+      <ManifestoJsonLd />
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#0B5E56]">Manifesto Workdeal</p>
       <h1
         className="mt-3 max-w-[22ch] text-[34px] font-extrabold leading-[1.04] tracking-tight text-[#0F1A2E] sm:text-[46px]"
