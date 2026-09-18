@@ -9,6 +9,8 @@ export interface AssistantContext {
   profileSummary: string | null;
   /** Resumo de actividade (counts: tarefas abertas, propostas, quotas). */
   activitySummary: string | null;
+  /** Resumo persistido da conversa anterior (memória) — opcional. */
+  conversationSummary?: string | null;
   currency: string;
 }
 
@@ -34,6 +36,7 @@ export function buildAssistantSystemPrompt(ctx: AssistantContext): string {
     `Empresa: ${ctx.organizationName ?? "—"}`,
     ctx.profileSummary ? `Perfil: ${ctx.profileSummary}` : "Perfil: sem dados públicos.",
     ctx.activitySummary ? `Actividade recente: ${ctx.activitySummary}` : "Actividade recente: sem registos.",
+    ctx.conversationSummary ? `CONVERSA ANTERIOR (resumo): ${ctx.conversationSummary}` : "",
   ].join("\n");
 }
 

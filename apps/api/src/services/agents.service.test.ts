@@ -10,9 +10,14 @@ const mocks = vi.hoisted(() => ({
   },
   features: { requireFeature: vi.fn(), requireFeatureKeys: vi.fn() },
   usage: { insert: vi.fn() },
-  tasks: { findById: vi.fn(), getUserProfileIds: vi.fn() },
+  tasks: { findById: vi.fn(), getUserProfileIds: vi.fn(), listByRequester: vi.fn(), listProposalsByProviders: vi.fn() },
   services: { listByProfile: vi.fn() },
-  profiles: { findById: vi.fn(), findBySlug: vi.fn() },
+  profiles: { findById: vi.fn(), findBySlug: vi.fn(), findByOrganizationId: vi.fn() },
+  orgs: { findById: vi.fn() },
+  portfolio: { listByProfile: vi.fn() },
+  badges: { listActiveBadgeNames: vi.fn() },
+  reviews: { avgRating: vi.fn() },
+  locations: { listByProfile: vi.fn() },
   profilesService: { getPublicProfile: vi.fn() },
   aiSettings: { getRuntimeConfig: vi.fn() },
   getOrgRole: vi.fn(),
@@ -24,6 +29,11 @@ vi.mock("../repositories/agent-usage.repository.js", () => ({ agentUsageReposito
 vi.mock("../repositories/tasks.repository.js", () => ({ tasksRepository: mocks.tasks }));
 vi.mock("../repositories/services.repository.js", () => ({ servicesRepository: mocks.services }));
 vi.mock("../repositories/profiles.repository.js", () => ({ profilesRepository: mocks.profiles }));
+vi.mock("../repositories/admin-organizations.repository.js", () => ({ adminOrganizationsRepository: mocks.orgs }));
+vi.mock("../repositories/portfolio.repository.js", () => ({ portfolioRepository: mocks.portfolio }));
+vi.mock("../repositories/badges.repository.js", () => ({ badgesRepository: mocks.badges }));
+vi.mock("../repositories/reviews.repository.js", () => ({ reviewsRepository: mocks.reviews }));
+vi.mock("../repositories/profile-location.repository.js", () => ({ profileLocationRepository: mocks.locations }));
 vi.mock("./profiles.service.js", () => ({ profilesService: mocks.profilesService }));
 vi.mock("./ai-settings.service.js", () => ({ aiSettingsService: mocks.aiSettings }));
 vi.mock("@workdeal/auth", () => ({ getOrgRole: mocks.getOrgRole }));
@@ -99,6 +109,14 @@ beforeEach(() => {
   mocks.features.requireFeature.mockResolvedValue(undefined as never);
   mocks.features.requireFeatureKeys.mockResolvedValue(undefined as never);
   mocks.tasks.getUserProfileIds.mockResolvedValue(["prof-1"]);
+  mocks.tasks.listByRequester.mockResolvedValue({ total: 2, items: [] });
+  mocks.tasks.listProposalsByProviders.mockResolvedValue({ total: 3, items: [] });
+  mocks.profiles.findByOrganizationId.mockResolvedValue(null);
+  mocks.orgs.findById.mockResolvedValue(null);
+  mocks.portfolio.listByProfile.mockResolvedValue([]);
+  mocks.badges.listActiveBadgeNames.mockResolvedValue([]);
+  mocks.reviews.avgRating.mockResolvedValue({ avg: 0, count: 0 });
+  mocks.locations.listByProfile.mockResolvedValue([]);
   mocks.profiles.findBySlug.mockResolvedValue({ id: "prof-1", status: "active", organizationId: "org-1" });
   mocks.profilesService.getPublicProfile.mockResolvedValue(COMPANY_PROFILE_VIEW as never);
   mocks.aiSettings.getRuntimeConfig.mockResolvedValue({
@@ -156,6 +174,24 @@ describe("chatAssistant", () => {
     mocks.getOrgRole.mockResolvedValue(null);
     await expect(agentsService.chatAssistant(USER, { message: "olá", organizationId: "org-x" })).rejects.toMatchObject({ code: "NOT_MEMBER" });
   });
+
+  it("preenche o contexto da organização no mock sem metering", async () => {
+    mocks.getOrgRole.mockResolvedValue("owner");
+    mocks.orgs.findById.mockResolvedValue({ name: "Massinga Lda" });
+    mocks.profiles.findByOrganizationId.mockResolvedValue({ name: "Construções Massinga", tagline: "Construção civil", description: "Empresa moçambicana." });
+    const res = await agentsService.chatAssistant(USER, { message: "olá", organizationId: "org-1" });
+    expect(res.reply).toContain("Massinga Lda");
+    expect(res.demo).toBe(true);
+    expect(mocks.usage.insert).not.toHaveBeenCalled();
+  });
+
+  it("responde mesmo quando o enriquecimento falha", async () => {
+    mocks.tasks.listByRequester.mockRejectedValue(new Error("db down"));
+    mocks.tasks.listProposalsByProviders.mockRejectedValue(new Error("db down"));
+    const res = await agentsService.chatAssistant(USER, { message: "olá", organizationId: null });
+    expect(res.demo).toBe(true);
+    expect(res.reply).toContain("a sua organização");
+  });
 });
 
 describe("draftProposal", () => {
@@ -187,6 +223,39 @@ describe("draftProposal", () => {
     mocks.tasks.getUserProfileIds.mockResolvedValue(["prof-outro"]);
     await expect(agentsService.draftProposal(USER, { taskId: "task-1", providerProfileId: "prof-1", organizationId: null })).rejects.toMatchObject({ code: "PROFILE_REQUIRED" });
   });
+
+  it("enriquece o perfil do fornecedor (portefólio, selos, avaliação, cidade)", async () => {
+    mocks.tasks.findById.mockResolvedValue(OPEN_TASK);
+    mocks.services.listByProfile.mockResolvedValue([{ title: "Canalização" }]);
+    mocks.profiles.findById.mockResolvedValue({ name: "Carla Reparos" });
+    mocks.portfolio.listByProfile.mockResolvedValue([{ title: "Obra X" }, { title: "Obra Y" }]);
+    mocks.badges.listActiveBadgeNames.mockResolvedValue(["Verificado"]);
+    mocks.reviews.avgRating.mockResolvedValue({ avg: 4.6, count: 8 });
+    mocks.locations.listByProfile.mockResolvedValue([{ isPrimary: true, district: "Kampfumu", province: "Maputo" }]);
+
+    const res = await agentsService.draftProposal(USER, { taskId: "task-1", providerProfileId: "prof-1", organizationId: null });
+
+    expect(mocks.portfolio.listByProfile).toHaveBeenCalledWith("prof-1");
+    expect(mocks.badges.listActiveBadgeNames).toHaveBeenCalledWith("prof-1");
+    expect(mocks.reviews.avgRating).toHaveBeenCalledWith("prof-1");
+    expect(mocks.locations.listByProfile).toHaveBeenCalledWith("prof-1");
+    expect(res.demo).toBe(true);
+  });
+
+  it("gera rascunho mesmo quando o enriquecimento falha", async () => {
+    mocks.tasks.findById.mockResolvedValue(OPEN_TASK);
+    mocks.services.listByProfile.mockResolvedValue([{ title: "Canalização" }]);
+    mocks.profiles.findById.mockResolvedValue({ name: "Carla Reparos" });
+    mocks.portfolio.listByProfile.mockRejectedValue(new Error("db down"));
+    mocks.badges.listActiveBadgeNames.mockRejectedValue(new Error("db down"));
+    mocks.reviews.avgRating.mockRejectedValue(new Error("db down"));
+    mocks.locations.listByProfile.mockRejectedValue(new Error("db down"));
+
+    const res = await agentsService.draftProposal(USER, { taskId: "task-1", providerProfileId: "prof-1", organizationId: null });
+
+    expect(res.message).toContain("Reparação de canalização");
+    expect(res.demo).toBe(true);
+  });
 });
 
 describe("draftResponse", () => {
@@ -194,6 +263,28 @@ describe("draftResponse", () => {
     const res = await agentsService.draftResponse(USER, { contextType: "quote", subject: "Pedido de orçamento para pintura", detail: "Quero pintar 3 divisões.", organizationId: null });
     expect(mocks.features.requireFeature).toHaveBeenCalledWith({ userId: "u1", organizationId: null }, "ai_response_support");
     expect(res.message).toContain("Pedido de orçamento para pintura");
+    expect(res.demo).toBe(true);
+  });
+
+  it("enriquece com nome e serviços do perfil da organização", async () => {
+    mocks.getOrgRole.mockResolvedValue("owner");
+    mocks.profiles.findByOrganizationId.mockResolvedValue({ id: "prof-1", name: "Construções Massinga" });
+    mocks.services.listByProfile.mockResolvedValue([{ title: "Pintura" }, { title: "Canalização" }]);
+
+    const res = await agentsService.draftResponse(USER, { contextType: "quote", subject: "Pedido de orçamento para pintura", organizationId: "org-1" });
+
+    expect(mocks.services.listByProfile).toHaveBeenCalledWith("prof-1");
+    expect(res.message).toContain("Construções Massinga");
+    expect(res.demo).toBe(true);
+  });
+
+  it("gera rascunho mesmo quando o enriquecimento falha", async () => {
+    mocks.getOrgRole.mockResolvedValue("owner");
+    mocks.profiles.findByOrganizationId.mockRejectedValue(new Error("db down"));
+
+    const res = await agentsService.draftResponse(USER, { contextType: "contact", subject: "Contacto geral", organizationId: "org-1" });
+
+    expect(res.message).toContain("Contacto geral");
     expect(res.demo).toBe(true);
   });
 });

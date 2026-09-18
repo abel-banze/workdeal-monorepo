@@ -42,12 +42,20 @@ describe("profile-assistant prompt", () => {
     expect(user).toContain("pintura");
   });
 
+  it("system prompt impõe revelação progressiva e anti-extracção", () => {
+    const sys = buildProfileAssistantSystemPrompt(CTX);
+    expect(sys).toContain("Revelação progressiva");
+    expect(sys).toContain("Anti-extracção");
+  });
+
   it("mock devolve reply + sugestão de acção válida", () => {
     for (const msg of ["Quanto custa construir?", "Falamos por whatsapp?", "Quero guardar"] as const) {
       const r = mockProfileAssistantReply(CTX, msg);
       const parsed = profileAssistantReplySchema.safeParse(r);
       expect(parsed.success).toBe(true);
       expect(r.reply).not.toContain("[modo demo");
+      // Revelação progressiva: o mock nunca despeja contactos no texto.
+      expect(r.reply).not.toContain("258840000000");
     }
     expect(mockProfileAssistantReply(CTX, "Quanto custa?").suggest).toBe("quote");
     expect(mockProfileAssistantReply(CTX, "fala por whatsapp por favor").suggest).toBe("whatsapp");

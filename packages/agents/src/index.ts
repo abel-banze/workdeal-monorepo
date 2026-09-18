@@ -8,7 +8,7 @@ export { AI_PROVIDERS, MODEL_TIERS, MODEL_PRICES, DEFAULT_BUDGETS } from "./mode
 
 // ── Provider / motor ───────────────────────────────────────────────────────
 export { createModel, resolveModelId, AgentProviderError } from "./provider.js";
-export { runAgent, classifyAgentError, structuredOutput, normalizeHistory, blockedResult } from "./runtime/run.js";
+export { runAgent, classifyAgentError, structuredOutput, normalizeHistory, blockedResult, buildStructuredRetryUserPrompt } from "./runtime/run.js";
 export type { AgentStreamHandle } from "./runtime/stream.js";
 export { streamAgent } from "./runtime/stream.js";
 export { mockResult } from "./runtime/mock.js";
@@ -25,7 +25,7 @@ export type { AssistantContext } from "./prompts/assistant.js";
 export { buildAssistantSystemPrompt, buildAssistantUserPrompt, mockAssistantReply } from "./prompts/assistant.js";
 
 export type { ProposalWriterContext } from "./prompts/proposal-writer.js";
-export { proposalMessageSchema, buildProposalSystemPrompt, buildProposalUserPrompt, mockProposalMessage, type ProposalMessage } from "./prompts/proposal-writer.js";
+export { proposalMessageSchema, buildProposalSystemPrompt, buildProposalUserPrompt, mockProposalMessage, validateProposalContent, type ProposalMessage } from "./prompts/proposal-writer.js";
 
 export type { ResponseContextType, ResponseSupportContext } from "./prompts/response-support.js";
 export { responseMessageSchema, buildResponseSystemPrompt, buildResponseUserPrompt, mockResponseMessage, type ResponseMessage } from "./prompts/response-support.js";

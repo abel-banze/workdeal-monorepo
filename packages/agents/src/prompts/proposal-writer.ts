@@ -40,6 +40,25 @@ export const proposalMessageSchema = z.object({
 
 export type ProposalMessage = z.infer<typeof proposalMessageSchema>;
 
+/**
+ * Validação pós-geração do rascunho — heurísticas determinísticas (testáveis).
+ * Devolve a lista de problemas; vazia = aceitável. O serviço regenera uma vez
+ * quando há problemas, em vez de entregar proposta incompleta.
+ */
+export function validateProposalContent(message: string, hints: { priceMzn: number | null; estimatedDays: number | null }): string[] {
+  const issues: string[] = [];
+  if (message.length > 2000) {
+    issues.push(`mensagem com ${message.length} caracteres (máximo ~2000) — encurtar`);
+  }
+  if (hints.priceMzn != null && !/\d/.test(message)) {
+    issues.push("o preço indicado não aparece na mensagem");
+  }
+  if (hints.estimatedDays != null && !/\d/.test(message)) {
+    issues.push("o prazo indicado não aparece na mensagem");
+  }
+  return issues;
+}
+
 export function buildProposalSystemPrompt(ctx: ProposalWriterContext): string {
   const budget = ctx.task.priceMinMzn != null || ctx.task.priceMaxMzn != null
     ? ` Orçamento: ${ctx.task.priceMinMzn ?? ""}–${ctx.task.priceMaxMzn ?? ""} ${ctx.currency}.`
