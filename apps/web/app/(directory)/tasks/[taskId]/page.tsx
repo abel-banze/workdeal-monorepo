@@ -8,7 +8,7 @@ import { featureAccessible } from "@/lib/features";
 import { formatMzn, formatDeadline, formatFull } from "@/lib/dates";
 import { TASK_STATUS_LABELS_PT, TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared";
 import { TaskProposalForm } from "@/components/features/task-proposal-form";
-import { getSiteUrl } from "@/lib/seo";
+import { getSiteUrl, taskDetailKeywords } from "@/lib/seo";
 import type { TaskView } from "@workdeal/shared";
 
 export const revalidate = 0;
@@ -20,9 +20,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { data } = await getPublicTask(taskId);
     if (!data) return { title: "Requisição não encontrada" };
+    const categoryName = data.categoryId
+      ? (await getCategories().catch(() => ({ data: [] as { id: string; name: string }[] }))).data.find(
+          (c) => c.id === data.categoryId,
+        )?.name ?? null
+      : null;
     return {
       title: data.title,
       description: data.description.slice(0, 160),
+      keywords: taskDetailKeywords({ ...data, categoryName }),
       alternates: { canonical: `/tasks/${taskId}` },
     };
   } catch {

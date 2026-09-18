@@ -9,6 +9,7 @@ import { CompaniesFilters } from "@/components/features/companies-filters";
 import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-consent";
 import { haversineKm } from "@workdeal/shared/lib/geo";
 import { parseSmartSearch, STOPWORDS_PT } from "@workdeal/shared/lib/smart-search";
+import { COMPANIES_KEYWORDS } from "@/lib/seo";
 
 export const revalidate = 300;
 
@@ -16,6 +17,7 @@ export async function generateMetadata() {
   return {
     title: "Empresas",
     description: "Explore empresas verificadas em Moçambique: construção, manutenção, tecnologia e mais. Filtre por categoria, proximidade, ordenação e selos.",
+    keywords: COMPANIES_KEYWORDS,
     alternates: { canonical: "/companies" },
     openGraph: { title: "Empresas", type: "website" },
   };
