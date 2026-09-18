@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Requisição — Workdeal" };
+export const metadata: Metadata = { title: "Requisição" };
 
 export default function PublicTaskLoading() {
   return (

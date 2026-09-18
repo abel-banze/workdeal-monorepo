@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // Domínio canónico único — apex converge para www (só em produção, host real do portal)
+      { source: "/:path*", has: [{ type: "host", value: "workdeal.co.mz" }], destination: "https://www.workdeal.co.mz/:path*", permanent: true },
       { source: "/empresas", destination: "/companies", permanent: true },
       { source: "/empresas/:path*", destination: "/companies/:path*", permanent: true },
       { source: "/termos", destination: "/terms", permanent: true },

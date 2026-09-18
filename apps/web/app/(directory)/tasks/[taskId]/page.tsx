@@ -8,6 +8,8 @@ import { featureAccessible } from "@/lib/features";
 import { formatMzn, formatDeadline, formatFull } from "@/lib/dates";
 import { TASK_STATUS_LABELS_PT, TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared";
 import { TaskProposalForm } from "@/components/features/task-proposal-form";
+import { getSiteUrl } from "@/lib/seo";
+import type { TaskView } from "@workdeal/shared";
 
 export const revalidate = 0;
 
@@ -17,14 +19,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { taskId } = await params;
   try {
     const { data } = await getPublicTask(taskId);
-    if (!data) return { title: "Requisição — Workdeal" };
+    if (!data) return { title: "Requisição não encontrada" };
     return {
-      title: `${data.title} — Workdeal`,
+      title: data.title,
       description: data.description.slice(0, 160),
+      alternates: { canonical: `/tasks/${taskId}` },
     };
   } catch {
-    return { title: "Requisição — Workdeal" };
+    return { title: "Requisição não encontrada" };
   }
+}
+
+function TaskJsonLd({ task, siteUrl }: { task: TaskView; siteUrl: string }) {
+  const json = {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    name: task.title,
+    description: task.description,
+    url: `${siteUrl}/tasks/${task.id}`,
+    provider: task.requesterProfileName
+      ? {
+          "@type": task.requesterOrganizationId ? "Organization" : "Person",
+          name: task.requesterProfileName,
+        }
+      : undefined,
+    areaServed: task.province ? { "@type": "Place", name: task.province } : undefined,
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(json) }} />;
 }
 
 export default async function PublicTaskPage({ params }: Props) {
@@ -57,6 +78,7 @@ export default async function PublicTaskPage({ params }: Props) {
 
   return (
     <div className="bg-[#F6F3EE]">
+      <TaskJsonLd task={task} siteUrl={getSiteUrl()} />
       <section className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-[0.14em]">
           <Link href="/" className="text-[#0F1A2E]/40 hover:text-[#0F1A2E]">

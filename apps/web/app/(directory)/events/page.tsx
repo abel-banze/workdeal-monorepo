@@ -11,7 +11,7 @@ import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-conse
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Eventos — Workdeal",
+  title: "Eventos",
   description: "Feiras, seminários, lançamentos e networking para empresas em Moçambique. Inscreva-se gratuitamente na plataforma Workdeal.",
 };
 

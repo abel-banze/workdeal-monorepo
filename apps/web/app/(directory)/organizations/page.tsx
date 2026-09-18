@@ -12,10 +12,10 @@ export const revalidate = 300;
 
 export async function generateMetadata() {
   return {
-    title: "Instituições e Organizações — Workdeal",
+    title: "Instituições e Organizações",
     description: "Explore associações, câmaras de comércio, ONG e instituições que dão estrutura ao ecossistema Workdeal. Filtre por tipo, categoria, província e proximidade.",
     openGraph: {
-      title: "Instituições e Organizações — Workdeal",
+      title: "Instituições e Organizações",
       description: "Associações, câmaras de comércio, ONG e entidades públicas representadas no directório Workdeal.",
     },
   };

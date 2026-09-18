@@ -8,7 +8,7 @@ import { getServerSession } from "@/lib/auth";
 import { ResetPasswordForm } from "./reset-password-form";
 
 export const metadata = {
-  title: "Redefinir palavra-passe — Workdeal",
+  title: "Redefinir palavra-passe",
   description: "Escolhe uma nova palavra-passe para a tua conta Workdeal.",
 };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { FaWhatsapp } from "react-icons/fa";
+import Image from "next/image";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@workspace/ui/components/dialog";
 import { QuoteDialog } from "./profile-quote-dialog";
 
@@ -18,8 +19,7 @@ function PortfolioDialog({ item, profileName, profileEmail, targetProfileId }: {
       <div className="max-h-[88vh] overflow-y-auto">
         {item.imageUrl && (
           <div className="relative h-[220px] overflow-hidden bg-[#F6F3EE] sm:h-[260px]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.imageUrl} alt={item.title} className="size-full object-cover" />
+            <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 720px) 100vw, 720px" className="object-cover" />
           </div>
         )}
 
@@ -94,8 +94,7 @@ export function ProfilePortfolio({ profileName, profileEmail, targetProfileId, i
             <DialogTrigger className="group w-full overflow-hidden rounded-2xl border border-[#D9D2C2] bg-white text-left transition hover:border-[#0B5E56]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5E56]/20">
               <div className="relative h-[148px] overflow-hidden bg-[#F6F3EE]">
                 {item.imageUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={item.imageUrl} alt={item.title} className="size-full object-cover transition duration-300 group-hover:scale-[1.02]" loading="lazy" />
+                  <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 768px) 100vw, 400px" className="object-cover transition duration-300 group-hover:scale-[1.02]" />
                 ) : (
                   <div className="flex size-full items-center justify-center">
                     <span className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F1A2E]/20">Sem imagem</span>

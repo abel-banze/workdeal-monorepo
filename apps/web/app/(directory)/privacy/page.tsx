@@ -3,11 +3,11 @@ import Link from "next/link";
 import { Article, LegalCrossLink, LegalHeader, LegalIndex } from "../_components/legal-doc";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade — Workdeal",
+  title: "Política de Privacidade",
   description:
     "Política de Privacidade da Workdeal: que dados recolhemos, para que finalidades, partilha, conservação, direitos do titular e contactos.",
   openGraph: {
-    title: "Política de Privacidade — Workdeal",
+title: "Política de Privacidade",
     description: "Como a Workdeal trata os seus dados.",
     type: "article",
   },

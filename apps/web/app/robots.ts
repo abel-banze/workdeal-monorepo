@@ -1,15 +1,8 @@
 import type { MetadataRoute } from "next";
-
-function getBaseUrl(): string {
-  const site = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
-  if (site) return site;
-  const vercel = process.env.VERCEL_URL;
-  if (vercel) return `https://${vercel}`;
-  return "https://workdeal.co.mz";
-}
+import { getSiteUrl } from "@/lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
-  const base = getBaseUrl();
+  const base = getSiteUrl();
 
   // Bloqueia preview protegido da Vercel de ser indexado — só prod deve indexar
   const isVercelPreview = !!process.env.VERCEL_URL && process.env.VERCEL_ENV !== "production";
@@ -27,7 +20,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/dashboard", "/api/", "/admin", "/onboarding", "/auth"],
+        disallow: ["/dashboard", "/api/", "/admin", "/onboarding", "/auth", "/pre-register"],
       },
     ],
     sitemap: `${base}/sitemap.xml`,

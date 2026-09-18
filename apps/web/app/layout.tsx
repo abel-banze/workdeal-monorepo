@@ -5,6 +5,8 @@ import "@workspace/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@workspace/ui/components/sonner"
 import { cn } from "@workspace/ui/lib/utils"
+import { OrganizationJsonLd, WebSiteJsonLd } from "@/components/seo/json-ld"
+import { SITE_DESCRIPTION, SITE_NAME, SITE_OG_IMAGE_ABS, SITE_TAGLINE, getSiteUrl } from "@/lib/seo"
 import type { Metadata } from "next"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
@@ -12,12 +14,29 @@ const sora = Sora({ subsets: ["latin"], variable: "--font-display", weight: ["40
 const fontMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
 
 export const metadata: Metadata = {
-  title: "Workdeal — Onde os negócios se encontram",
-  description:
-    "O Workdeal é o ecossistema global de negócios — uma plataforma digital onde empresas verificadas ganham visibilidade, constroem confiança e fecham negócios sem fronteiras.",
+  metadataBase: new URL(getSiteUrl()),
+  title: {
+    default: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  alternates: { canonical: "/" },
   openGraph: {
-    title: "Workdeal — Onde os negócios se encontram",
-    description: "Mais do que um directório: a comunidade global onde empresas sérias se encontram e crescem juntas.",
+    type: "website",
+    locale: "pt_MZ",
+    url: getSiteUrl(),
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    images: [{ url: SITE_OG_IMAGE_ABS(getSiteUrl()), width: 1200, height: 630, alt: `${SITE_NAME} — ${SITE_TAGLINE}` }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: SITE_NAME,
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    images: [SITE_OG_IMAGE_ABS(getSiteUrl())],
   },
 }
 
@@ -31,6 +50,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <Toaster />
         </ThemeProvider>
         <Analytics />
+        <OrganizationJsonLd />
+        <WebSiteJsonLd />
       </body>
     </html>
   )

@@ -6,6 +6,8 @@ import { getEventBySlug } from "@/lib/directory";
 import { getServerSession } from "@/lib/auth";
 import { formatEventWhen, formatFull } from "@/lib/dates";
 import { EventRegisterButton } from "@/components/features/event-register-button";
+import { getSiteUrl } from "@/lib/seo";
+import type { PublicEventView } from "@/lib/directory";
 
 export const revalidate = 300;
 
@@ -15,15 +17,66 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   try {
     const { data } = await getEventBySlug(slug);
-    if (!data) return { title: "Evento — Workdeal" };
+    if (!data) return { title: "Evento não encontrado" };
     return {
-      title: `${data.title} — Workdeal`,
+      title: data.title,
       description: data.description.slice(0, 160),
+      alternates: { canonical: `/events/${slug}` },
       openGraph: data.coverImage ? { images: [data.coverImage] } : undefined,
     };
   } catch {
-    return { title: "Evento — Workdeal" };
+    return { title: "Evento não encontrado" };
   }
+}
+
+function EventJsonLd({ event, siteUrl }: { event: PublicEventView; siteUrl: string }) {
+  const url = `${siteUrl}/events/${event.slug}`;
+  const cancelled = event.status === "cancelled";
+  const location = event.isOnline
+    ? { "@type": "VirtualLocation", url: event.onlineUrl ?? siteUrl }
+    : event.venueName || event.province
+      ? {
+          "@type": "Place",
+          name: event.venueName ?? undefined,
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: event.address ?? undefined,
+            addressLocality: event.district ?? undefined,
+            addressRegion: event.province ?? undefined,
+            addressCountry: "MZ",
+          },
+          geo:
+            event.latitude != null && event.longitude != null
+              ? { "@type": "GeoCoordinates", latitude: event.latitude, longitude: event.longitude }
+              : undefined,
+        }
+      : undefined;
+
+  const json = {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: event.title,
+    description: event.description,
+    url,
+    image: event.coverImage ?? undefined,
+    startDate: new Date(event.startAt).toISOString(),
+    endDate: new Date(event.endAt).toISOString(),
+    eventStatus: cancelled ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
+    eventAttendanceMode: event.isOnline
+      ? "https://schema.org/OnlineEventAttendanceMode"
+      : "https://schema.org/OfflineEventAttendanceMode",
+    location,
+    organizer:
+      event.organizerName != null
+        ? {
+            "@type": "Organization",
+            name: event.organizerName,
+            url: event.organizerSlug ? `${siteUrl}/profiles/${event.organizerSlug}` : undefined,
+          }
+        : undefined,
+    maximumAttendeeCapacity: event.capacity ?? undefined,
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(json) }} />;
 }
 
 export default async function PublicEventPage({ params }: Props) {
@@ -48,6 +101,7 @@ export default async function PublicEventPage({ params }: Props) {
 
   return (
     <div className="bg-[#F6F3EE]">
+      <EventJsonLd event={event} siteUrl={getSiteUrl()} />
       <section className="border-b border-[#D9D2C2] bg-white">
         <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-[0.14em]">
