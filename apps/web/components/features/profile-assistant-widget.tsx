@@ -67,18 +67,17 @@ export function ProfileAssistantWidget({ slug, profileId, profileName, profileEm
     setBusy(true);
     try {
       const res = await chatWithCompanyAssistant({ message }, slug);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
       setTurns((t) => [...t, {
         role: "assistant",
-        content: res.data?.reply ?? "Sem resposta.",
-        suggest: res.data?.suggest ?? "none",
+        content: res.data.reply ?? "Sem resposta.",
+        suggest: res.data.suggest ?? "none",
       }]);
     } catch (err) {
-      const raw = err instanceof Error ? err.message : "Falha ao contactar o assistente.";
-      toast.error(
-        /timeout/i.test(raw)
-          ? "O assistente está a demorar mais do que o esperado. Tente novamente."
-          : raw,
-      );
+      toast.error(err instanceof Error ? err.message : "Falha ao contactar o assistente.");
     } finally {
       setBusy(false);
     }

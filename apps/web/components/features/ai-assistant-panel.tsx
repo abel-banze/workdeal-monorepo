@@ -22,7 +22,11 @@ export function AiAssistantPanel({ organizationId }: { organizationId: string | 
     setBusy(true)
     try {
       const res = await chatWithAssistant({ message, organizationId })
-      const reply = res.data?.reply ?? "Sem resposta."
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      const reply = res.data.reply ?? "Sem resposta."
       setTurns((t) => [...t, { role: "assistant", content: reply }])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao contactar o assistente.")

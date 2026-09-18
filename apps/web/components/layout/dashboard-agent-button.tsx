@@ -69,12 +69,15 @@ export function DashboardAgentButton() {
     setError(null)
     try {
       const res = await chatWithAssistant({ message: withTaskContext(toSend ?? display, taskRef), organizationId })
-      const reply = res?.data?.reply ?? "Sem resposta por agora."
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      const reply = res.data.reply ?? "Sem resposta por agora."
       setHistory((h) => [...h, { question: display, answer: reply }])
       setStep(2)
     } catch (err) {
-      const raw = err instanceof Error ? err.message : "Falha ao contactar o agente."
-      setError(/timeout/i.test(raw) ? "O assistente está a demorar mais do que o esperado. Tente novamente." : raw)
+      setError(err instanceof Error ? err.message : "Falha ao contactar o agente.")
     } finally {
       setBusy(false)
     }
