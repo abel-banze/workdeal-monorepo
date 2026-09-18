@@ -7,7 +7,7 @@ import { getServerSession } from "@/lib/auth";
 import { ForgotPasswordForm } from "./forgot-password-form";
 
 export const metadata = {
-  title: "Recuperar palavra-passe — Workdeal",
+  title: "Recuperar palavra-passe",
   description: "Recebe um link seguro para redefinir a tua palavra-passe no Workdeal.",
 };
 

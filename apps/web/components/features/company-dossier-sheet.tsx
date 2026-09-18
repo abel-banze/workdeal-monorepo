@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { FiMapPin, FiMessageCircle, FiStar } from "react-icons/fi";
 import {
   Sheet,
@@ -104,10 +105,9 @@ export function CompanyDossierSheet({ open, onOpenChange, slug, fallbackName, on
             {/* Selo: identidade + reputação */}
             <div className="border-b border-[#D9D2C2] bg-[#0F1A2E] px-6 pb-6 pt-8 text-white">
               <div className="flex items-start gap-4">
-                <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white text-xl font-black text-[#0F1A2E]">
+                <span className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white text-xl font-black text-[#0F1A2E]">
                   {profile.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={profile.logoUrl} alt={`Logótipo de ${profile.name}`} className="size-full object-cover" />
+                    <Image src={profile.logoUrl} alt={`Logótipo de ${profile.name}`} fill sizes="64px" className="object-cover" />
                   ) : (
                     (profile.name ?? "?").slice(0, 1).toUpperCase()
                   )}

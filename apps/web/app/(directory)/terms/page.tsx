@@ -3,11 +3,11 @@ import Link from "next/link";
 import { Article, LegalCrossLink, LegalHeader, LegalIndex } from "../_components/legal-doc";
 
 export const metadata: Metadata = {
-  title: "Termos e Condições — Workdeal",
+  title: "Termos e Condições",
   description:
     "Termos e Condições de utilização da Workdeal: contas, perfis de empresa, verificação, tarefas, propostas, negociação, planos e utilização de IA.",
   openGraph: {
-    title: "Termos e Condições — Workdeal",
+title: "Termos e Condições",
     description: "Regras de utilização da plataforma Workdeal.",
     type: "article",
   },

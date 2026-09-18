@@ -14,8 +14,10 @@ export const revalidate = 300;
 
 export async function generateMetadata() {
   return {
-    title: "Empresas — Workdeal",
-    description: "Explore empresas verificadas na plataforma global Workdeal. Filtre por categoria, proximidade, ordenação e selos.",
+    title: "Empresas",
+    description: "Explore empresas verificadas em Moçambique: construção, manutenção, tecnologia e mais. Filtre por categoria, proximidade, ordenação e selos.",
+    alternates: { canonical: "/companies" },
+    openGraph: { title: "Empresas", type: "website" },
   };
 }
 

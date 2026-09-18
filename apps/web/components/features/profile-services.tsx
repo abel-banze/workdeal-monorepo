@@ -1,6 +1,7 @@
 "use client";
 
 import { FiTool, FiArrowUpRight, FiCheck } from "react-icons/fi";
+import Image from "next/image";
 import type { PublicService } from "@workdeal/shared";
 import { QuoteDialog } from "./profile-quote-dialog";
 
@@ -57,7 +58,11 @@ export function ProfileServices({
               </div>
               <h3 className="mt-3 text-[15px] font-black leading-tight tracking-[-0.02em] text-[#0F1A2E]">{s.title}</h3>
               {s.description ? <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-[#0F1A2E]/60">{s.description}</p> : null}
-              {s.imageUrl ? <img src={s.imageUrl} alt={s.title} className="mt-3 h-32 w-full rounded-xl border border-[#D9D2C2] object-cover" /> : null}
+              {s.imageUrl ? (
+                <div className="relative mt-3 h-32 w-full overflow-hidden rounded-xl border border-[#D9D2C2]">
+                  <Image src={s.imageUrl} alt={s.title} fill sizes="(max-width: 768px) 100vw, 400px" className="object-cover" />
+                </div>
+              ) : null}
               <div className="mt-4 flex items-center justify-between border-t border-[#D9D2C2] pt-3">
                 <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-[#0F1A2E]/50">
                   <FiCheck className="size-3" /> Serviço

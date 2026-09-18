@@ -6,7 +6,7 @@ import { getCategories } from "@/lib/profiles";
 import { CompleteForm } from "./complete-form";
 
 export const metadata = {
-  title: "Completar registo | Workdeal",
+  title: "Completar registo",
 };
 
 interface PreRegisterCompany {

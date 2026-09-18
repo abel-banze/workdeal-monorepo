@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getPublicProfile, getPortfolioItems } from "@/lib/profiles";
 import Link from "next/link";
+import Image from "next/image";
 import { FaWhatsapp } from "react-icons/fa";
 import { FiPhone, FiGlobe, FiShare2 } from "react-icons/fi";
 import { VerificationBadge } from "@/components/features/verification-badge";
@@ -15,6 +16,7 @@ import { BookmarkButton } from "@/components/features/profile-bookmark-button";
 import { ProfileAssistantWidget } from "@/components/features/profile-assistant-widget";
 import { Analytics } from "@/components/features/analytics";
 import { ProfileAssociations } from "@/components/features/profile-associations";
+import { getSiteUrl } from "@/lib/seo";
 import type { PublicProfileView } from "@workdeal/shared";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
@@ -22,8 +24,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   try {
     const { data: profile } = await getPublicProfile(slug);
     return {
-      title: `${profile.name} — Workdeal`,
+      title: profile.name,
       description: profile.tagline ?? profile.description?.slice(0, 160) ?? "Perfil verificado no Workdeal.",
+      alternates: { canonical: `/profiles/${slug}` },
       openGraph: {
         title: profile.name,
         description: profile.tagline ?? undefined,
@@ -31,17 +34,61 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       },
     };
   } catch {
-    return { title: "Perfil não encontrado — Workdeal" };
+    return { title: "Perfil não encontrado" };
   }
 }
 
-function JsonLd({ profile }: { profile: { name: string; description: string | null; logoUrl: string | null } }) {
+const GEO_DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function JsonLd({ profile, siteUrl }: { profile: PublicProfileView; siteUrl: string }) {
+  const loc = profile.location;
+  const slug = profile.slug;
+  const url = `${siteUrl}/profiles/${slug}`;
+  const displayLat = loc?.latitude ?? profile.latitude;
+  const displayLng = loc?.longitude ?? profile.longitude;
+  const address = loc?.formattedAddress ?? loc?.address ?? null;
+
+  const hours = (profile.businessHours as { periods?: Array<{ open?: { day?: number; time?: string }; close?: { day?: number; time?: string } }> } | null)?.periods;
+  const openingHoursSpecification =
+    Array.isArray(hours) && hours.length > 0
+      ? hours.slice(0, 7).map((p) => ({
+          "@type": "OpeningHoursSpecification",
+          ...(p.open?.day != null ? { dayOfWeek: `https://schema.org/${GEO_DAY_NAMES[p.open.day]}` } : {}),
+          opens: p.open?.time ?? "00:00",
+          closes: p.close?.time ?? "23:59",
+        }))
+      : undefined;
+
+  const reviewAvg = profile.reviews.count > 0 ? profile.reviews.average : null;
+
   const json = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
+    "@id": url,
     name: profile.name,
     description: profile.description ?? undefined,
     image: profile.logoUrl ?? undefined,
+    logo: profile.logoUrl ?? undefined,
+    url,
+    telephone: profile.phone ?? undefined,
+    email: profile.email ?? undefined,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: address ?? undefined,
+      addressLocality: loc?.district ?? undefined,
+      addressRegion: loc?.province ?? undefined,
+      addressCountry: "MZ",
+    },
+    geo:
+      displayLat != null && displayLng != null
+        ? { "@type": "GeoCoordinates", latitude: displayLat, longitude: displayLng }
+        : undefined,
+    openingHoursSpecification,
+    aggregateRating:
+      reviewAvg != null
+        ? { "@type": "AggregateRating", ratingValue: reviewAvg, reviewCount: profile.reviews.count }
+        : undefined,
+    sameAs: profile.website ? [profile.website] : undefined,
   };
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(json) }} />;
 }
@@ -109,7 +156,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
 
   return (
     <div className="bg-[#F6F3EE] min-h-screen">
-      <JsonLd profile={p} />
+      <JsonLd profile={p} siteUrl={getSiteUrl()} />
       <Analytics profileId={p.id} province={loc?.province ?? undefined} district={loc?.district ?? undefined} />
       {p.assistantEnabled ? (
         <ProfileAssistantWidget
@@ -146,10 +193,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
 
           {/* cover — replica card "sem perfil" de /dashboard/profile/edit quando não há coverUrl */}
           <div className="relative">
-            <div className="h-[132px] overflow-hidden bg-[#0F1A2E] sm:h-[168px]">
+            <div className="relative h-[132px] overflow-hidden bg-[#0F1A2E] sm:h-[168px]">
               {p.coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.coverUrl} alt="" className="size-full object-cover opacity-90" />
+                <Image src={p.coverUrl} alt="" fill sizes="(max-width: 767px) 100vw, 1160px" className="object-cover opacity-90" />
               ) : (
                 <>
                   <div
@@ -169,8 +215,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
             <div className="absolute -bottom-10 left-5 z-10 flex items-end gap-3 sm:left-7">
               <div className="relative flex size-[84px] items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-white bg-white p-2 shadow-[0_8px_24px_rgba(15,26,46,0.18)] sm:size-[96px]">
                 {p.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.logoUrl} alt={p.name} className="size-full object-contain" />
+                  <Image src={p.logoUrl} alt={p.name} fill sizes="96px" className="object-contain" />
                 ) : (
                   <div className="flex size-full items-center justify-center bg-[#F6F3EE] font-black tracking-[-0.04em] text-[#0F1A2E] text-xl">
                     {p.name.slice(0, 2).toUpperCase()}
@@ -326,13 +371,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                     <div className="relative size-[132px] shrink-0 sm:size-[148px]">
                       <div className="absolute inset-0 rounded-full bg-[#0F1A2E] ring-1 ring-inset ring-white/25" aria-hidden />
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src="/seal-workdeal.png"
                         alt="Selo Workdeal Verificado — selo circular"
                         width={148}
                         height={148}
-                        className="relative size-full rounded-full object-cover p-1.5"
+                        className="size-full rounded-full object-cover p-1.5"
                       />
                       <div className={`pointer-events-none absolute inset-[10px] flex flex-col items-center justify-center rounded-full border text-center ${verifiedBadge ? "border-[#0B5E56]/40" : "border-[#1F5C99]/50"} bg-[#0F1A2E]/20`}>
                         <span className={`font-mono text-[9px] font-black uppercase tracking-[0.22em] ${verifiedBadge ? "text-[#4FD1C5]" : "text-[#7FB8E0]"}`}>Workdeal</span>

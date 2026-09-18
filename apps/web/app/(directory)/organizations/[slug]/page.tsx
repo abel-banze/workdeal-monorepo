@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   try {
     const { data: institution } = await getPublicInstitution(slug);
     return {
-      title: `${institution.name} — Workdeal`,
+      title: institution.name,
       description: institution.tagline ?? institution.description?.slice(0, 160) ?? "Instituição e organização representada no directório Workdeal.",
       openGraph: {
         title: institution.name,
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       },
     };
   } catch {
-    return { title: "Instituição não encontrada — Workdeal" };
+    return { title: "Instituição não encontrada" };
   }
 }
 
@@ -85,10 +85,9 @@ export default async function InstitutionPage({ params }: { params: Promise<{ sl
           <div className={`h-[4px] w-full ${verified ? "bg-[#0B5E56]" : "bg-[#D9D2C2]/60"}`} />
 
           <div className="relative">
-            <div className="h-[132px] overflow-hidden bg-[#0F1A2E] sm:h-[168px]">
+            <div className="relative h-[132px] overflow-hidden bg-[#0F1A2E] sm:h-[168px]">
               {institution.coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={institution.coverUrl} alt="" className="size-full object-cover opacity-90" />
+                <Image src={institution.coverUrl} alt="" fill sizes="(max-width: 767px) 100vw, 1160px" className="object-cover opacity-90" />
               ) : (
                 <>
                   <div
@@ -107,8 +106,7 @@ export default async function InstitutionPage({ params }: { params: Promise<{ sl
             <div className="absolute -bottom-10 left-5 z-10 flex items-end gap-3 sm:left-7">
               <div className="relative flex size-[84px] items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-white bg-white p-2 shadow-[0_8px_24px_rgba(15,26,46,0.18)] sm:size-[96px]">
                 {institution.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={institution.logoUrl} alt={institution.name} className="size-full object-contain" />
+                  <Image src={institution.logoUrl} alt={institution.name} fill sizes="96px" className="object-contain" />
                 ) : (
                   <div className="flex size-full items-center justify-center bg-[#F6F3EE] font-black tracking-[-0.04em] text-[#0F1A2E] text-xl">
                     {institution.name.slice(0, 2).toUpperCase()}

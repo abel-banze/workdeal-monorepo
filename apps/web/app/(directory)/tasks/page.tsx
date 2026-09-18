@@ -12,8 +12,10 @@ import { applyDefaultLocation, parseLocationCookies } from "@/lib/location-conse
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Requisições — Workdeal",
+  title: "Requisições",
   description: "Encontre pedidos de serviço em Moçambique: manutenção, construção, limpeza, tecnologia e mais. Veja os detalhes e envie a sua proposta.",
+  alternates: { canonical: "/tasks" },
+  openGraph: { title: "Requisições", type: "website" },
 };
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };

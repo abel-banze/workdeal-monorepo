@@ -11,8 +11,10 @@ type CommandBarSections = ComponentProps<typeof DirectoryCommandBar>["sections"]
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Concursos Públicos — Workdeal",
+  title: "Concursos Públicos",
   description: "Concursos e anúncios públicos em Moçambique: obras, fornecimento de bens e serviços, pré-qualificações e consultoria — agregados a partir do portal UFSA.",
+  alternates: { canonical: "/concursos" },
+  openGraph: { title: "Concursos Públicos", type: "website" },
 };
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };

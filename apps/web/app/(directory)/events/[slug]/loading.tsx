@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Evento — Workdeal" };
+export const metadata: Metadata = { title: "Evento" };
 
 export default function PublicEventLoading() {
   return (

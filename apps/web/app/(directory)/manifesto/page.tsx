@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Manifesto — Workdeal",
+  title: "Manifesto",
   description:
     "Manifesto Workdeal: por um mercado empresarial moçambicano mais aberto, confiável e conectado. O que acreditamos, o nosso compromisso e o que não somos.",
   openGraph: {
-    title: "Manifesto Workdeal",
+    title: "Manifesto",
     description: "Por um mercado empresarial moçambicano mais aberto, confiável e conectado.",
     type: "article",
   },

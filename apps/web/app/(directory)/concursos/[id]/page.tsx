@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { TenderView } from "@workdeal/shared";
 import { getPublicTender, formatTenderMoney } from "@/lib/tenders";
 import { formatDayMonth, formatFull } from "@/lib/dates";
+import { getSiteUrl } from "@/lib/seo";
 
 export const revalidate = 300;
 
@@ -13,15 +14,36 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   try {
     const { data } = await getPublicTender(id);
-    if (!data) return { title: "Concurso — Workdeal" };
+    if (!data) return { title: "Concurso não encontrado" };
     const title = data.object || data.generalObject || data.reference;
     return {
-      title: `${title} — Workdeal`,
+      title: `${title}`,
       description: (data.generalObject || data.object || "Concurso público em Moçambique").slice(0, 160),
+      alternates: { canonical: `/concursos/${id}` },
     };
   } catch {
-    return { title: "Concurso — Workdeal" };
+    return { title: "Concurso não encontrado" };
   }
+}
+
+function TenderJsonLd({ tender, siteUrl }: { tender: TenderView; siteUrl: string }) {
+  const title = tender.object || tender.generalObject || tender.reference;
+  const json: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: title,
+    description: tender.description ?? tender.generalObject ?? title,
+    url: `${siteUrl}/concursos/${tender.id}`,
+    datePublished: tender.publishedAt ? new Date(tender.publishedAt).toISOString() : undefined,
+    dateModified: tender.lastSeenAt ? new Date(tender.lastSeenAt).toISOString() : undefined,
+    inLanguage: "pt-MZ",
+    publisher: {
+      "@type": "Organization",
+      name: "Workdeal",
+      url: siteUrl,
+    },
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(json) }} />;
 }
 
 function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
@@ -54,6 +76,7 @@ export default async function PublicTenderPage({ params }: Props) {
 
   return (
     <div className="bg-[#F6F3EE]">
+      <TenderJsonLd tender={tender} siteUrl={getSiteUrl()} />
       <section className="border-b border-[#D9D2C2] bg-white">
         <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-[0.14em]">

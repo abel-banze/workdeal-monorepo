@@ -11,7 +11,6 @@ export const revalidate = 300;
 
 export async function generateMetadata() {
   return {
-    title: "Workdeal — Onde os negócios se encontram",
     description:
       "O Workdeal é o ecossistema global de negócios — uma plataforma digital onde empresas verificadas ganham visibilidade, constroem confiança e fecham negócios sem fronteiras.",
     openGraph: {
