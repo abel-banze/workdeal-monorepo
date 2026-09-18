@@ -51,10 +51,13 @@ export function TaskAgentSheet({ organizationId, taskRef }: { organizationId: st
       }
       const contextual = pairs.length > 0 ? composeFollowUp(pairs, text) : text;
       const res = await chatWithAssistant({ message: withTaskContext(contextual, taskRef ?? null), organizationId });
-      setTurns((t) => [...t, { role: "assistant", content: res.data?.reply ?? "Sem resposta." }]);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setTurns((t) => [...t, { role: "assistant", content: res.data.reply ?? "Sem resposta." }]);
     } catch (err) {
-      const raw = err instanceof Error ? err.message : "Falha ao contactar o assistente.";
-      toast.error(/timeout/i.test(raw) ? "O assistente está a demorar mais do que o esperado. Tente novamente." : raw);
+      toast.error(err instanceof Error ? err.message : "Falha ao contactar o assistente.");
     } finally {
       setBusy(false);
     }

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getSiteUrl } from "@/lib/seo";
 
+const MANIFESTO_OG_IMAGE = `${getSiteUrl()}/og-image-manifesto.png`;
+
 export const metadata: Metadata = {
   title: "Manifesto",
   description:
@@ -13,6 +15,7 @@ export const metadata: Metadata = {
     type: "article",
     url: `${getSiteUrl()}/manifesto`,
     siteName: "Workdeal",
+    images: [{ url: MANIFESTO_OG_IMAGE, alt: "Manifesto Workdeal" }],
   },
 };
 

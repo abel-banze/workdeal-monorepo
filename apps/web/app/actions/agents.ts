@@ -8,6 +8,22 @@ import { requireFeature } from "@/lib/features"
 import { assistantChatSchema, profileAssistantChatSchema, proposalDraftSchema, responseDraftSchema } from "@workdeal/shared"
 import { z } from "zod"
 
+export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string }
+
+/**
+ * Converte qualquer erro numa mensagem amigável para o utilizador.
+ * Nunca deixa escapar o erro genérico do Next.js ("An error occurred in the
+ * Server Components render…") que esconde o motivo real em produção.
+ */
+function toFriendlyError(err: unknown, fallback: string): string {
+  if (err instanceof Error && !/Server Components render/i.test(err.message)) {
+    const raw = err.message.trim()
+    if (/timeout/i.test(raw)) return fallback
+    return raw
+  }
+  return fallback
+}
+
 async function getAuthToken(): Promise<string> {
   const store = await cookies()
   const token = store.get(JWT_COOKIE_NAME)?.value
@@ -16,23 +32,33 @@ async function getAuthToken(): Promise<string> {
 }
 
 /** Chat com o Assistente Comercial (draft efémero — nunca persiste). */
-export async function chatWithAssistant(input: z.infer<typeof assistantChatSchema>) {
-  await requireAuth()
-  // Pré-check amigável (a API Hono mantém-se o ponto único de enforcement).
-  await requireFeature(input.organizationId ?? null, "ai_assistant")
-  const data = assistantChatSchema.parse(input)
-  const token = await getAuthToken()
-  return apiFetchWithAuth<{ reply: string }>("/api/v1/ai/assistant/chat", token, { method: "POST", body: JSON.stringify(data), timeoutMs: AI_API_TIMEOUT_MS })
+export async function chatWithAssistant(input: z.infer<typeof assistantChatSchema>): Promise<ActionResult<{ reply: string }>> {
+  try {
+    await requireAuth()
+    // Pré-check amigável (a API Hono mantém-se o ponto único de enforcement).
+    await requireFeature(input.organizationId ?? null, "ai_assistant")
+    const data = assistantChatSchema.parse(input)
+    const token = await getAuthToken()
+    const res = await apiFetchWithAuth<{ reply: string }>("/api/v1/ai/assistant/chat", token, { method: "POST", body: JSON.stringify(data), timeoutMs: AI_API_TIMEOUT_MS })
+    return { ok: true, data: res.data }
+  } catch (err) {
+    return { ok: false, error: toFriendlyError(err, "O assistente está a demorar mais do que o esperado. Tente novamente.") }
+  }
 }
 
 /** Rascunho de proposta preenchido num formulário (o utilizador revê e envia). */
-export async function draftProposalAction(input: Omit<z.infer<typeof proposalDraftSchema>, "providerProfileId"> & { providerProfileId?: string }) {
-  await requireAuth()
-  await requireFeature(input.organizationId ?? null, "ai_proposal_generation")
-  const providerProfileId = input.providerProfileId ?? (await resolveProviderProfileId())
-  const data = proposalDraftSchema.parse({ ...input, providerProfileId })
-  const token = await getAuthToken()
-  return apiFetchWithAuth<{ message: string }>("/api/v1/ai/proposals/draft", token, { method: "POST", body: JSON.stringify(data), timeoutMs: AI_API_TIMEOUT_MS })
+export async function draftProposalAction(input: Omit<z.infer<typeof proposalDraftSchema>, "providerProfileId"> & { providerProfileId?: string }): Promise<ActionResult<{ message: string }>> {
+  try {
+    await requireAuth()
+    await requireFeature(input.organizationId ?? null, "ai_proposal_generation")
+    const providerProfileId = input.providerProfileId ?? (await resolveProviderProfileId())
+    const data = proposalDraftSchema.parse({ ...input, providerProfileId })
+    const token = await getAuthToken()
+    const res = await apiFetchWithAuth<{ message: string }>("/api/v1/ai/proposals/draft", token, { method: "POST", body: JSON.stringify(data), timeoutMs: AI_API_TIMEOUT_MS })
+    return { ok: true, data: res.data }
+  } catch (err) {
+    return { ok: false, error: toFriendlyError(err, "Falha ao gerar o rascunho. Tente novamente.") }
+  }
 }
 
 async function resolveProviderProfileId(): Promise<string> {
@@ -43,22 +69,35 @@ async function resolveProviderProfileId(): Promise<string> {
 }
 
 /** Rascunho de resposta a um pedido de orçamento/oportunidade/contacto. */
-export async function draftResponseAction(input: z.infer<typeof responseDraftSchema>) {
-  await requireAuth()
-  await requireFeature(input.organizationId ?? null, "ai_response_support")
-  const data = responseDraftSchema.parse(input)
-  const token = await getAuthToken()
-  return apiFetchWithAuth<{ message: string }>("/api/v1/ai/responses/draft", token, { method: "POST", body: JSON.stringify(data), timeoutMs: AI_API_TIMEOUT_MS })
+export async function draftResponseAction(input: z.infer<typeof responseDraftSchema>): Promise<ActionResult<{ message: string }>> {
+  try {
+    await requireAuth()
+    await requireFeature(input.organizationId ?? null, "ai_response_support")
+    const data = responseDraftSchema.parse(input)
+    const token = await getAuthToken()
+    const res = await apiFetchWithAuth<{ message: string }>("/api/v1/ai/responses/draft", token, { method: "POST", body: JSON.stringify(data), timeoutMs: AI_API_TIMEOUT_MS })
+    return { ok: true, data: res.data }
+  } catch (err) {
+    return { ok: false, error: toFriendlyError(err, "Falha ao gerar a resposta. Tente novamente.") }
+  }
 }
 
 /** Chat com o assistente de IA de um perfil público (visitor autenticado). */
-export async function chatWithCompanyAssistant(input: z.infer<typeof profileAssistantChatSchema>, slug: string) {
-  await requireAuth()
-  const data = profileAssistantChatSchema.parse(input)
-  const token = await getAuthToken()
-  return apiFetchWithAuth<{ reply: string; suggest: "none" | "quote" | "whatsapp" | "bookmark" }>(
-    `/api/v1/profiles/${encodeURIComponent(slug)}/assistant/chat`,
-    token,
-    { method: "POST", body: JSON.stringify(data), timeoutMs: AI_API_TIMEOUT_MS },
-  )
+export async function chatWithCompanyAssistant(
+  input: z.infer<typeof profileAssistantChatSchema>,
+  slug: string,
+): Promise<ActionResult<{ reply: string; suggest: "none" | "quote" | "whatsapp" | "bookmark" }>> {
+  try {
+    await requireAuth()
+    const data = profileAssistantChatSchema.parse(input)
+    const token = await getAuthToken()
+    const res = await apiFetchWithAuth<{ reply: string; suggest: "none" | "quote" | "whatsapp" | "bookmark" }>(
+      `/api/v1/profiles/${encodeURIComponent(slug)}/assistant/chat`,
+      token,
+      { method: "POST", body: JSON.stringify(data), timeoutMs: AI_API_TIMEOUT_MS },
+    )
+    return { ok: true, data: res.data }
+  } catch (err) {
+    return { ok: false, error: toFriendlyError(err, "Falha ao contactar o assistente. Tente novamente.") }
+  }
 }

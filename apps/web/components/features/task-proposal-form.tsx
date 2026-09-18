@@ -63,7 +63,11 @@ export function TaskProposalForm({
     setAiBusy(true);
     try {
       const res = await draftProposalAction({ taskId, priceMzn, estimatedDays, providerProfileId: profileId || undefined });
-      const draft = res.data?.message;
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      const draft = res.data.message;
       if (draft) {
         setMessage(draft);
         toast.success("Rascunho gerado — revê antes de enviar.");

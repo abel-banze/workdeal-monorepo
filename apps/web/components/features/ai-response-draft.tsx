@@ -38,7 +38,11 @@ export function AiResponseDraft({ organizationId, trigger, defaultContextType = 
         fromOrganization: fromOrganization.trim() || null,
         organizationId,
       })
-      setDraft(res.data?.message ?? null)
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      setDraft(res.data.message ?? null)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao gerar a resposta.")
     } finally {
