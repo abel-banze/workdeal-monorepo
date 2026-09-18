@@ -1737,3 +1737,47 @@ export const tenderDocument = pgTable(
     index("tender_document_tender_idx").on(table.tenderId),
   ],
 );
+
+/**
+ * Conversas dos agentes de IA — memória por utilizador (nunca partilhada
+ * entre membros): `key` identifica o âmbito
+ * (`ai:v1:u:{userId}:a:{agent}:o:{orgId|-}:p:{profileId|-}`).
+ */
+export const aiConversation = pgTable(
+  "ai_conversation",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    key: text("key").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "cascade" }),
+    agentKey: text("agent_key").notNull(),
+    profileId: text("profile_id").references(() => profile.id, { onDelete: "cascade" }),
+    summary: text("summary"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ai_conversation_key_uidx").on(table.key),
+    index("ai_conversation_user_idx").on(table.userId),
+  ],
+);
+
+export const aiConversationMessage = pgTable(
+  "ai_conversation_message",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => aiConversation.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    text: text("text").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("ai_conversation_message_conversation_idx").on(table.conversationId, table.createdAt)],
+);

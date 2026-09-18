@@ -164,6 +164,12 @@ class BadgesRepository {
     return this.fetchAssignedViews(profileId);
   }
 
+  /** Nomes dos selos activos de um perfil (para contexto de IA — leve, sem awardedBy). */
+  async listActiveBadgeNames(profileId: string): Promise<string[]> {
+    const views = await this.fetchAssignedViews(profileId);
+    return views.filter((v) => v.status === "active").map((v) => v.name);
+  }
+
   async findInstitutionProfileId(institutionId: string): Promise<string | null> {
     const [row] = await db.select({ profileId: institution.profileId }).from(institution).where(eq(institution.id, institutionId)).limit(1);
     return row?.profileId ?? null;

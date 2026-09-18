@@ -103,6 +103,15 @@ export function truncateSdkMessage(err: unknown, max = 300): string | null {
   return msg ? msg.slice(0, max) : null;
 }
 
+/**
+ * Monta o prompt do utilizador para a segunda tentativa de output estruturado:
+ * o pedido original mais o motivo da rejeição (erros Zod ou validação de
+ * conteúdo), para o modelo corrigir em vez de repetir o mesmo erro.
+ */
+export function buildStructuredRetryUserPrompt(baseUser: string, feedback: string): string {
+  return `${baseUser}\n\nA resposta anterior foi rejeitada: ${feedback} Responde apenas com o objecto JSON válido.`;
+}
+
 /** Resultado bloqueado por guardrail — partilhado com `streamAgent`. */
 export function blockedResult(options: RunAgentOptions, guard: { code: string; message: string }, now: number): AgentRunResult {
   return {

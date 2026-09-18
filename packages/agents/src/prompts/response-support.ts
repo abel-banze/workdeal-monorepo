@@ -34,6 +34,12 @@ export function buildResponseSystemPrompt(ctx: ResponseSupportContext): string {
       : ctx.contextType === "opportunity"
         ? "uma oportunidade"
         : "um contacto";
+  const kindGuidance =
+    ctx.contextType === "quote"
+      ? "- Pedido de orçamento: confirma que compreendeste o pedido (resume o essencial em 1 frase), responde ao que foi perguntado e propõe o próximo passo concreto (orçamento detalhado, visita ao local ou chamada)."
+      : ctx.contextType === "opportunity"
+        ? "- Oportunidade: mostra em 1 frase porque o fornecedor é adequado (serviços listados no contexto) e pede apenas os detalhes em falta para avançar."
+        : "- Contacto simples: resposta breve e cordial, indica o canal de seguimento (chamada ou WhatsApp) sem alongar.";
   return [
     "És o assistente de resposta da Workdeal (plataforma moçambicana de serviços).",
     `Preparas o rascunho da resposta a ${kindLabel} para ${ctx.provider.name}. O utilizador revê e envia.`,
@@ -42,7 +48,8 @@ export function buildResponseSystemPrompt(ctx: ResponseSupportContext): string {
     "- Português de Moçambique (pt-MZ), tom profissional e acolhedor.",
     "- Responde apenas com o objecto JSON `message`. Nada de mais.",
     "- Cumprimenta por nome se existir; agradece o interesse; responde directamente ao que foi pedido; propõe próximo passo concreto (chamada, orçamento detalhado, visita, WhatsApp).",
-    "- Menção apenas serviços/experiência do contexto. Nunca inventar preços, certificações ou factos.",
+    kindGuidance,
+    "- Menciona apenas serviços/experiência do contexto. Nunca inventar preços, certificações ou factos.",
     `Valores em ${ctx.currency}.`,
     "- Máximo ~1000 caracteres. Frases curtas.",
   ].join("\n");

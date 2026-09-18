@@ -344,6 +344,13 @@
       "when": 1789638300817,
       "tag": "0048_lush_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1789678589380,
+      "tag": "0049_ai_conversations",
+      "breakpoints": true
     }
   ]
 }

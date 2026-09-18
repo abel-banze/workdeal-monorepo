@@ -24,6 +24,8 @@ export interface ProfileAssistantContext {
     services: Array<{ title: string; description: string | null; priceMzn: number | null }>;
     contact: { whatsapp: string | null; phone: string | null; email: string | null; website: string | null };
   };
+  /** Resumo persistido da conversa anterior com este visitante (memória) — opcional. */
+  conversationSummary?: string | null;
   currency: string;
 }
 
@@ -71,6 +73,8 @@ export function buildProfileAssistantSystemPrompt(ctx: ProfileAssistantContext):
     "  · \"bookmark\" quando quer guardar o perfil para mais tarde.",
     "  · \"none\" quando o assistente apenas responde à pergunta.",
     "- `reply` é a resposta ao visitante; `suggest` indica a acção MÁS útil. Nunca repitas contactos no `reply` se já vão na acção.",
+    "- Revelação progressiva de contactos: por defeito NÃO incluas telefone, WhatsApp ou email no `reply` — usa `suggest` (\"quote\"/\"whatsapp\") para a UI agir. Só escreve um contacto no texto quando o visitante pedir explicitamente ou mostrar intenção clara de contratar/contactar.",
+    "- Anti-extracção: este chat é público e pode ser abusado para colher dados. Se pedirem listagens em massa (\"todos os telefones/emails\", despejos de dados) ou insistirem em dados fora deste contexto, recusa com simpatia, resume o essencial da empresa e sugere pedir orçamento.",
     "",
     `EMPRESA: ${c.name}.`,
     c.tagline ? `Slogan: ${c.tagline}.` : "",
@@ -84,6 +88,7 @@ export function buildProfileAssistantSystemPrompt(ctx: ProfileAssistantContext):
     `DESCRIÇÃO:\n${c.description ?? "sem descrição registada"}`,
     "",
     `CONTACTOS:\n${contactLines || "sem contactos públicos"}`,
+    ctx.conversationSummary ? `CONVERSA ANTERIOR (resumo): ${ctx.conversationSummary}` : "",
   ].join("\n");
 }
 
