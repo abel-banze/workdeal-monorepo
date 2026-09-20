@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { getOrgRole } from "@workdeal/auth/repository"
 import { hasOrgPermission } from "@workdeal/shared"
+import { Card, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { OpportunitiesManager } from "./opportunities-manager"
 
 export type ProposalSentItem = {
@@ -79,24 +80,25 @@ export default async function OpportunitiesPage({
 
   return (
     <div className="mx-auto w-full max-w-[960px] space-y-5 pb-10">
-      <div className="rounded-[22px] border border-[#D9D2C2] bg-white p-6">
-        <p className="text-[11px] font-bold tracking-[0.14em] text-[#0B5E56]">OPORTUNIDADES · {isPersonal ? "PESSOAL" : String(orgName ?? organizationId).toUpperCase()}</p>
-        <h1 className="mt-2 text-[22px] font-black tracking-tight text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
-          Propostas e adjudicações
-        </h1>
-        <p className="mt-1 text-sm leading-relaxed text-[#0F1A2E]/60">
-          Acompanha as propostas que enviaste e os trabalhos que ganhaste — desde a adjudicação até à conclusão.
-        </p>
-      </div>
+      <Card>
+        <CardHeader>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Oportunidades · {isPersonal ? "Pessoal" : (orgName ?? organizationId)}</p>
+          <CardTitle className="text-xl">Propostas e adjudicações</CardTitle>
+          <CardDescription>
+            Acompanha as propostas que enviaste e os trabalhos que ganhaste — desde a adjudicação até à conclusão.
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
-      <div className="flex flex-wrap gap-1.5 rounded-[16px] border border-[#D9D2C2] bg-white p-2">
+      <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1.5">
         {TABS.map((t) => {
           const active = t.key === activeTab
           return (
             <a
               key={t.key}
               href={`/dashboard/${organizationId}/opportunities${t.key === "proposals" ? "" : `?tab=${t.key}`}`}
-              className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${active ? "bg-[#0F1A2E] text-white" : "text-[#0F1A2E]/60 hover:bg-[#F6F3EE] hover:text-[#0F1A2E]"}`}
+              aria-current={active ? "page" : undefined}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
             >
               {t.label}
             </a>
