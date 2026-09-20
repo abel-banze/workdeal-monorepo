@@ -1,6 +1,9 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { FiLock } from "react-icons/fi"
+import { MapPin, Pencil, FolderKanban, Store, ListChecks, Briefcase, CalendarDays, ArrowRight, TrendingUp, TrendingDown } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import { Button } from "@workspace/ui/components/button"
 import { notFound, redirect } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { getOrgRole } from "@workdeal/auth/repository"
@@ -200,157 +203,155 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
 
   return (
     <div className="mx-auto w-full max-w-[1160px] space-y-5 pb-10">
-      {/* ── Masthead — manifesto da organização ── */}
-      <div className="overflow-hidden rounded-[22px] border border-[#D9D2C2] bg-white shadow-[0_8px_32px_rgba(15,26,46,0.07)]">
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0F1A2E] px-5 py-3 sm:px-6">
-          <div className="flex items-center gap-2 text-[11px] font-bold tracking-[0.14em] text-white/60">
-            <span className="size-1.5 rounded-full bg-[#0B5E56] animate-pulse" aria-hidden />
-            PAINEL DA ORGANIZAÇÃO
-            <span className="hidden sm:inline text-white/20">·</span>
-            <span className="hidden sm:inline font-mono text-[11px] font-medium tracking-normal text-white/45">/{orgSlug ?? organizationId.slice(0, 8)}</span>
+      {/* ── Org header — quiet card, mesma linguagem do sidebar ── */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Painel da organização · <span className="font-mono normal-case">/{orgSlug ?? organizationId.slice(0, 8)}</span>
+            </p>
+            <div className="flex items-center gap-1.5">
+              <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize text-muted-foreground">{role}</span>
+              {orgVerified ? (
+                <span className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground">Verificada</span>
+              ) : (
+                <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium text-muted-foreground">Verificação pendente</span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold capitalize text-white/80">{role}</span>
-            <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${orgVerified ? "bg-[#0B5E56] text-white" : "bg-white/15 text-white/70"}`}>
-              {orgVerified ? "✓ Verificada" : "Verificação pendente"}
-            </span>
-          </div>
-        </div>
+        </CardHeader>
 
-        <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="relative p-5 sm:p-6">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-[0.035]"
-              style={{
-                backgroundImage: `linear-gradient(to right, #0F1A2E 1px, transparent 1px), linear-gradient(to bottom, #0F1A2E 1px, transparent 1px)`,
-                backgroundSize: "28px 28px",
-              }}
-            />
-            <div className="relative flex gap-4">
-              <div className="hidden sm:flex size-[72px] shrink-0 items-center justify-center rounded-[16px] border-[1.5px] border-dashed border-[#0B5E56]/30 bg-[#F6F3EE] text-[18px] font-black tracking-[-0.04em] text-[#0F1A2E]">
-                {initials}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <h1 className="text-[22px] font-black leading-none tracking-[-0.04em] text-[#0F1A2E] sm:text-[26px]" style={{ fontFamily: "var(--font-display)" }}>
-                    {orgName ?? profileName ?? "Empresa"}
-                  </h1>
-                  {qualification && (
-                    <span className="rounded-full bg-[#0F1A2E] px-2.5 py-1 text-[11px] font-bold text-white">
-                      {sizeLabelMap[qualification.companySize] ?? qualification.companySize}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-[#0F1A2E]/60">
-                  {profileName ? `Perfil público: ${profileName}` : "Sem perfil público ainda"} · {locations.length} {locations.length === 1 ? "local" : "locais"} ·{" "}
-                  {qualification ? `${qualification.workers} colaboradores` : "qualificação pendente"}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 text-xs font-medium text-[#0F1A2E]/70">
-                    {hasLocation ? `📍 ${locations[0]!.province}${locations[0]!.district ? ` · ${locations[0]!.district}` : ""}` : "Sem localização — adiciona para “Perto de mim”"}
+        <CardContent>
+          <div className="flex gap-4">
+            <div className="hidden size-12 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold text-muted-foreground sm:flex" aria-hidden>
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle>{orgName ?? profileName ?? "Empresa"}</CardTitle>
+                {qualification && (
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                    {sizeLabelMap[qualification.companySize] ?? qualification.companySize}
                   </span>
-                  {qualification?.nuit && (
-                    <span className="inline-flex rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 font-mono text-xs font-semibold text-[#0F1A2E]/70">NUIT {qualification.nuit}</span>
-                  )}
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href={`/dashboard/${organizationId}/profile/edit`} className="inline-flex h-8 items-center justify-center rounded-full bg-[#0F1A2E] px-4 text-xs font-bold text-white hover:bg-black">
-                    Editar perfil da empresa
-                  </Link>
-                  <Link
-                    href={profileSlug ? `/profiles/${profileSlug}` : orgSlug ? `/profiles/${orgSlug}` : "/companies"}
-                    className="inline-flex h-8 items-center justify-center rounded-full border border-[#D9D2C2] bg-white px-4 text-xs font-semibold text-[#0F1A2E] hover:border-[#0F1A2E]"
-                  >
-                    Ver no directório
-                  </Link>
-                </div>
+                )}
+              </div>
+              <CardDescription className="mt-1">
+                {profileName ? `Perfil público: ${profileName}` : "Sem perfil público ainda"} · {locations.length} {locations.length === 1 ? "local" : "locais"} ·{" "}
+                {qualification ? `${qualification.workers} colaboradores` : "qualificação pendente"}
+              </CardDescription>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-muted-foreground">
+                  <MapPin className="size-3.5" aria-hidden />
+                  {hasLocation ? `${locations[0]!.province}${locations[0]!.district ? ` · ${locations[0]!.district}` : ""}` : "Sem localização — adiciona para “Perto de mim”"}
+                </span>
+                {qualification?.nuit && (
+                  <span className="inline-flex rounded-full border px-2.5 py-1 font-mono text-xs text-muted-foreground">NUIT {qualification.nuit}</span>
+                )}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button render={<Link href={`/dashboard/${organizationId}/profile/edit`} />}>
+                  Editar perfil da empresa
+                </Button>
+                <Button variant="outline" render={<Link href={profileSlug ? `/profiles/${profileSlug}` : orgSlug ? `/profiles/${orgSlug}` : "/companies"} />}>
+                  Ver no directório
+                </Button>
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* visits summary — vault (desfocado com CTA quando premium bloqueado) */}
-          <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref}>
-          <div className="border-t border-[#D9D2C2] bg-[#F6F3EE] p-5 sm:p-6 lg:border-l lg:border-t-0">
-            <p className="text-[11px] font-bold tracking-[0.12em] text-[#0B5E56]">VISITAS · ÚLTIMOS 30 DIAS</p>
-            <div className="mt-3 flex items-baseline gap-3">
-              <span className="text-[42px] font-black leading-none tracking-[-0.05em] text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
+      {/* visits summary — vault (desfocado com CTA quando premium bloqueado) */}
+      <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref}>
+        <Card>
+          <CardHeader>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Visitas · últimos 30 dias</p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="font-heading text-4xl font-semibold tracking-tight">
                 {analytics.total30}
               </span>
-              <span className={`rounded-full px-2 py-1 text-xs font-bold ${analytics.growth >= 0 ? "bg-[#0B5E56] text-white" : "bg-[#FF3B1F] text-white"}`}>
-                {analytics.growth >= 0 ? `↗ +${analytics.growth}%` : `↘ ${analytics.growth}%`} vs 30d ant.
+              <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-muted-foreground">
+                {analytics.growth >= 0 ? <TrendingUp className="size-3.5" aria-hidden /> : <TrendingDown className="size-3.5" aria-hidden />}
+                {analytics.growth >= 0 ? `+${analytics.growth}%` : `${analytics.growth}%`} vs 30d ant.
               </span>
             </div>
-            <p className="mt-1 text-xs leading-relaxed text-[#0F1A2E]/55">
+            <CardDescription>
               {analytics.unicos30} visitantes únicos · média {(analytics.total30 / 30).toFixed(1)}/dia · pico {Math.max(...analytics.days.slice(-30).map((d) => d.visitas))} visitas
-            </p>
-            {/* mini ledger ticks — 30 tiny bars */}
-            <div className="mt-3 flex items-end gap-[2px] h-8">
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex h-8 items-end gap-[2px]">
               {analytics.days.slice(-30).map((d) => (
-                <div key={d.date} className="flex-1 rounded-sm bg-[#0B5E56]" style={{ height: `${Math.max(12, (d.visitas / 38) * 100)}%`, opacity: 0.18 + (d.visitas / 38) * 0.82 }} title={`${d.label}: ${d.visitas}`} />
+                <div key={d.date} className="flex-1 rounded-sm bg-primary" style={{ height: `${Math.max(12, (d.visitas / 38) * 100)}%`, opacity: 0.18 + (d.visitas / 38) * 0.82 }} title={`${d.label}: ${d.visitas}`} />
               ))}
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl bg-white px-2 py-2 border border-[#D9D2C2]">
-                <p className="font-mono text-sm font-bold text-[#0F1A2E]">{analytics.unicos30}</p>
-                <p className="text-[10px] font-bold tracking-wide text-[#0F1A2E]/50">ÚNICOS</p>
+              <div className="rounded-lg bg-muted px-2 py-2">
+                <p className="font-mono text-sm font-semibold">{analytics.unicos30}</p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Únicos</p>
               </div>
-              <div className="rounded-xl bg-white px-2 py-2 border border-[#D9D2C2]">
-                <p className="font-mono text-sm font-bold text-[#0F1A2E]">{Math.round((analytics.unicos30 / Math.max(1, analytics.total30)) * 100)}%</p>
-                <p className="text-[10px] font-bold tracking-wide text-[#0F1A2E]/50">RETORNO</p>
+              <div className="rounded-lg bg-muted px-2 py-2">
+                <p className="font-mono text-sm font-semibold">{Math.round((analytics.unicos30 / Math.max(1, analytics.total30)) * 100)}%</p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Retorno</p>
               </div>
-              <div className="rounded-xl bg-[#0F1A2E] px-2 py-2">
-                <p className="font-mono text-sm font-bold text-white">{analytics.quotesCount}</p>
-                <p className="text-[10px] font-bold tracking-wide text-white/60">ACÇÕES</p>
+              <div className="rounded-lg bg-muted px-2 py-2">
+                <p className="font-mono text-sm font-semibold">{analytics.quotesCount}</p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Acções</p>
               </div>
             </div>
-          </div>
-          </AnalyticsZone>
-        </div>
-      </div>
+          </CardContent>
+        </Card>
+      </AnalyticsZone>
 
-      {/* ── KPI strip org ── */}
+      {/* ── KPI strip org — 4 cards idênticos ── */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-[18px] border border-[#D9D2C2] bg-white p-4">
-          <p className="text-[11px] font-bold tracking-[0.1em] text-[#0F1A2E]/50">VISIBILIDADE</p>
-          <p className="mt-2 text-sm font-bold text-[#0F1A2E]">{isProfilePublished ? "Publicada no directório" : "Rascunho — não listada"}</p>
-          <p className="mt-1 text-xs text-[#0F1A2E]/55">{isProfilePublished ? "Aparece em pesquisas e mapa." : "Completa perfil para ser encontrada."}</p>
-          <div className="mt-3 h-1.5 rounded-full bg-[#F6F3EE] overflow-hidden flex">
-            <div className="bg-[#0B5E56]" style={{ width: isProfilePublished ? "92%" : "18%" }} />
-          </div>
-        </div>
+        <Card size="sm">
+          <CardHeader>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Visibilidade</p>
+            <CardTitle className="text-sm">{isProfilePublished ? "Publicada no directório" : "Rascunho — não listada"}</CardTitle>
+            <CardDescription>{isProfilePublished ? "Aparece em pesquisas e mapa." : "Completa perfil para ser encontrada."}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className="bg-primary" style={{ width: isProfilePublished ? "92%" : "18%" }} />
+            </div>
+          </CardContent>
+        </Card>
         <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} overlay="compact">
-        <div className="rounded-[18px] border border-[#D9D2C2] bg-[#0F1A2E] p-4 text-white">
-          <p className="text-[11px] font-bold tracking-[0.1em] text-white/50">PERFORMANCE</p>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-[26px] font-black leading-none" style={{ fontFamily: "var(--font-display)" }}>
-              {Math.round((analytics.unicos30 / Math.max(1, analytics.total30)) * 100)}%
-            </span>
-            <span className="text-xs text-white/60">taxa visitantes únicos</span>
-          </div>
-          <p className="mt-1 text-xs text-white/50">Visitantes que voltam para contactar.</p>
-        </div>
+          <Card size="sm">
+            <CardHeader>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Performance</p>
+              <CardTitle className="font-heading text-2xl font-semibold tracking-tight">
+                {Math.round((analytics.unicos30 / Math.max(1, analytics.total30)) * 100)}%
+              </CardTitle>
+              <CardDescription>Taxa de visitantes únicos — visitantes que voltam para contactar.</CardDescription>
+            </CardHeader>
+          </Card>
         </AnalyticsZone>
         <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} overlay="compact">
-        <div className="rounded-[18px] border border-[#D9D2C2] bg-[#F6F3EE] p-4">
-          <p className="text-[11px] font-bold tracking-[0.1em] text-[#0F1A2E]/50">CONVERSÃO {analytics.realQuotesCount > 0 ? "REAL" : "EST."}</p>
-          <p className="mt-2 text-sm font-bold text-[#0F1A2E]">
-            {analytics.realQuotesCount > 0
-              ? `${analytics.realQuotesCount} cotações / 30d (real)`
-              : `${analytics.quotesCount} contactos / 30d`}
-          </p>
-          <p className="mt-1 text-xs text-[#0F1A2E]/55">
-            {analytics.realQuotesCount > 0 ? "Cotações via /api/v1/quotes" : "Cliques em WhatsApp/telefone/email"}
-          </p>
-        </div>
+          <Card size="sm">
+            <CardHeader>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Conversão {analytics.realQuotesCount > 0 ? "real" : "est."}</p>
+              <CardTitle className="text-sm">
+                {analytics.realQuotesCount > 0
+                  ? `${analytics.realQuotesCount} cotações / 30d (real)`
+                  : `${analytics.quotesCount} contactos / 30d`}
+              </CardTitle>
+              <CardDescription>
+                {analytics.realQuotesCount > 0 ? "Cotações via /api/v1/quotes" : "Cliques em WhatsApp/telefone/email"}
+              </CardDescription>
+            </CardHeader>
+          </Card>
         </AnalyticsZone>
-        <div className="rounded-[18px] border border-[#D9D2C2] bg-white p-4">
-          <p className="text-[11px] font-bold tracking-[0.1em] text-[#0F1A2E]/50">TERRITÓRIO</p>
-          <p className="mt-2 text-sm font-bold text-[#0F1A2E]">{locations.length} sede(s) activas</p>
-          <p className="mt-1 text-xs text-[#0F1A2E]/55">
-            {locations.filter((l) => l.visibility === "exact" && l.latitude).length} com pin exacto · PostGIS ranking activo
-          </p>
-        </div>
+        <Card size="sm">
+          <CardHeader>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Território</p>
+            <CardTitle className="text-sm">{locations.length} sede(s) activas</CardTitle>
+            <CardDescription>
+              {locations.filter((l) => l.visibility === "exact" && l.latitude).length} com pin exacto · PostGIS ranking activo
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
 
       {/* ── Analytics premium — desfocado com CTA quando bloqueado ── */}
@@ -443,64 +444,37 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
         </div>
       </div>
 
-      <div className="rounded-[20px] border border-[#D9D2C2] bg-white p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-black tracking-tight text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
-            Atalhos da organização
-          </h2>
-          <span className="text-xs text-[#0F1A2E]/45">Operação diária sem sair do painel.</span>
-        </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <Link href={`/dashboard/${organizationId}/profile/edit`} className="group flex items-center gap-3 rounded-[16px] border border-[#D9D2C2] bg-[#F6F3EE] px-4 py-3 hover:border-[#0B5E56]/30 hover:bg-white">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-[#0F1A2E] text-white">◈</span>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold leading-tight text-[#0F1A2E]">Editar perfil</span>
-              <span className="block text-xs text-[#0F1A2E]/55">Logo, bio, contactos</span>
-            </span>
-            <span className="ml-auto text-[#0F1A2E]/30 group-hover:text-[#0B5E56]">→</span>
-          </Link>
-          <Link href={`/dashboard/${organizationId}/profile`} className="group flex items-center gap-3 rounded-[16px] border border-[#D9D2C2] bg-white px-4 py-3 hover:border-[#0F1A2E]/20">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-[#0B5E56] text-white">◎</span>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold leading-tight text-[#0F1A2E]">Portfólio</span>
-              <span className="block text-xs text-[#0F1A2E]/55">Obras e casos</span>
-            </span>
-            <span className="ml-auto text-[#0F1A2E]/30 group-hover:text-[#0B5E56]">→</span>
-          </Link>
-          <Link href="/companies" className="group flex items-center gap-3 rounded-[16px] border border-[#D9D2C2] bg-white px-4 py-3 hover:border-[#0F1A2E]/20">
-            <span className="flex size-9 items-center justify-center rounded-xl border border-[#D9D2C2] bg-[#F6F3EE] text-[#0F1A2E]">✦</span>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold leading-tight text-[#0F1A2E]">Concorrência</span>
-              <span className="block text-xs text-[#0F1A2E]/55">Ver vizinhos no mapa</span>
-            </span>
-            <span className="ml-auto text-[#0F1A2E]/30 group-hover:text-[#0B5E56]">→</span>
-          </Link>
-          <Link href={`/dashboard/${organizationId}/tasks`} className="group flex items-center gap-3 rounded-[16px] border border-[#D9D2C2] bg-[#F6F3EE] px-4 py-3 hover:border-[#0B5E56]/30 hover:bg-white">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-[#0F1A2E] text-white">▤</span>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold leading-tight text-[#0F1A2E]">Tarefas</span>
-              <span className="block text-xs text-[#0F1A2E]/55">Publicar e gerir propostas</span>
-            </span>
-            <span className="ml-auto text-[#0F1A2E]/30 group-hover:text-[#0B5E56]">→</span>
-          </Link>
-          <Link href={`/dashboard/${organizationId}/opportunities`} className="group flex items-center gap-3 rounded-[16px] border border-[#D9D2C2] bg-white px-4 py-3 hover:border-[#0F1A2E]/20">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-[#0B5E56] text-white">⬡</span>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold leading-tight text-[#0F1A2E]">Oportunidades</span>
-              <span className="block text-xs text-[#0F1A2E]/55">Propostas e adjudicações</span>
-            </span>
-            <span className="ml-auto text-[#0F1A2E]/30 group-hover:text-[#0B5E56]">→</span>
-          </Link>
-          <Link href={`/dashboard/${organizationId}/events`} className="group flex items-center gap-3 rounded-[16px] border border-[#D9D2C2] bg-white px-4 py-3 hover:border-[#0F1A2E]/20">
-            <span className="flex size-9 items-center justify-center rounded-xl border border-[#D9D2C2] bg-[#F6F3EE] text-[#0F1A2E]">◷</span>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold leading-tight text-[#0F1A2E]">Eventos</span>
-              <span className="block text-xs text-[#0F1A2E]/55">Criar e fazer check-in</span>
-            </span>
-            <span className="ml-auto text-[#0F1A2E]/30 group-hover:text-[#0B5E56]">→</span>
-          </Link>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-sm">Atalhos da organização</CardTitle>
+            <CardDescription>Operação diária sem sair do painel.</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { href: `/dashboard/${organizationId}/profile/edit`, icon: Pencil, title: "Editar perfil", desc: "Logo, bio, contactos" },
+              { href: `/dashboard/${organizationId}/profile`, icon: FolderKanban, title: "Portfólio", desc: "Obras e casos" },
+              { href: "/companies", icon: Store, title: "Concorrência", desc: "Ver vizinhos no mapa" },
+              { href: `/dashboard/${organizationId}/tasks`, icon: ListChecks, title: "Tarefas", desc: "Publicar e gerir propostas" },
+              { href: `/dashboard/${organizationId}/opportunities`, icon: Briefcase, title: "Oportunidades", desc: "Propostas e adjudicações" },
+              { href: `/dashboard/${organizationId}/events`, icon: CalendarDays, title: "Eventos", desc: "Criar e fazer check-in" },
+            ].map((item) => (
+              <Link key={item.title} href={item.href} className="group flex items-center gap-3 rounded-lg border px-4 py-3 hover:bg-muted">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <item.icon className="size-4" aria-hidden />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium leading-tight">{item.title}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{item.desc}</span>
+                </span>
+                <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {aiAssistant && (
         <AiAssistantPanel organizationId={organizationId} />

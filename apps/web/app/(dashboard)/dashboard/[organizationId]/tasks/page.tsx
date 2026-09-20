@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { getOrgRole } from "@workdeal/auth/repository"
 import { hasOrgPermission } from "@workdeal/shared"
+import { Card, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { TasksManager } from "./tasks-manager"
 
 export type TaskListItem = {
@@ -82,30 +83,31 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
 
   return (
     <div className="mx-auto w-full max-w-[960px] space-y-5 pb-10">
-      <div className="rounded-[22px] border border-[#D9D2C2] bg-white p-6">
-        <p className="text-[11px] font-bold tracking-[0.14em] text-[#0B5E56]">TAREFAS · {isPersonal ? "PESSOAL" : String(orgName ?? organizationId).toUpperCase()}</p>
-        <h1 className="mt-2 text-[22px] font-black tracking-tight text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
-          Pedidos de serviço
-        </h1>
-        <p className="mt-1 text-sm leading-relaxed text-[#0F1A2E]/60">
-          Publica tarefas, gere propostas e adjudica em execução. Tarefas aparecem para fornecedores na directoria e nas oportunidades.
-        </p>
-      </div>
+      <Card>
+        <CardHeader>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tarefas · {isPersonal ? "Pessoal" : (orgName ?? organizationId)}</p>
+          <CardTitle className="text-xl">Pedidos de serviço</CardTitle>
+          <CardDescription>
+            Publica tarefas, gere propostas e adjudica em execução. Tarefas aparecem para fornecedores na directoria e nas oportunidades.
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
-      <div className="flex flex-wrap gap-1.5 rounded-[16px] border border-[#D9D2C2] bg-white p-2">
+      <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1.5">
         {STATUS_TABS.map((t) => {
           const active = t.key === activeStatus
           return (
             <a
               key={t.key}
               href={`/dashboard/${organizationId}/tasks${t.key === "all" ? "" : `?status=${t.key}`}`}
-              className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${active ? "bg-[#0F1A2E] text-white" : "text-[#0F1A2E]/60 hover:bg-[#F6F3EE] hover:text-[#0F1A2E]"}`}
+              aria-current={active ? "page" : undefined}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
             >
               {t.label}
             </a>
           )
         })}
-        <span className="ml-auto self-center pr-2 text-xs font-semibold text-[#0F1A2E]/45">{activeTab?.label ?? "Todas"}</span>
+        <span className="ml-auto self-center pr-2 text-xs text-muted-foreground">{activeTab?.label ?? "Todas"}</span>
       </div>
 
       <TasksManager

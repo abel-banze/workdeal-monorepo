@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { ArrowLeft } from "lucide-react"
 import { requireAuth } from "@/lib/auth"
 import { featureAccessible } from "@/lib/features"
 import { getOrgRole } from "@workdeal/auth/repository"
@@ -117,10 +118,10 @@ export default async function TaskDetailPage({
 
   if (!task) {
     return (
-      <div className="mx-auto max-w-[800px] rounded-[20px] border border-dashed border-[#D9D2C2] bg-white p-8 text-center">
-        <p className="text-sm font-bold text-[#0F1A2E]">Tarefa não encontrada</p>
-        <Link href={`/dashboard/${organizationId}/tasks`} className="mt-3 inline-block text-xs font-bold text-[#0B5E56]">
-          ← Voltar às tarefas
+      <div className="mx-auto max-w-[800px] rounded-xl border border-dashed bg-card p-8 text-center">
+        <p className="text-sm font-semibold">Tarefa não encontrada</p>
+        <Link href={`/dashboard/${organizationId}/tasks`} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+          <ArrowLeft className="size-3.5" aria-hidden /> Voltar às tarefas
         </Link>
       </div>
     )
@@ -133,17 +134,17 @@ export default async function TaskDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-[1024px] space-y-5 pb-10">
-      <div className="flex items-center gap-2 text-xs text-[#0F1A2E]/50">
-        <Link href={`/dashboard/${organizationId}/tasks`} className="font-bold text-[#0B5E56] hover:underline">
-          ← Tarefas
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Link href={`/dashboard/${organizationId}/tasks`} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+          <ArrowLeft className="size-3.5" aria-hidden /> Tarefas
         </Link>
         <span>/</span>
         <span className="truncate">{task.title}</span>
       </div>
 
       <div>
-        <p className="text-[11px] font-bold tracking-[0.14em] text-[#0B5E56]">TAREFA · {orgName?.toUpperCase() ?? "PESSOAL"}</p>
-        <h1 className="mt-1 text-[22px] font-black leading-tight tracking-tight text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tarefa · {orgName ?? "Pessoal"}</p>
+        <h1 className="mt-1 text-xl font-bold leading-tight tracking-tight">
           {task.title}
         </h1>
       </div>
@@ -153,7 +154,7 @@ export default async function TaskDetailPage({
           title: task.title,
           description: task.description,
           statusLabel: task.status.replace("_", " "),
-          statusCls: "bg-[#0F1A2E] text-white",
+          statusCls: "bg-primary text-primary-foreground",
           budgetLabel:
             task.priceMinMzn != null || task.priceMaxMzn != null
               ? `${task.priceMinMzn != null ? `${task.priceMinMzn.toLocaleString("pt-MZ")} MZN` : "—"} – ${task.priceMaxMzn != null ? `${task.priceMaxMzn.toLocaleString("pt-MZ")} MZN` : "—"}`
@@ -173,7 +174,7 @@ export default async function TaskDetailPage({
         }}
       />
 
-      {error && <p className="rounded-lg border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 px-3 py-2 text-xs text-[#7A1A0A]">{error}</p>}
+      {error && <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
 
       {aiEnabled && <TaskAgentSheet organizationId={aiScope} taskRef={{ id: task.id, title: task.title }} />}
 
@@ -189,7 +190,7 @@ export default async function TaskDetailPage({
           budgetMax={task.priceMaxMzn}
         />
       ) : (
-        <div className="rounded-[20px] border border-dashed border-[#D9D2C2] bg-white p-6 text-sm text-[#0F1A2E]/60">
+        <div className="rounded-xl border border-dashed bg-card p-6 text-sm text-muted-foreground">
           Não és o solicitante desta tarefa — só o utilizador que a publicou gere as propostas.
         </div>
       )}

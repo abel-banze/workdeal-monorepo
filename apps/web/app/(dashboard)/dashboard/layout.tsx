@@ -127,7 +127,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <DashboardVerificationButton />
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-5 bg-[#F6F3EE] p-5 pt-2">{children}</div>
+        <div className="flex flex-1 flex-col gap-5 bg-muted p-5 pt-2">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   )
