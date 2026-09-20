@@ -2,11 +2,13 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { ArrowRight, Plus } from "lucide-react"
 import { createTask, updateTask } from "@/app/actions/tasks"
 import { TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import type { TaskListItem } from "./page"
 
-const PROVINCES = ["Cidade de Maputo", "Matola", "Gaza", "Inhambane", "Sofala", "Manica", "Tete", "Zambézia", "Nampula", "Niassa", "Cabo Delgado"]
+const PROVINCES = ["Cabo Delgado", "Cidade de Maputo", "Gaza", "Inhambane", "Manica", "Maputo", "Nampula", "Niassa", "Sofala", "Tete", "Zambézia"]
 
 type ContractType = "service" | "recurring" | "consulting" | "emergency" | "project" | "public_tender"
 type TagOption = { id: string; slug: string; name: string; category?: string | null }
@@ -17,12 +19,12 @@ const CONTRACT_OPTIONS = (Object.keys(TASK_CONTRACT_TYPE_LABELS_PT) as ContractT
 type TaskStatus = "open" | "in_review" | "in_progress" | "completed" | "cancelled" | "withdrawn"
 
 const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
-  open: { label: "Aceitando propostas", cls: "bg-[#0B5E56] text-white" },
-  in_review: { label: "Em análise", cls: "bg-[#0F1A2E] text-white" },
-  in_progress: { label: "Em execução", cls: "bg-[#D97706] text-white" },
-  completed: { label: "Concluída", cls: "bg-[#0F766E] text-white" },
-  cancelled: { label: "Cancelada", cls: "bg-[#FF3B1F] text-white" },
-  withdrawn: { label: "Retirada", cls: "bg-[#6B7280] text-white" },
+  open: { label: "Aceitando propostas", cls: "bg-primary text-primary-foreground" },
+  in_review: { label: "Em análise", cls: "border border-border bg-card text-foreground" },
+  in_progress: { label: "Em execução", cls: "bg-muted text-foreground" },
+  completed: { label: "Concluída", cls: "bg-primary/10 text-primary" },
+  cancelled: { label: "Cancelada", cls: "bg-destructive/10 text-destructive" },
+  withdrawn: { label: "Retirada", cls: "border border-border bg-card text-muted-foreground" },
 }
 
 function fmtMzn(v: number | null): string {
@@ -153,21 +155,24 @@ export function TasksManager({
   return (
     <div className="space-y-5">
       {canManage && (
-        <div className="rounded-[20px] border border-[#D9D2C2] bg-white p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-black text-[#0F1A2E]">Publicar tarefa</h2>
-              <p className="mt-0.5 text-xs text-[#0F1A2E]/55">Solicitante: {orgName}. Fornecedores que se candidatam aparecem em “propostas”.</p>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-sm">Publicar tarefa</CardTitle>
+                <CardDescription>Solicitante: {orgName}. Fornecedores que se candidatam aparecem em “propostas”.</CardDescription>
+              </div>
+              <button type="button" onClick={() => setOpenForm((v) => !v)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted">
+                {openForm ? "Fechar" : (<><Plus className="size-3.5" aria-hidden /> Nova tarefa</>)}
+              </button>
             </div>
-            <button type="button" onClick={() => setOpenForm((v) => !v)} className="rounded-full border border-[#D9D2C2] bg-white px-4 py-2 text-xs font-bold text-[#0F1A2E] hover:bg-[#F6F3EE]">
-              {openForm ? "Fechar" : "Nova tarefa +"}
-            </button>
-          </div>
+          </CardHeader>
           {openForm && (
-            <form onSubmit={onCreate} className="mt-4 space-y-3">
+            <CardContent>
+            <form onSubmit={onCreate} className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
-                <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Título * ex: Instalação de ar-condicionado 18K BTU" maxLength={120} className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
-                <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]">
+                <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Título * ex: Instalação de ar-condicionado 18K BTU" maxLength={120} className="rounded-lg border border-border bg-muted px-3 py-2 text-[13px] text-foreground" />
+                <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="rounded-lg border border-border bg-muted px-3 py-2 text-[13px] text-foreground">
                   <option value="">Categoria (opcional)</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -175,7 +180,7 @@ export function TasksManager({
                     </option>
                   ))}
                 </select>
-                <select value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value as ContractType })} className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]">
+                <select value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value as ContractType })} className="rounded-lg border border-border bg-muted px-3 py-2 text-[13px] text-foreground">
                   <option value="">Tipo de contrato (opcional)</option>
                   {CONTRACT_OPTIONS.map((k) => (
                     <option key={k} value={k}>
@@ -183,7 +188,7 @@ export function TasksManager({
                     </option>
                   ))}
                 </select>
-                <select value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]">
+                <select value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} className="rounded-lg border border-border bg-muted px-3 py-2 text-[13px] text-foreground">
                   <option value="">Província (opcional)</option>
                   {PROVINCES.map((p) => (
                     <option key={p} value={p}>
@@ -191,18 +196,18 @@ export function TasksManager({
                     </option>
                   ))}
                 </select>
-                <input value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} placeholder="Distrito (opcional)" maxLength={80} className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
-                <input value={form.priceMin} onChange={(e) => setForm({ ...form, priceMin: e.target.value })} type="number" min={0} placeholder="Orçamento mín. (MZN)" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
-                <input value={form.priceMax} onChange={(e) => setForm({ ...form, priceMax: e.target.value })} type="number" min={0} placeholder="Orçamento máx. (MZN)" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
-                <input value={form.dueAt} onChange={(e) => setForm({ ...form, dueAt: e.target.value })} type="datetime-local" title="Prazo de execução da tarefa" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
-                <input value={form.proposalDeadlineAt} onChange={(e) => setForm({ ...form, proposalDeadlineAt: e.target.value })} type="datetime-local" title="Data limite para receber propostas" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
+                <input value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} placeholder="Distrito (opcional)" maxLength={80} className="rounded-lg border border-border bg-muted px-3 py-2 text-[13px] text-foreground" />
+                <input value={form.priceMin} onChange={(e) => setForm({ ...form, priceMin: e.target.value })} type="number" min={0} placeholder="Orçamento mín. (MZN)" className="rounded-lg border border-border bg-muted px-3 py-2 text-[13px] text-foreground" />
+                <input value={form.priceMax} onChange={(e) => setForm({ ...form, priceMax: e.target.value })} type="number" min={0} placeholder="Orçamento máx. (MZN)" className="rounded-lg border border-border bg-muted px-3 py-2 text-[13px] text-foreground" />
+                <input value={form.dueAt} onChange={(e) => setForm({ ...form, dueAt: e.target.value })} type="datetime-local" title="Prazo de execução da tarefa" className="rounded-lg border border-border bg-muted px-3 py-2 text-[13px] text-foreground" />
+                <input value={form.proposalDeadlineAt} onChange={(e) => setForm({ ...form, proposalDeadlineAt: e.target.value })} type="datetime-local" title="Data limite para receber propostas" className="rounded-lg border border-border bg-muted px-3 py-2 text-[13px] text-foreground" />
               </div>
               {tags.length > 0 && (
-                <div className="rounded-lg border border-[#D9D2C2] bg-white p-3">
+                <div className="rounded-lg border border-border bg-card p-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-[#0F1A2E]">Área da tarefa / competências ({form.tagSlugs.length}/10)</p>
+                    <p className="text-xs font-bold text-foreground">Área da tarefa / competências ({form.tagSlugs.length}/10)</p>
                     {form.tagSlugs.length > 0 && (
-                      <button type="button" onClick={() => setForm({ ...form, tagSlugs: [] })} className="text-[11px] font-bold text-[#0B5E56] hover:underline">
+                      <button type="button" onClick={() => setForm({ ...form, tagSlugs: [] })} className="text-[11px] font-bold text-primary hover:underline">
                         Limpar
                       </button>
                     )}
@@ -210,7 +215,7 @@ export function TasksManager({
                   <div className="mt-2 space-y-2">
                     {Object.entries(tagGroups).map(([cat, items]) => (
                       <div key={cat} className="flex flex-wrap items-center gap-1.5">
-                        <span className="w-24 shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[#0F1A2E]/40">{cat}</span>
+                        <span className="w-24 shrink-0 font-mono text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{cat}</span>
                         {items.map((t) => {
                           const on = form.tagSlugs.includes(t.slug)
                           return (
@@ -219,7 +224,7 @@ export function TasksManager({
                               type="button"
                               onClick={() => toggleTag(t.slug)}
                               className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                                on ? "bg-[#0B5E56] text-white" : "border border-[#D9D2C2] bg-[#F6F3EE] text-[#0F1A2E]/70 hover:border-[#0B5E56] hover:text-[#0B5E56]"
+                                on ? "bg-primary text-primary-foreground" : "border border-border bg-muted text-muted-foreground hover:border-primary hover:text-primary"
                               }`}
                             >
                               {t.name}
@@ -231,41 +236,41 @@ export function TasksManager({
                   </div>
                 </div>
               )}
-              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Descrição detalhada * (mín. 20 caracteres)" rows={4} className="w-full rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
+              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Descrição detalhada * (mín. 20 caracteres)" rows={4} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-[13px] text-foreground" />
               <div className="flex items-center gap-3">
-                <button type="submit" disabled={saving} className="rounded-full bg-[#0F1A2E] px-6 py-2.5 text-sm font-bold text-white hover:bg-black disabled:opacity-50">
+                <button type="submit" disabled={saving} className="rounded-full bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/80 disabled:opacity-50">
                   {saving ? "A publicar…" : "Publicar tarefa"}
                 </button>
-                {error && <p className="rounded-lg border border-[#FF3B1F]/20 bg-[#FF3B1F]/10 px-3 py-2 text-xs text-[#7A1A0A]">{error}</p>}
+                {error && <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
               </div>
             </form>
-          )}
-        </div>
+            </CardContent>
+        </Card>
       )}
 
-      {msg && <p className="rounded-lg border border-[#0B5E56]/20 bg-[#0B5E56]/10 px-3 py-2 text-xs text-[#0B5E56]">{msg}</p>}
+      {msg && <p className="rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-primary">{msg}</p>}
 
       {tasks.length === 0 && (
-        <p className="rounded-xl border border-dashed border-[#D9D2C2] bg-white p-6 text-center text-sm text-[#0F1A2E]/50">Ainda sem tarefas neste estado.</p>
+        <p className="rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">Ainda sem tarefas neste estado.</p>
       )}
 
       <div className="space-y-3">
         {tasks.map((t) => {
-          const st = STATUS_STYLES[t.status] ?? { label: t.status, cls: "bg-[#6B7280] text-white" }
+          const st = STATUS_STYLES[t.status] ?? { label: t.status, cls: "bg-muted text-muted-foreground" }
           return (
-            <div key={t.id} className="rounded-[18px] border border-[#D9D2C2] bg-white p-4">
+            <div key={t.id} className="rounded-xl border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-[15px] font-black leading-tight text-[#0F1A2E]">{t.title}</h3>
+                    <h3 className="text-[15px] font-bold leading-tight text-foreground">{t.title}</h3>
                     <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.label}</span>
                     {t.contractType && (
-                      <span className="rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-0.5 text-[11px] font-semibold text-[#0F1A2E]/70">
+                      <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
                         {TASK_CONTRACT_TYPE_LABELS_PT[t.contractType as ContractType] ?? t.contractType}
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-[#0F1A2E]/55">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {[t.province, t.district].filter(Boolean).join(" · ") || "Local a combinar"} · criada {new Date(t.createdAt).toLocaleDateString("pt-MZ")}
                     {t.proposalDeadlineAt && (
                       <> · propostas até {new Date(t.proposalDeadlineAt).toLocaleString("pt-MZ", { dateStyle: "short", timeStyle: "short" })}</>
@@ -273,51 +278,51 @@ export function TasksManager({
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 font-mono font-semibold text-[#0F1A2E]">{fmtMzn(t.priceMinMzn)}–{fmtMzn(t.priceMaxMzn)}</span>
-                  {t.dueAt && <span className="rounded-full border border-[#D9D2C2] bg-white px-2.5 py-1 text-[#0F1A2E]/60">prazo {new Date(t.dueAt).toLocaleDateString("pt-MZ")}</span>}
+                  <span className="rounded-full border border-border bg-muted px-2.5 py-1 font-mono font-semibold text-foreground">{fmtMzn(t.priceMinMzn)}–{fmtMzn(t.priceMaxMzn)}</span>
+                  {t.dueAt && <span className="rounded-full border border-border bg-card px-2.5 py-1 text-muted-foreground">prazo {new Date(t.dueAt).toLocaleDateString("pt-MZ")}</span>}
                 </div>
               </div>
 
-              {catName(t.categoryId) && <p className="mt-2 text-xs font-semibold text-[#0B5E56]">{catName(t.categoryId)}</p>}
+              {catName(t.categoryId) && <p className="mt-2 text-xs font-semibold text-primary">{catName(t.categoryId)}</p>}
 
               {canManage && (t.tags ?? []).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {(t.tags ?? []).map((tag) => (
-                    <span key={tag.id} className="rounded-full border border-[#D9D2C2] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0F1A2E]/60">
+                    <span key={tag.id} className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
                       {tag.name}
                     </span>
                   ))}
                 </div>
               )}
 
-              <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-[#0F1A2E]/60">{t.description}</p>
+              <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">{t.description}</p>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-[#0F1A2E] px-2.5 py-1 text-[11px] font-bold text-white">{t.proposalCount} {t.proposalCount === 1 ? "proposta" : "propostas"}</span>
+                <span className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground">{t.proposalCount} {t.proposalCount === 1 ? "proposta" : "propostas"}</span>
                 <Link
                   href={`/dashboard/${organizationId}/tasks/${t.id}`}
-                  className="rounded-full border border-[#D9D2C2] bg-white px-3.5 py-1.5 text-xs font-bold text-[#0F1A2E] hover:border-[#0F1A2E]"
+                  className="inline-flex items-center gap-1 rounded-full border px-3.5 py-1.5 text-xs font-medium hover:bg-muted"
                 >
-                  Ver propostas →
+                  Ver propostas <ArrowRight className="size-3.5" aria-hidden />
                 </Link>
                 {canManage && (t.status === "open" || t.status === "in_review") && (
                   <>
                     {t.status === "open" && (
-                      <button onClick={() => onStatus(t.id, "withdrawn")} className="rounded-full border border-[#D9D2C2] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#0F1A2E]/70 hover:bg-[#F6F3EE]">
+                      <button onClick={() => onStatus(t.id, "withdrawn")} className="rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted">
                         Retirar
                       </button>
                     )}
-                    <button onClick={() => onStatus(t.id, "cancelled")} className="rounded-full border border-[#FF3B1F]/25 bg-white px-3.5 py-1.5 text-xs font-semibold text-[#7A1A0A] hover:bg-[#FF3B1F]/10">
+                    <button onClick={() => onStatus(t.id, "cancelled")} className="rounded-full border border-destructive/25 bg-card px-3.5 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10">
                       Cancelar
                     </button>
                   </>
                 )}
                 {canManage && t.status === "withdrawn" && (
-                  <button onClick={() => onStatus(t.id, "open")} className="rounded-full border border-[#0B5E56]/25 bg-white px-3.5 py-1.5 text-xs font-semibold text-[#0B5E56] hover:bg-[#0B5E56]/10">
+                  <button onClick={() => onStatus(t.id, "open")} className="rounded-full border border-primary/25 bg-card px-3.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10">
                     Reabrir
                   </button>
                 )}
-                {!canManage && <span className="text-xs text-[#0F1A2E]/40">Modo leitura · papel actual não gere tarefas</span>}
+                {!canManage && <span className="text-xs text-muted-foreground">Modo leitura · papel actual não gere tarefas</span>}
               </div>
             </div>
           )
