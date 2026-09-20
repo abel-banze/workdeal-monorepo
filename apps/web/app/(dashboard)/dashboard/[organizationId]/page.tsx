@@ -1,13 +1,13 @@
 import Link from "next/link"
+import Image from "next/image"
 import type { ReactNode } from "react"
 import { FiLock } from "react-icons/fi"
-import { MapPin, Pencil, FolderKanban, Store, ListChecks, Briefcase, CalendarDays, ArrowRight, TrendingUp, TrendingDown } from "lucide-react"
+import { Activity, Eye, MapPin, Pencil, Percent, FolderKanban, Store, ListChecks, Briefcase, CalendarDays, ArrowRight, TrendingUp, TrendingDown } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Button } from "@workspace/ui/components/button"
 import { notFound, redirect } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { getOrgRole } from "@workdeal/auth/repository"
-import { SignOutButton } from "../sign-out-button"
 import { AdvancedLocationSettings } from "../advanced-location-settings"
 import { VisitsTimeChart, OriginsChart, SizeChart, ProvinceBars, VisitorsTable } from "@/components/features/org-analytics"
 import { getFeatureAccess } from "@/lib/features"
@@ -79,16 +79,9 @@ export default async function OrgDashboardPage({
   let orgVerified = false
   let profileName: string | undefined
   let profileSlug: string | undefined
+  let profileLogoUrl: string | null = null
   let profileId: string | null = null
   let isProfilePublished = false
-  type QualificationView = {
-    companySize: string
-    workers: number
-    turnoverMzn: number | null
-    legalForm: string | null
-    nuit: string | null
-  }
-  let qualification: QualificationView | null = null
   let locations: { id: string; province: string; district: string | null; bairro: string | null; latitude: number | null; longitude: number | null; visibility: string; isPrimary: boolean }[] = []
 
   try {
@@ -104,28 +97,16 @@ export default async function OrgDashboardPage({
   // slug da organização (rename, pré-registo, sufixo de unicidade).
   try {
     const { apiFetch } = await import("@/lib/api")
-    const pRes = await apiFetch<{ id: string; name: string; slug: string; status: string } | null>(`/api/v1/profiles/by-organization/${organizationId}`, { cache: "no-store" })
+    const pRes = await apiFetch<{ id: string; name: string; slug: string; status: string; logoUrl: string | null } | null>(`/api/v1/profiles/by-organization/${organizationId}`, { cache: "no-store" })
     const pData = pRes.data
     if (pData?.id) {
       profileName = pData.name
       profileSlug = pData.slug
+      profileLogoUrl = pData.logoUrl ?? null
       profileId = pData.id
       isProfilePublished = pData.status === "active"
     }
   } catch {}
-
-  try {
-    const { apiFetch } = await import("@/lib/api")
-    const qRes = await apiFetch<QualificationView | null>(`/api/v1/company-qualification/${organizationId}`, { cache: "no-store" })
-    qualification = qRes.data ?? null
-    if (!qualification) {
-      const alt = await apiFetch<QualificationView | null>("/api/v1/company-qualification/me", { cache: "no-store" })
-      const altData = alt.data
-      if (altData) qualification = altData
-    }
-  } catch {
-    qualification = null
-  }
 
   if (profileId) {
     try {
@@ -133,13 +114,6 @@ export default async function OrgDashboardPage({
       const locRes = await apiFetch<typeof locations>(`/api/v1/profile-locations/${profileId}`, { cache: "no-store" })
       locations = locRes.data ?? []
     } catch {}
-  }
-
-  const sizeLabelMap: Record<string, string> = {
-    micro: "Microempresa",
-    pequena: "Pequena Empresa",
-    media: "Média Empresa",
-    grande: "Grande Empresa",
   }
 
   const featureAccess = await getFeatureAccess(organizationId)
@@ -223,226 +197,43 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
 
         <CardContent>
           <div className="flex gap-4">
-            <div className="hidden size-12 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold text-muted-foreground sm:flex" aria-hidden>
-              {initials}
-            </div>
+            {profileLogoUrl ? (
+              <Image src={profileLogoUrl} alt={`Logótipo de ${orgName ?? profileName ?? "empresa"}`} width={48} height={48} className="hidden size-12 shrink-0 rounded-lg border object-cover sm:block" />
+            ) : (
+              <div className="hidden size-12 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold text-muted-foreground sm:flex" aria-hidden>
+                {initials}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <CardTitle>{orgName ?? profileName ?? "Empresa"}</CardTitle>
-                {qualification && (
-                  <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                    {sizeLabelMap[qualification.companySize] ?? qualification.companySize}
+                {orgVerified && (
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                    Verificada
                   </span>
                 )}
               </div>
               <CardDescription className="mt-1">
-                {profileName ? `Perfil público: ${profileName}` : "Sem perfil público ainda"} · {locations.length} {locations.length === 1 ? "local" : "locais"} ·{" "}
-                {qualification ? `${qualification.workers} colaboradores` : "qualificação pendente"}
+                {profileName ? `Perfil público: ${profileName}` : "Sem perfil público ainda"} · {locations.length} {locations.length === 1 ? "local" : "locais"}
               </CardDescription>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-muted-foreground">
                   <MapPin className="size-3.5" aria-hidden />
                   {hasLocation ? `${locations[0]!.province}${locations[0]!.district ? ` · ${locations[0]!.district}` : ""}` : "Sem localização — adiciona para “Perto de mim”"}
                 </span>
-                {qualification?.nuit && (
-                  <span className="inline-flex rounded-full border px-2.5 py-1 font-mono text-xs text-muted-foreground">NUIT {qualification.nuit}</span>
-                )}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button render={<Link href={`/dashboard/${organizationId}/profile/edit`} />}>
-                  Editar perfil da empresa
+                  <Pencil /> Editar perfil da empresa
                 </Button>
                 <Button variant="outline" render={<Link href={profileSlug ? `/profiles/${profileSlug}` : orgSlug ? `/profiles/${orgSlug}` : "/companies"} />}>
-                  Ver no directório
+                  <Eye /> Ver no directório
                 </Button>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      {/* visits summary — vault (desfocado com CTA quando premium bloqueado) */}
-      <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref}>
-        <Card>
-          <CardHeader>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Visitas · últimos 30 dias</p>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="font-heading text-4xl font-semibold tracking-tight">
-                {analytics.total30}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-muted-foreground">
-                {analytics.growth >= 0 ? <TrendingUp className="size-3.5" aria-hidden /> : <TrendingDown className="size-3.5" aria-hidden />}
-                {analytics.growth >= 0 ? `+${analytics.growth}%` : `${analytics.growth}%`} vs 30d ant.
-              </span>
-            </div>
-            <CardDescription>
-              {analytics.unicos30} visitantes únicos · média {(analytics.total30 / 30).toFixed(1)}/dia · pico {Math.max(...analytics.days.slice(-30).map((d) => d.visitas))} visitas
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex h-8 items-end gap-[2px]">
-              {analytics.days.slice(-30).map((d) => (
-                <div key={d.date} className="flex-1 rounded-sm bg-primary" style={{ height: `${Math.max(12, (d.visitas / 38) * 100)}%`, opacity: 0.18 + (d.visitas / 38) * 0.82 }} title={`${d.label}: ${d.visitas}`} />
-              ))}
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-lg bg-muted px-2 py-2">
-                <p className="font-mono text-sm font-semibold">{analytics.unicos30}</p>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Únicos</p>
-              </div>
-              <div className="rounded-lg bg-muted px-2 py-2">
-                <p className="font-mono text-sm font-semibold">{Math.round((analytics.unicos30 / Math.max(1, analytics.total30)) * 100)}%</p>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Retorno</p>
-              </div>
-              <div className="rounded-lg bg-muted px-2 py-2">
-                <p className="font-mono text-sm font-semibold">{analytics.quotesCount}</p>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Acções</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </AnalyticsZone>
-
-      {/* ── KPI strip org — 4 cards idênticos ── */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card size="sm">
-          <CardHeader>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Visibilidade</p>
-            <CardTitle className="text-sm">{isProfilePublished ? "Publicada no directório" : "Rascunho — não listada"}</CardTitle>
-            <CardDescription>{isProfilePublished ? "Aparece em pesquisas e mapa." : "Completa perfil para ser encontrada."}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="bg-primary" style={{ width: isProfilePublished ? "92%" : "18%" }} />
-            </div>
-          </CardContent>
-        </Card>
-        <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} overlay="compact">
-          <Card size="sm">
-            <CardHeader>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Performance</p>
-              <CardTitle className="font-heading text-2xl font-semibold tracking-tight">
-                {Math.round((analytics.unicos30 / Math.max(1, analytics.total30)) * 100)}%
-              </CardTitle>
-              <CardDescription>Taxa de visitantes únicos — visitantes que voltam para contactar.</CardDescription>
-            </CardHeader>
-          </Card>
-        </AnalyticsZone>
-        <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} overlay="compact">
-          <Card size="sm">
-            <CardHeader>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Conversão {analytics.realQuotesCount > 0 ? "real" : "est."}</p>
-              <CardTitle className="text-sm">
-                {analytics.realQuotesCount > 0
-                  ? `${analytics.realQuotesCount} cotações / 30d (real)`
-                  : `${analytics.quotesCount} contactos / 30d`}
-              </CardTitle>
-              <CardDescription>
-                {analytics.realQuotesCount > 0 ? "Cotações via /api/v1/quotes" : "Cliques em WhatsApp/telefone/email"}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </AnalyticsZone>
-        <Card size="sm">
-          <CardHeader>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Território</p>
-            <CardTitle className="text-sm">{locations.length} sede(s) activas</CardTitle>
-            <CardDescription>
-              {locations.filter((l) => l.visibility === "exact" && l.latitude).length} com pin exacto · PostGIS ranking activo
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* ── Analytics premium — desfocado com CTA quando bloqueado ── */}
-      <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} className="space-y-4">
-      <VisitsTimeChart days={analytics.days} />
-
-      {/* ── Secondary charts — distinct treatments ── */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <OriginsChart data={analytics.origins} />
-        <SizeChart data={analytics.sizes} />
-        <ProvinceBars data={analytics.provinces} />
-      </div>
-
-      <VisitorsTable rows={analytics.visitors} />
-      </AnalyticsZone>
-
-      {/* ── Visitors caption — nunca finge "sem tráfego" quando bloqueado ── */}
-      {analyticsLocked ? (
-        <p className="text-xs text-[#0F1A2E]/40">Detalhe de visitas, origens e visitantes disponível no plano Analytics.</p>
-      ) : (
-        <p className="text-xs text-[#0F1A2E]/40">
-          {analytics.total30 > 0
-            ? `${analytics.total30} visitas nos últimos 30d · ${analytics.unicos30} visitantes únicos.`
-            : "Sem visitas registadas ainda — os dados aparecem quando utilizadores visitarem o vosso perfil."}
-        </p>
-      )}
-
-      {/* ── Operations row — qualification + locations + shortcuts ── */}
-      <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-        <div className="flex flex-col rounded-[20px] border border-[#D9D2C2] bg-white p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-black tracking-tight text-[#0F1A2E]" style={{ fontFamily: "var(--font-display)" }}>
-              Qualificação IPEME
-            </h2>
-            {qualification ? (
-              <span className="rounded-full bg-[#0F1A2E] px-2.5 py-1 text-[11px] font-bold text-white">{sizeLabelMap[qualification.companySize] ?? qualification.companySize}</span>
-            ) : (
-              <span className="rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 text-[11px] font-semibold text-[#0F1A2E]/60">Pendente</span>
-            )}
-          </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-[#0F1A2E]/55">Define selo, taxas internas e elegibilidade para oportunidades por porte.</p>
-          {qualification ? (
-            <div className="mt-4 divide-y divide-[#D9D2C2]/60 rounded-xl border border-[#D9D2C2] bg-[#F6F3EE]/60">
-              <div className="flex items-center justify-between px-3 py-2.5">
-                <span className="text-xs font-semibold tracking-wide text-[#0F1A2E]/60">PORTE</span>
-                <span className="rounded-full bg-[#0B5E56] px-2.5 py-1 text-xs font-bold text-white">{sizeLabelMap[qualification.companySize] ?? qualification.companySize}</span>
-              </div>
-              <div className="flex items-center justify-between px-3 py-2.5">
-                <span className="text-xs text-[#0F1A2E]/60">Trabalhadores</span>
-                <span className="font-mono text-sm font-bold text-[#0F1A2E]">{qualification.workers}</span>
-              </div>
-              {qualification.turnoverMzn != null && (
-                <div className="flex items-center justify-between px-3 py-2.5">
-                  <span className="text-xs text-[#0F1A2E]/60">Volume anual</span>
-                  <span className="font-mono text-sm font-semibold text-[#0F1A2E]">{qualification.turnoverMzn.toLocaleString("pt-MZ")} MZN</span>
-                </div>
-              )}
-              {qualification.legalForm && (
-                <div className="flex items-center justify-between px-3 py-2.5">
-                  <span className="text-xs text-[#0F1A2E]/60">Forma jurídica</span>
-                  <span className="text-sm font-medium capitalize text-[#0F1A2E]">{qualification.legalForm}</span>
-                </div>
-              )}
-              {qualification.nuit && (
-                <div className="flex items-center justify-between px-3 py-2.5">
-                  <span className="text-xs text-[#0F1A2E]/60">NUIT</span>
-                  <span className="font-mono text-xs font-semibold tracking-wide text-[#0F1A2E]">{qualification.nuit}</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="mt-4 rounded-xl border border-dashed border-[#D9D2C2] bg-[#F6F3EE] p-4">
-              <p className="text-sm font-bold text-[#0F1A2E]">Qualifica a empresa</p>
-              <p className="mt-1 text-xs leading-relaxed text-[#0F1A2E]/60">Adiciona trabalhadores, volume e NUIT para desbloquear selo e cálculo de taxas correcto.</p>
-              <Link href={`/dashboard/${organizationId}/profile/edit`} className="mt-3 inline-flex rounded-full bg-[#FF3B1F] px-4 py-2 text-xs font-bold text-white hover:bg-[#E8350F]">
-                Qualificar agora →
-              </Link>
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0">
-          {profileId ? (
-            <AdvancedLocationSettings profileId={profileId} organizationId={organizationId} initial={locations} />
-          ) : (
-            <div className="rounded-[20px] border border-dashed border-[#D9D2C2] bg-white p-6 text-sm text-[#0F1A2E]/60">
-              Cria o perfil da empresa para gerir localizações e aparecer em “Perto de mim”.
-            </div>
-          )}
-        </div>
-      </div>
 
       <Card>
         <CardHeader>
@@ -476,6 +267,150 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
         </CardContent>
       </Card>
 
+      {/* visits summary — vault (desfocado com CTA quando premium bloqueado) */}
+      <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref}>
+        <Card>
+          <CardHeader>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Visitas · últimos 30 dias</p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="font-heading text-4xl font-semibold tracking-tight">
+                {analytics.total30}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-muted-foreground">
+                {analytics.growth >= 0 ? <TrendingUp className="size-3.5" aria-hidden /> : <TrendingDown className="size-3.5" aria-hidden />}
+                {analytics.growth >= 0 ? `+${analytics.growth}%` : `${analytics.growth}%`} vs 30d ant.
+              </span>
+            </div>
+            <CardDescription>
+              {analytics.unicos30} visitantes únicos · média {(analytics.total30 / 30).toFixed(1)}/dia · pico {Math.max(...analytics.days.slice(-30).map((d) => d.visitas))} visitas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg bg-muted px-2 py-2">
+                <p className="font-mono text-sm font-semibold">{analytics.unicos30}</p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Únicos</p>
+              </div>
+              <div className="rounded-lg bg-muted px-2 py-2">
+                <p className="font-mono text-sm font-semibold">{Math.round((analytics.unicos30 / Math.max(1, analytics.total30)) * 100)}%</p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Retorno</p>
+              </div>
+              <div className="rounded-lg bg-muted px-2 py-2">
+                <p className="font-mono text-sm font-semibold">{analytics.quotesCount}</p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Acções</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </AnalyticsZone>
+
+      {/* ── KPI strip org — icon + valor ── */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card size="sm">
+          <CardHeader>
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <Eye className="size-4" aria-hidden />
+              </span>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Visibilidade</p>
+            </div>
+            <CardTitle className="mt-2 text-sm">{isProfilePublished ? "Publicada no directório" : "Rascunho — não listada"}</CardTitle>
+            <CardDescription>{isProfilePublished ? "Aparece em pesquisas e mapa." : "Completa perfil para ser encontrada."}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className="bg-primary" style={{ width: isProfilePublished ? "92%" : "18%" }} />
+            </div>
+          </CardContent>
+        </Card>
+        <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} overlay="compact">
+          <Card size="sm">
+            <CardHeader>
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <Activity className="size-4" aria-hidden />
+                </span>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Performance</p>
+              </div>
+              <CardTitle className="mt-2 font-heading text-2xl font-semibold tracking-tight">
+                {Math.round((analytics.unicos30 / Math.max(1, analytics.total30)) * 100)}%
+              </CardTitle>
+              <CardDescription>Taxa de visitantes únicos — visitantes que voltam para contactar.</CardDescription>
+            </CardHeader>
+          </Card>
+        </AnalyticsZone>
+        <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} overlay="compact">
+          <Card size="sm">
+            <CardHeader>
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <Percent className="size-4" aria-hidden />
+                </span>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Conversão {analytics.realQuotesCount > 0 ? "real" : "est."}</p>
+              </div>
+              <CardTitle className="mt-2 text-sm">
+                {analytics.realQuotesCount > 0
+                  ? `${analytics.realQuotesCount} cotações / 30d (real)`
+                  : `${analytics.quotesCount} contactos / 30d`}
+              </CardTitle>
+              <CardDescription>
+                {analytics.realQuotesCount > 0 ? "Cotações via /api/v1/quotes" : "Cliques em WhatsApp/telefone/email"}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </AnalyticsZone>
+        <Card size="sm">
+          <CardHeader>
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <MapPin className="size-4" aria-hidden />
+              </span>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Território</p>
+            </div>
+            <CardTitle className="mt-2 text-sm">{locations.length} sede(s) activas</CardTitle>
+            <CardDescription>
+              {locations.filter((l) => l.visibility === "exact" && l.latitude).length} com pin exacto · {locations.length - locations.filter((l) => l.visibility === "exact" && l.latitude).length} por zona
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+
+      {/* ── Analytics premium — desfocado com CTA quando bloqueado ── */}
+      <AnalyticsZone locked={analyticsLocked} unlockHref={unlockHref} className="space-y-4">
+      <VisitsTimeChart days={analytics.days} />
+
+      {/* ── Secondary charts — distinct treatments ── */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <OriginsChart data={analytics.origins} />
+        <SizeChart data={analytics.sizes} />
+        <ProvinceBars data={analytics.provinces} />
+      </div>
+
+      <VisitorsTable rows={analytics.visitors} />
+      </AnalyticsZone>
+
+      {/* ── Visitors caption — nunca finge "sem tráfego" quando bloqueado ── */}
+      {analyticsLocked ? (
+        <p className="text-xs text-muted-foreground">Detalhe de visitas, origens e visitantes disponível no plano Analytics.</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {analytics.total30 > 0
+            ? `${analytics.total30} visitas nos últimos 30d · ${analytics.unicos30} visitantes únicos.`
+            : "Sem visitas registadas ainda — os dados aparecem quando utilizadores visitarem o vosso perfil."}
+        </p>
+      )}
+
+      {/* ── Localizações — sede + sucursais ── */}
+      <div className="min-w-0">
+        {profileId ? (
+          <AdvancedLocationSettings profileId={profileId} organizationId={organizationId} initial={locations} />
+        ) : (
+          <div className="rounded-xl border border-dashed bg-card p-6 text-sm text-muted-foreground">
+            Cria o perfil da empresa para gerir localizações e aparecer em “Perto de mim”.
+          </div>
+        )}
+      </div>
+
       {aiAssistant && (
         <AiAssistantPanel organizationId={organizationId} />
       )}
@@ -504,17 +439,6 @@ const initials = (orgName ?? profileName ?? "EM").slice(0, 2).toUpperCase()
         </div>
       )}
 
-      <div className="flex flex-col gap-3 rounded-[16px] border border-[#D9D2C2] bg-[#F6F3EE] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-xs font-bold tracking-wide text-[#0F1A2E]">Sessão activa</p>
-          <p className="truncate font-mono text-xs text-[#0F1A2E]/60">
-            {orgName ?? organizationId} · papel {role} · {session.user.email}
-          </p>
-        </div>
-        <div className="shrink-0">
-          <SignOutButton />
-        </div>
-      </div>
     </div>
   )
 }
