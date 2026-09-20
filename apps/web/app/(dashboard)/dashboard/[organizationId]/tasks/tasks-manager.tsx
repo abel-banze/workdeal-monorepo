@@ -245,6 +245,7 @@ export function TasksManager({
               </div>
             </form>
             </CardContent>
+          )}
         </Card>
       )}
 
