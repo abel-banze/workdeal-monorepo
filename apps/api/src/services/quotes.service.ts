@@ -141,6 +141,15 @@ export const quotesService = {
 async function notifyWhatsApp(quoteId: string, targetProfileId: string, serviceLabel: string) {
   const contact = await quotesRepository.getProfileContact(targetProfileId);
   if (!contact) return;
+  // Respeita as preferências de notificação da empresa destinatária
+  if (contact.organizationId) {
+    const { organizationsRepository } = await import("../repositories/organizations.repository.js");
+    const prefs = await organizationsRepository.getNotificationPrefs(contact.organizationId).catch(() => null);
+    if (prefs && !prefs.whatsapp) {
+      console.log(`[quotes whatsapp] empresa optou por não receber WhatsApp — cotação ${quoteId} não notificada`);
+      return;
+    }
+  }
   const to = (contact.whatsapp ?? contact.phone ?? "").replace(/\D/g, "");
   if (!to) {
     console.warn(`[quotes whatsapp] sem whatsapp/phone para perfil ${targetProfileId} — cotação ${quoteId} não notificada por WhatsApp`);

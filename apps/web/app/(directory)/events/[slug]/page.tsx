@@ -60,8 +60,8 @@ function EventJsonLd({ event, siteUrl }: { event: PublicEventView; siteUrl: stri
     description: event.description,
     url,
     image: event.coverImage ?? undefined,
-    startDate: new Date(event.startAt).toISOString(),
-    endDate: new Date(event.endAt).toISOString(),
+    startDate: event.startAt ? new Date(event.startAt).toISOString() : undefined,
+    endDate: event.endAt ? new Date(event.endAt).toISOString() : undefined,
     eventStatus: cancelled ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
     eventAttendanceMode: event.isOnline
       ? "https://schema.org/OnlineEventAttendanceMode"
@@ -94,9 +94,16 @@ export default async function PublicEventPage({ params }: Props) {
   if (!event) notFound();
 
   const when = formatEventWhen(event.startAt, event.endAt);
-  const started = new Date(event.startAt) <= new Date();
-  const spotsLeft = event.capacity != null ? event.capacity - (event.registrationCount ?? 0) : null;
+  const dateless = event.startAt == null || event.endAt == null;
+  const started = event.startAt ? new Date(event.startAt) <= new Date() : false;
+  const spotsLeft = event.capacity != null && !dateless ? event.capacity - (event.registrationCount ?? 0) : null;
   const alreadyRegistered = event.myRegistration === "registered" || event.myRegistration === "checked_in";
+  const myStatus = (event.myRegistration === "interested" ? "interested" : alreadyRegistered ? (event.myRegistration as "registered" | "checked_in") : null) as
+    | "registered"
+    | "checked_in"
+    | "interested"
+    | null;
+  const interestCount = event.interestCount ?? 0;
   const organizerHref = event.organizerSlug ? `/profiles/${event.organizerSlug}` : null;
   const location = event.isOnline ? "Online" : [event.venueName, event.province, event.district].filter(Boolean).join(" · ") || "Local a definir";
 
@@ -141,6 +148,9 @@ export default async function PublicEventPage({ params }: Props) {
                 <span className="rounded-full bg-[#FF3B1F] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
                   {event.isOnline ? "Online" : "Presencial"}
                 </span>
+                {dateless ? (
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">Brevemente</span>
+                ) : null}
                 {event.status === "cancelled" ? (
                   <span className="rounded-full bg-[#0F1A2E] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">Cancelado</span>
                 ) : null}
@@ -204,11 +214,13 @@ export default async function PublicEventPage({ params }: Props) {
               <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#0F1A2E]/40">INSCRIÇÃO</p>
               <h2 className="mt-2 text-lg font-black tracking-tight text-[#0F1A2E]">{event.title}</h2>
               <p className="mt-1 text-[13px] leading-relaxed text-[#0F1A2E]/60">
-                {spotsLeft != null
-                  ? spotsLeft > 0
-                    ? `${spotsLeft} ${spotsLeft === 1 ? "vaga restante" : "vagas restantes"}`
-                    : "Evento sem vagas"
-                  : `${event.registrationCount ?? 0} ${(event.registrationCount ?? 0) === 1 ? "pessoa inscrita" : "pessoas inscritas"}`}
+                {dateless
+                  ? `${interestCount} ${interestCount === 1 ? "pessoa já manifestou interesse" : "pessoas já manifestaram interesse"} — a data será anunciada em breve.`
+                  : spotsLeft != null
+                    ? spotsLeft > 0
+                      ? `${spotsLeft} ${spotsLeft === 1 ? "vaga restante" : "vagas restantes"}`
+                      : "Evento sem vagas"
+                    : `${event.registrationCount ?? 0} ${(event.registrationCount ?? 0) === 1 ? "pessoa inscrita" : "pessoas inscritas"}`}
                 {started ? " • já começou" : ""}
               </p>
 
@@ -223,6 +235,8 @@ export default async function PublicEventPage({ params }: Props) {
                     alreadyRegistered={alreadyRegistered}
                     spotsLeft={spotsLeft}
                     started={started}
+                    dateless={dateless}
+                    myStatus={myStatus}
                   />
                 )}
                 {!session ? (

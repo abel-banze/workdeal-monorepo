@@ -17,7 +17,8 @@
     "db:seed:comprehensive": "tsx src/seed-comprehensive.ts",
     "db:seed:plans": "tsx src/seed-plans.ts",
     "db:seed:flags": "tsx src/seed-flags.ts",
-    "db:seed:codebaz-tasks": "tsx src/seed-codebaz-tasks.ts"
+    "db:seed:codebaz-tasks": "tsx src/seed-codebaz-tasks.ts",
+    "db:send:tasks-cta": "tsx src/send-tasks-cta.ts"
   },
   "dependencies": {
     "@workdeal/shared": "workspace:*",

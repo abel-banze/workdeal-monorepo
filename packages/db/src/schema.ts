@@ -137,6 +137,11 @@ export const organization = pgTable(
     contactName: text("contact_name"),
     contactPhone: text("contact_phone"),
     contactEmail: text("contact_email"),
+    // Preferências de notificação da empresa (geridas nas Definições).
+    // Por defeito: email + WhatsApp ligados, SMS desligado.
+    notifyEmail: boolean("notify_email").notNull().default(true),
+    notifyWhatsapp: boolean("notify_whatsapp").notNull().default(true),
+    notifySms: boolean("notify_sms").notNull().default(false),
     completionToken: text("completion_token"),
     completionTokenExpiresAt: timestamp("completion_token_expires_at"),
   },
@@ -870,6 +875,28 @@ export const analyticsEvent = pgTable(
   ],
 );
 
+// ── Onboarding funnel ──────────────────────────────────────────
+// Tracking de acções durante o onboarding (sem perfil ainda — por isso não
+// cabe em analytics_event, que exige profile_id). Base para o funil:
+// onde os utilizadores param e porquê (passo, erros de validação, OTP).
+export const onboardingEvent = pgTable(
+  "onboarding_event",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    visitorId: text("visitor_id"),
+    step: smallint("step"),
+    action: text("action").notNull(),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("onboarding_event_user_idx").on(table.userId, table.createdAt),
+    index("onboarding_event_action_created_idx").on(table.action, table.createdAt),
+    index("onboarding_event_visitor_idx").on(table.visitorId),
+  ],
+);
+
 // ── Tasks / Pedidos de serviço ─────────────────────────────────────
 
 export const taskStatusEnum = pgEnum("task_status", ["open", "in_review", "in_progress", "completed", "cancelled", "withdrawn"]);
@@ -1051,7 +1078,7 @@ export const negotiationMessage = pgTable(
 // ── Eventos ────────────────────────────────────────────────────────
 
 export const eventStatusEnum = pgEnum("event_status", ["draft", "published", "cancelled", "ended"]);
-export const eventRegistrationStatusEnum = pgEnum("event_registration_status", ["registered", "cancelled", "checked_in"]);
+export const eventRegistrationStatusEnum = pgEnum("event_registration_status", ["registered", "cancelled", "checked_in", "interested"]);
 export const eventVisibilityEnum = pgEnum("event_visibility", ["public", "members_only", "private"]);
 
 export const event = pgTable(
@@ -1067,8 +1094,10 @@ export const event = pgTable(
     title: text("title").notNull(),
     slug: text("slug").notNull().unique(),
     description: text("description").notNull(),
-    startAt: timestamp("start_at").notNull(),
-    endAt: timestamp("end_at").notNull(),
+    // Datas opcionais: NULL = "data a anunciar" (Brevemente). Inscrições
+    // convertem-se em manifestação de interesse até a data ser marcada.
+    startAt: timestamp("start_at"),
+    endAt: timestamp("end_at"),
     isOnline: boolean("is_online").notNull().default(false),
     onlineUrl: text("online_url"),
     venueName: text("venue_name"),

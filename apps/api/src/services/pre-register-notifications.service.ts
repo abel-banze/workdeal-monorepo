@@ -1,5 +1,6 @@
 import { resend, EMAIL_FROM } from "../lib/resend.js";
 import { preRegisterCompanyHtml } from "@workdeal/shared/lib/email-templates";
+import { normalizeMzPhone } from "@workdeal/shared/lib/phone";
 import { DEFAULT_NOTIFY_CHANNELS, type NotifyChannel } from "@workdeal/shared/schemas/pre-register";
 
 export interface PreRegisterNotifyInput {
@@ -111,13 +112,14 @@ export async function sendSms(input: PreRegisterNotifyInput) {
 }
 
 export async function sendWhatsApp(input: PreRegisterNotifyInput) {
-  if (!input.contactPhone) {
-    console.warn(`[pre-register whatsapp] sem contactPhone para ${input.companyName} — skip`);
+  // Normalização canónica MZ (258XXXXXXXXX) — mesmo normalizador do OTP/onboarding.
+  const digits = normalizeMzPhone(input.contactPhone);
+  if (!digits) {
+    console.warn(`[pre-register whatsapp] telefone ausente/inválido para ${input.companyName} — skip`);
     return { ok: true as const, skipped: true as const };
   }
   const token = process.env.ZERNIO_API_KEY ?? process.env.WHATSAPP_API_TOKEN;
   const accountId = process.env.ZERNIO_PHONE_ID;
-  const digits = input.contactPhone.replace(/\D/g, "");
   const isProd = process.env.NODE_ENV === "production";
   if (!token || !accountId) {
     if (isProd) return { ok: false as const, skipped: false as const, error: "ZERNIO_API_KEY/PHONE_ID em falta" };

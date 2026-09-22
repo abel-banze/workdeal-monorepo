@@ -917,3 +917,50 @@ export async function upsertAiCredentialFromForm(formData: FormData) {
   const apiKey = String(formData.get("apiKey") ?? "");
   return upsertAiCredential({ provider: provider as AiCredentialUpsertInput["provider"], apiKey });
 }
+
+export type OnboardingFunnelData = {
+  days: number;
+  started: number;
+  reachedStep: Record<string, number>;
+  completed: number;
+  abandoned: number;
+  abandonByLastStep: { step: number | null; users: number }[];
+  validationErrors: { field: string; count: number }[];
+  otp: { channel: string | null; action: string; count: number }[];
+  createFailures: { error: string | null; count: number }[];
+  medianSecondsToComplete: number | null;
+};
+
+/** Funil de onboarding (tracking de acções no formulário). */
+export async function getOnboardingFunnel(days = 30) {
+  await requireSystemRole("moderator", "admin");
+  const d = [7, 30, 90].includes(days) ? days : 30;
+  const res = await apiFetch<OnboardingFunnelData>(`/api/v1/analytics/onboarding/funnel?days=${d}`);
+  return res;
+}
+
+export type OnboardingEventItem = {
+  id: string;
+  userId: string | null;
+  visitorId: string | null;
+  step: number | null;
+  action: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  userName: string | null;
+  userEmail: string | null;
+  companies: string[];
+};
+
+/** Drill-down de eventos do funil com identidade (utilizador, empresas). */
+export async function getOnboardingEvents(query: { action?: string; step?: number; days?: number; page?: number; limit?: number }) {
+  await requireSystemRole("moderator", "admin");
+  const params = new URLSearchParams();
+  if (query.action) params.set("action", query.action);
+  if (query.step !== undefined) params.set("step", String(query.step));
+  params.set("days", String([7, 30, 90].includes(query.days ?? 30) ? (query.days ?? 30) : 30));
+  params.set("page", String(query.page ?? 1));
+  params.set("limit", "25");
+  const res = await apiFetch<OnboardingEventItem[]>(`/api/v1/analytics/onboarding/events?${params.toString()}`);
+  return res;
+}

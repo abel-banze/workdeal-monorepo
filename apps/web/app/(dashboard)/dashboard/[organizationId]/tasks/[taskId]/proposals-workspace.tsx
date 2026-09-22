@@ -351,17 +351,17 @@ export function ProposalsWorkspace({
                     Gestão da tarefa
                   </p>
                   {taskStatus === "open" && (
-                    <DropdownMenuItem onSelect={() => onTaskStatus("withdrawn")} disabled={busy} className="rounded-xl text-[13px]">
+                    <DropdownMenuItem onClick={() => onTaskStatus("withdrawn")} disabled={busy} className="rounded-xl text-[13px]">
                       Retirar (pausar propostas)
                     </DropdownMenuItem>
                   )}
                   {(taskStatus === "open" || taskStatus === "in_review") && (
-                    <DropdownMenuItem onSelect={() => onTaskStatus("cancelled")} disabled={busy} className="rounded-xl text-[13px] text-destructive">
+                    <DropdownMenuItem onClick={() => onTaskStatus("cancelled")} disabled={busy} className="rounded-xl text-[13px] text-destructive">
                       Cancelar tarefa
                     </DropdownMenuItem>
                   )}
                   {taskStatus === "withdrawn" && (
-                    <DropdownMenuItem onSelect={() => onTaskStatus("open")} disabled={busy} className="rounded-xl text-[13px] text-primary">
+                    <DropdownMenuItem onClick={() => onTaskStatus("open")} disabled={busy} className="rounded-xl text-[13px] text-primary">
                       Reabrir tarefa
                     </DropdownMenuItem>
                   )}

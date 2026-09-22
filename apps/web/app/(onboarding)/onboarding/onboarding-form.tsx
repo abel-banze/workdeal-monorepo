@@ -11,6 +11,7 @@ import type { BusinessHours, PlaceSuggestion, VerificationDocumentInput } from "
 import type { LegalForm } from "@workdeal/shared/lib/company-size";
 import type { ContactChannel } from "@workdeal/shared/lib/phone";
 import { getVerifiedContacts } from "@/app/actions/otp";
+import { trackOnboardingEvent } from "@/components/features/analytics";
 import { placesAutocompleteAction, placesDetailsAction } from "@/app/actions/places";
 import { LocationPicker } from "@/components/features/location-picker";
 import { VerificationDocuments } from "@/components/features/verification-documents";
@@ -288,8 +289,7 @@ export function OnboardingForm({
   }
 
   const [activeStep, setActiveStep] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);  const [loading, setLoading] = useState(false);
   const [progressLabel, setProgressLabel] = useState("");
   const [createdProfileId, setCreatedProfileId] = useState<string | null>(null);
   const [wantVerification, setWantVerification] = useState<boolean | null>(null);
@@ -303,6 +303,36 @@ export function OnboardingForm({
   const [restoredVerified, setRestoredVerified] = useState<Set<ContactChannel>>(new Set());
   // Passo restaurado do draft — mostra "continuar onde parou" até dispensar
   const [restoredStep, setRestoredStep] = useState<number | null>(null);
+
+  // ── Tracking do funil (analytics de onboarding, fire-and-forget) ──
+  const mountAtRef = useRef(0);
+  const prevStepRef = useRef(0);
+  const completedRef = useRef(false);
+
+  // Vistas e navegação entre passos (0=Empresa, 1=Contactos, 2=Presença)
+  useEffect(() => {
+    if (mountAtRef.current === 0) mountAtRef.current = Date.now();
+    if (activeStep > 2) return;
+    const prev = prevStepRef.current;
+    prevStepRef.current = activeStep;
+    void trackOnboardingEvent({ action: "step_view", step: activeStep });
+    if (activeStep > prev) void trackOnboardingEvent({ action: "step_next", step: activeStep, metadata: { from: prev } });
+    if (activeStep < prev) void trackOnboardingEvent({ action: "step_back", step: activeStep, metadata: { from: prev } });
+  }, [activeStep]);
+
+  // Abandono: saída da página sem concluir (keepalive sobrevive ao unload)
+  useEffect(() => {
+    const handler = () => {
+      if (completedRef.current) return;
+      void trackOnboardingEvent({
+        action: "onboarding_abandoned",
+        step: Math.min(prevStepRef.current, 2),
+        metadata: { elapsedSeconds: Math.round((Date.now() - mountAtRef.current) / 1000) },
+      });
+    };
+    window.addEventListener("pagehide", handler);
+    return () => window.removeEventListener("pagehide", handler);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -371,7 +401,10 @@ export function OnboardingForm({
           if (typeof d.activeStep === "number") {
             const s = Math.min(Math.max(Math.trunc(d.activeStep), 0), 2);
             setActiveStep(s);
-            if (s > 0) setRestoredStep(s);
+            if (s > 0) {
+              setRestoredStep(s);
+              void trackOnboardingEvent({ action: "draft_restored", step: s });
+            }
           }
           }
         }
@@ -472,12 +505,13 @@ export function OnboardingForm({
       try {
         const { sendWhatsappOtp } = await import("@/app/actions/otp");
         const res = await sendWhatsappOtp({ whatsapp: whatsapp.trim() });
-        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar código." }); return; }
+        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar código." }); void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "whatsapp", error: (res.error ?? "send_failed").slice(0, 120) } }); return; }
         setWhatsappOtp("sent");
+        void trackOnboardingEvent({ action: "otp_requested", step: 1, metadata: { channel: "whatsapp" } });
         setWhatsappInput("");
         setMsg(res.dev ? { type: "info", text: "Modo dev: WhatsApp não enviado — vê o código na consola do servidor." } : { type: "success", text: "Código enviado! Verifica o teu WhatsApp." });
         setTimers((prev) => ({ ...prev, whatsapp: Date.now() + 60_000 }));
-      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar WhatsApp" }); }
+      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar WhatsApp" }); void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "whatsapp", error: "exception" } }); }
       finally { setWhatsappSending(false); }
       return;
     }
@@ -488,12 +522,13 @@ export function OnboardingForm({
       try {
         const { sendPhoneOtp } = await import("@/app/actions/otp");
         const res = await sendPhoneOtp({ phone: phone.trim() });
-        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar SMS." }); return; }
+        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar SMS." }); void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "phone", error: (res.error ?? "send_failed").slice(0, 120) } }); return; }
         setPhoneOtp("sent");
+        void trackOnboardingEvent({ action: "otp_requested", step: 1, metadata: { channel: "phone" } });
         setPhoneInput("");
         setMsg(res.dev ? { type: "info", text: "Modo dev: SMS não enviado — vê o código na consola do servidor." } : { type: "success", text: "Código enviado! Verifica o teu SMS." });
         setTimers((prev) => ({ ...prev, phone: Date.now() + 60_000 }));
-      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar SMS" }); }
+      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar SMS" }); void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "phone", error: "exception" } }); }
       finally { setPhoneSending(false); }
       return;
     }
@@ -503,12 +538,13 @@ export function OnboardingForm({
     try {
       const { sendEmailOtp } = await import("@/app/actions/otp");
       const res = await sendEmailOtp({ email: email.trim() });
-      if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar email." }); return; }
+      if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Falha ao enviar email." }); void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "email", error: (res.error ?? "send_failed").slice(0, 120) } }); return; }
       setEmailOtp("sent");
+      void trackOnboardingEvent({ action: "otp_requested", step: 1, metadata: { channel: "email" } });
       setEmailInput("");
       setMsg(res.dev ? { type: "info", text: "Modo dev: email não enviado — vê o código na consola do servidor." } : { type: "success", text: "Código enviado! Verifica o teu email." });
       setTimers((prev) => ({ ...prev, email: Date.now() + 60_000 }));
-    } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar email" }); }
+    } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao enviar email" }); void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "email", error: "exception" } }); }
     finally { setEmailSending(false); }
   }
 
@@ -524,13 +560,15 @@ export function OnboardingForm({
           const isExpired = /expirad/i.test(errText);
           const isInvalid = /incorreto/i.test(errText) || /inválid/i.test(errText);
           setMsg({ type: "error", text: isExpired ? "Código expirado. Reenvia um novo código." : isInvalid ? "Código inválido. Verifica e tenta novamente." : errText });
+          void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "whatsapp", reason: isExpired ? "expired" : isInvalid ? "invalid" : "other" } });
           return;
         }
         setWhatsappVerifiedAt(new Date());
+        void trackOnboardingEvent({ action: "otp_verified", step: 1, metadata: { channel: "whatsapp" } });
         setWhatsappOtp(null);
         setTimers((prev) => ({ ...prev, whatsapp: null }));
         setMsg({ type: "success", text: "WhatsApp verificado com sucesso!" });
-      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar OTP" }); }
+      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar OTP" }); void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "whatsapp", error: "exception" } }); }
       return;
     }
     if (type === "phone") {
@@ -543,31 +581,35 @@ export function OnboardingForm({
           const isExpired = /expirad/i.test(errText);
           const isInvalid = /incorreto/i.test(errText) || /inválid/i.test(errText);
           setMsg({ type: "error", text: isExpired ? "Código expirado. Reenvia um novo código." : isInvalid ? "Código inválido. Verifica e tenta novamente." : errText });
+          void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "phone", reason: isExpired ? "expired" : isInvalid ? "invalid" : "other" } });
           return;
         }
         setPhoneVerifiedAt(new Date());
+        void trackOnboardingEvent({ action: "otp_verified", step: 1, metadata: { channel: "phone" } });
         setPhoneOtp(null);
         setTimers((prev) => ({ ...prev, phone: null }));
         setMsg({ type: "success", text: "Telefone verificado com sucesso!" });
-      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar OTP" }); }
+      } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar OTP" }); void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "phone", error: "exception" } }); }
       return;
     }
     if (!emailInput || emailInput.length < 6) { setMsg({ type: "error", text: "Introduz os 6 dígitos do código." }); return; }
     try {
       const { verifyEmailOtp } = await import("@/app/actions/otp");
       const res = await verifyEmailOtp({ email: email.trim(), code: emailInput.trim() });
-      if (!res.ok) {
-        const errText = res.error ?? "Código incorreto.";
-        const isExpired = /expirad/i.test(errText);
-        const isInvalid = /incorreto/i.test(errText) || /inválid/i.test(errText);
-        setMsg({ type: "error", text: isExpired ? "Código expirado. Reenvia um novo código." : isInvalid ? "Código inválido. Verifica e tenta novamente." : errText });
-        return;
-      }
-      setEmailVerifiedAt(new Date());
+    if (!res.ok) {
+      const errText = res.error ?? "Código incorreto.";
+      const isExpired = /expirad/i.test(errText);
+      const isInvalid = /incorreto/i.test(errText) || /inválid/i.test(errText);
+      setMsg({ type: "error", text: isExpired ? "Código expirado. Reenvia um novo código." : isInvalid ? "Código inválido. Verifica e tenta novamente." : errText });
+      void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "email", reason: isExpired ? "expired" : isInvalid ? "invalid" : "other" } });
+      return;
+    }
+    setEmailVerifiedAt(new Date());
+    void trackOnboardingEvent({ action: "otp_verified", step: 1, metadata: { channel: "email" } });
       setEmailOtp(null);
       setTimers((prev) => ({ ...prev, email: null }));
       setMsg({ type: "success", text: "Email verificado com sucesso!" });
-    } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar OTP" }); }
+    } catch (e) { setMsg({ type: "error", text: e instanceof Error ? e.message : "Falha ao verificar OTP" }); void trackOnboardingEvent({ action: "otp_failed", step: 1, metadata: { channel: "email", error: "exception" } }); }
   }
 
   async function handleLogoFile(file: File) {
@@ -687,6 +729,7 @@ export function OnboardingForm({
     if (invalid) {
       setError(invalid.msg);
       setActiveStep(invalid.step);
+      void trackOnboardingEvent({ action: "validation_failed", step: 2, metadata: { fields: Object.keys(computeFieldErrors()) } });
       return;
     }
 
@@ -768,9 +811,13 @@ export function OnboardingForm({
         window.localStorage.removeItem(DRAFT_KEY);
       } catch {}
       setCreatedProfileId(res.profileId === "ok" ? null : res.profileId);
+      completedRef.current = true;
+      void trackOnboardingEvent({ action: "company_created", step: 2, metadata: { elapsedSeconds: Math.round((Date.now() - mountAtRef.current) / 1000) } });
       setActiveStep(3);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao criar perfil empresa");
+      const msg = e instanceof Error ? e.message : "Falha ao criar perfil empresa";
+      setError(msg);
+      void trackOnboardingEvent({ action: "company_create_failed", step: 2, metadata: { error: msg.slice(0, 160) } });
     } finally {
       setLoading(false);
       setProgressLabel("");
@@ -914,7 +961,11 @@ export function OnboardingForm({
             const errs = computeFieldErrors();
             const first = Object.entries(errs).find(([k]) => FIELD_STEP[k] === 0);
             setFieldErrors(errs);
-            if (first) { setError(first[1]); return; }
+            if (first) {
+              setError(first[1]);
+              void trackOnboardingEvent({ action: "validation_failed", step: 0, metadata: { fields: Object.keys(errs).filter((k) => FIELD_STEP[k] === 0) } });
+              return;
+            }
             setError(null);
             setActiveStep(1);
             return;
@@ -923,7 +974,11 @@ export function OnboardingForm({
             const errs = computeFieldErrors();
             const first = Object.entries(errs).find(([k]) => FIELD_STEP[k] === 1);
             setFieldErrors(errs);
-            if (first) { setError(first[1]); return; }
+            if (first) {
+              setError(first[1]);
+              void trackOnboardingEvent({ action: "validation_failed", step: 1, metadata: { fields: Object.keys(errs).filter((k) => FIELD_STEP[k] === 1) } });
+              return;
+            }
             setError(null);
             setActiveStep(2);
             return;

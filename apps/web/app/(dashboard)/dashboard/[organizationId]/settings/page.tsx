@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { getOrgRole } from "@workdeal/auth/repository"
-import { hasOrgPermission } from "@workdeal/shared"
+import { DEFAULT_NOTIFICATION_PREFS, hasOrgPermission } from "@workdeal/shared"
+import { NotificationsPrefsCard } from "./notifications-prefs-card"
 
 export default async function CompanySettingsPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await params
@@ -18,6 +19,16 @@ export default async function CompanySettingsPage({ params }: { params: Promise<
 
   const canEdit = hasOrgPermission(role, "profile:edit")
   const canManageMembers = hasOrgPermission(role, "members:manage")
+
+  // Preferências de notificação da empresa (email/WhatsApp/SMS)
+  let prefs = DEFAULT_NOTIFICATION_PREFS
+  try {
+    const { apiFetch } = await import("@/lib/api")
+    const res = await apiFetch<typeof prefs>(`/api/v1/organizations/${encodeURIComponent(organizationId)}/notification-prefs`, {
+      cache: "no-store",
+    })
+    if (res.data) prefs = res.data
+  } catch {}
 
   // Busca perfil para mostrar foto actual
   let profile: { id: string; name: string; slug: string; logoUrl: string | null; coverUrl: string | null } | null = null
@@ -86,6 +97,8 @@ export default async function CompanySettingsPage({ params }: { params: Promise<
           </ul>
         </div>
       </div>
+
+      <NotificationsPrefsCard organizationId={organizationId} initial={prefs} canEdit={canEdit} />
 
       <div className="rounded-[20px] border border-[#D9D2C2] bg-white p-5">
         <h2 className="text-sm font-black text-[#0F1A2E]">Como funciona a verificação</h2>
