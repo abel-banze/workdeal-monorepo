@@ -202,7 +202,7 @@ export function VisitorsTable({ rows }: { rows: VisitorRow[] }) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Select value={originFilter} onValueChange={(v) => setFilter(setOriginFilter, v)}>
+          <Select value={originFilter} onValueChange={(v) => setFilter(setOriginFilter, v ?? "todos")}>
             <SelectTrigger aria-label="Filtrar por origem" className="h-8 w-auto gap-1.5 rounded-full text-xs">
               <SelectValue placeholder="Origem" />
             </SelectTrigger>
@@ -213,7 +213,7 @@ export function VisitorsTable({ rows }: { rows: VisitorRow[] }) {
               ))}
             </SelectContent>
           </Select>
-          <Select value={actionFilter} onValueChange={(v) => setFilter(setActionFilter, v)}>
+          <Select value={actionFilter} onValueChange={(v) => setFilter(setActionFilter, v ?? "todos")}>
             <SelectTrigger aria-label="Filtrar por acção" className="h-8 w-auto gap-1.5 rounded-full text-xs">
               <SelectValue placeholder="Acção" />
             </SelectTrigger>
