@@ -28,9 +28,13 @@ export function TaskCard({ task, categoryName }: { task: TaskView; categoryName?
           <span className="size-1 rounded-full bg-[#FF3B1F]" aria-hidden />
           {locationText}{hasDistance ? ` · ${(task.distanceKm as number).toFixed(1)} km` : ""}
         </span>
+
+        {/** 
         <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${STATUS_STYLE[task.status] ?? "bg-[#F6F3EE] text-[#0F1A2E]/60"}`}>
           {TASK_STATUS_LABELS_PT[task.status]}
         </span>
+
+        */}
       </div>
 
       <div className="flex flex-1 flex-col px-5 pt-4">

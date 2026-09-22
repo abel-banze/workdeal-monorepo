@@ -4,7 +4,6 @@ import { requireAuth } from "../middlewares/auth.middleware.js";
 import type { Env } from "../middlewares/auth.middleware.js";
 import { ok } from "../lib/api-response.js";
 import { AppError } from "../lib/errors.js";
-import { analyticsRepository } from "../repositories/analytics.repository.js";
 import { analyticsService } from "../services/analytics.service.js";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
 
@@ -47,15 +46,18 @@ analyticsRoute.post("/track", async (c) => {
   }
 
   const { profileId, eventType, visitorId, province, district, referrer, metadata } = parsed.data;
-  await analyticsRepository.trackEvent({
-    profileId,
-    eventType,
-    visitorId: visitorId ?? null,
-    province: province ?? null,
-    district: district ?? null,
-    referrer: referrer ?? null,
-    metadata: metadata ?? null,
-  });
+  await analyticsService.track(
+    {
+      profileId,
+      eventType,
+      visitorId: visitorId ?? null,
+      province: province ?? null,
+      district: district ?? null,
+      referrer: referrer ?? null,
+      metadata: metadata ?? null,
+    },
+    { authorization: c.req.header("Authorization"), cookie: c.req.header("Cookie") },
+  );
 
   return c.json(ok({ tracked: true }), 201);
 });

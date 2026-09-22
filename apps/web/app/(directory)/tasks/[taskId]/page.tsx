@@ -8,6 +8,8 @@ import { featureAccessible } from "@/lib/features";
 import { formatMzn, formatDeadline, formatFull } from "@/lib/dates";
 import { TASK_STATUS_LABELS_PT, TASK_CONTRACT_TYPE_LABELS_PT } from "@workdeal/shared";
 import { TaskProposalForm } from "@/components/features/task-proposal-form";
+import { ShareDialog } from "@/components/features/share-dialog";
+import { FiShare2 } from "react-icons/fi";
 import { getSiteUrl, taskDetailKeywords } from "@/lib/seo";
 import type { TaskView } from "@workdeal/shared";
 
@@ -25,11 +27,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           (c) => c.id === data.categoryId,
         )?.name ?? null
       : null;
+    const siteUrl = getSiteUrl();
+    const description = data.description.slice(0, 160);
+    const ogImage = {
+      url: `${siteUrl}/tasks_og_image.png`,
+      width: 1671,
+      height: 941,
+      alt: `Requisição no Workdeal — ${data.title}`,
+    };
     return {
       title: data.title,
-      description: data.description.slice(0, 160),
+      description,
       keywords: taskDetailKeywords({ ...data, categoryName }),
       alternates: { canonical: `/tasks/${taskId}` },
+      openGraph: {
+        title: data.title,
+        description,
+        url: `${siteUrl}/tasks/${taskId}`,
+        siteName: "Workdeal",
+        images: [ogImage],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: data.title,
+        description,
+        images: [ogImage.url],
+      },
     };
   } catch {
     return { title: "Requisição não encontrada" };
@@ -96,6 +119,26 @@ export default async function PublicTaskPage({ params }: Props) {
           </Link>
           <span className="text-[#D9D2C2]">/</span>
           <span className="text-[#0B5E56]">PEDIDO</span>
+          <span className="ml-auto">
+            <ShareDialog
+              dialogTitle="Partilhar pedido"
+              itemName={task.title}
+              path={`/tasks/${task.id}`}
+              shareText={`${task.title} · Requisição no Workdeal`}
+              mailSubject={`${task.title} no Workdeal`}
+              footerNote="Qualquer pessoa com o link pode ver este pedido público"
+              trigger={
+                <button
+                  type="button"
+                  aria-label="Partilhar pedido"
+                  title="Partilhar"
+                  className="inline-flex h-9 items-center gap-2 rounded-full border border-[#D9D2C2] bg-white px-4 text-xs font-bold text-[#0F1A2E] transition-colors hover:bg-[#F6F3EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5E56]/20"
+                >
+                  <FiShare2 className="size-4" aria-hidden /> Partilhar
+                </button>
+              }
+            />
+          </span>
         </div>
 
         <div className="mt-6 grid gap-8 lg:grid-cols-[1.6fr_1fr] lg:items-start">

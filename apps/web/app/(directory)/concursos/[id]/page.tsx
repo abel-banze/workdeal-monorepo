@@ -5,6 +5,8 @@ import type { TenderView } from "@workdeal/shared";
 import { getPublicTender, formatTenderMoney } from "@/lib/tenders";
 import { formatDayMonth, formatFull } from "@/lib/dates";
 import { getSiteUrl } from "@/lib/seo";
+import { ShareDialog } from "@/components/features/share-dialog";
+import { FiShare2 } from "react-icons/fi";
 
 export const revalidate = 300;
 
@@ -16,10 +18,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { data } = await getPublicTender(id);
     if (!data) return { title: "Concurso não encontrado" };
     const title = data.object || data.generalObject || data.reference;
+    const description = (data.generalObject || data.object || "Concurso público em Moçambique").slice(0, 160);
+    const siteUrl = getSiteUrl();
+    const ogImage = {
+      url: `${siteUrl}/concursos_og_image.png`,
+      width: 1672,
+      height: 941,
+      alt: `Concurso público no Workdeal — ${title}`,
+    };
     return {
       title: `${title}`,
-      description: (data.generalObject || data.object || "Concurso público em Moçambique").slice(0, 160),
+      description,
       alternates: { canonical: `/concursos/${id}` },
+      openGraph: {
+        title: `${title}`,
+        description,
+        url: `${siteUrl}/concursos/${id}`,
+        siteName: "Workdeal",
+        images: [ogImage],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: `${title}`,
+        description,
+        images: [ogImage.url],
+      },
     };
   } catch {
     return { title: "Concurso não encontrado" };
@@ -89,6 +112,26 @@ export default async function PublicTenderPage({ params }: Props) {
             </Link>
             <span className="text-[#D9D2C2]">/</span>
             <span className="text-[#0B5E56]">CONCURSO</span>
+            <span className="ml-auto">
+              <ShareDialog
+                dialogTitle="Partilhar concurso"
+                itemName={title}
+                path={`/concursos/${tender.id}`}
+                shareText={`${title} · Concurso público no Workdeal`}
+                mailSubject={`${title} no Workdeal`}
+                footerNote="Qualquer pessoa com o link pode ver este concurso público"
+                trigger={
+                  <button
+                    type="button"
+                    aria-label="Partilhar concurso"
+                    title="Partilhar"
+                    className="inline-flex h-9 items-center gap-2 rounded-full border border-[#D9D2C2] bg-white px-4 text-xs font-bold text-[#0F1A2E] transition-colors hover:bg-[#F6F3EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5E56]/20"
+                  >
+                    <FiShare2 className="size-4" aria-hidden /> Partilhar
+                  </button>
+                }
+              />
+            </span>
           </div>
 
           <div className="relative mt-6 overflow-hidden rounded-[20px] border border-[#D9D2C2] bg-[#0F1A2E]">
