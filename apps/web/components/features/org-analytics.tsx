@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@workspace/ui/components/chart"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
+import { Search, MapPin, Link2, Share2, FileText, Globe, ChevronLeft, ChevronRight } from "lucide-react"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts"
 import type { DayPoint, OriginPoint, SizePoint, ProvincePoint, VisitorRow } from "@/lib/org-analytics-data"
 
@@ -159,10 +161,36 @@ export function ProvinceBars({ data }: { data: ProvincePoint[] }) {
   )
 }
 
+const PAGE_SIZE = 8
+
+function OriginIcon({ origin }: { origin: string }) {
+  const cls = "size-3.5 shrink-0 text-muted-foreground"
+  if (origin === "Pesquisa") return <Search className={cls} aria-hidden />
+  if (origin === "Perto de mim") return <MapPin className={cls} aria-hidden />
+  if (origin === "Directo") return <Link2 className={cls} aria-hidden />
+  if (origin === "Partilha") return <Share2 className={cls} aria-hidden />
+  if (origin === "Pedido") return <FileText className={cls} aria-hidden />
+  return <Globe className={cls} aria-hidden />
+}
+
 export function VisitorsTable({ rows }: { rows: VisitorRow[] }) {
   const origins = React.useMemo(() => Array.from(new Set(rows.map((r) => r.origin))), [rows])
-  const [filter, setFilter] = React.useState<string>("todos")
-  const filtered = filter === "todos" ? rows : rows.filter((r) => r.origin === filter)
+  const actions = React.useMemo(() => Array.from(new Set(rows.map((r) => r.action))), [rows])
+  const [originFilter, setOriginFilter] = React.useState<string>("todos")
+  const [actionFilter, setActionFilter] = React.useState<string>("todos")
+  const [page, setPage] = React.useState(0)
+
+  const filtered = rows.filter(
+    (r) => (originFilter === "todos" || r.origin === originFilter) && (actionFilter === "todos" || r.action === actionFilter),
+  )
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, pageCount - 1)
+  const visible = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+
+  function setFilter(setter: (v: string) => void, v: string) {
+    setter(v)
+    setPage(0)
+  }
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
@@ -173,22 +201,30 @@ export function VisitorsTable({ rows }: { rows: VisitorRow[] }) {
             {filtered.length} {filtered.length === 1 ? "visitante" : "visitantes"} · nomes reais quando identificados
           </p>
         </div>
-        {origins.length > 0 && (
-          <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrar por origem">
-            {["todos", ...origins].map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                aria-pressed={filter === f}
-                className={`rounded-full px-2.5 py-1 text-[11px] font-medium capitalize transition-colors ${
-                  filter === f ? "bg-primary text-primary-foreground" : "border text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                {f === "todos" ? "Todas" : f}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <Select value={originFilter} onValueChange={(v) => setFilter(setOriginFilter, v)}>
+            <SelectTrigger aria-label="Filtrar por origem" className="h-8 w-auto gap-1.5 rounded-full text-xs">
+              <SelectValue placeholder="Origem" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas as origens</SelectItem>
+              {origins.map((o) => (
+                <SelectItem key={o} value={o}>{o}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={actionFilter} onValueChange={(v) => setFilter(setActionFilter, v)}>
+            <SelectTrigger aria-label="Filtrar por acção" className="h-8 w-auto gap-1.5 rounded-full text-xs">
+              <SelectValue placeholder="Acção" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas as acções</SelectItem>
+              {actions.map((a) => (
+                <SelectItem key={a} value={a}>{a}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -207,7 +243,7 @@ export function VisitorsTable({ rows }: { rows: VisitorRow[] }) {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map((v) => (
+              {visible.map((v) => (
                 <tr key={v.id} className="align-top transition-colors hover:bg-muted/60">
                   <td className="px-4 py-3 sm:pl-5">
                     <div className="flex items-center gap-2.5">
@@ -223,7 +259,9 @@ export function VisitorsTable({ rows }: { rows: VisitorRow[] }) {
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{v.origin}</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      <OriginIcon origin={v.origin} /> {v.origin}
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{v.action}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-muted-foreground sm:pr-5">{v.time}</td>
@@ -233,9 +271,33 @@ export function VisitorsTable({ rows }: { rows: VisitorRow[] }) {
           </table>
         </div>
       )}
-      <p className="border-t bg-muted/60 px-4 py-2.5 text-[11px] leading-relaxed text-muted-foreground sm:px-5">
-        Visitantes identificados (pedidos e contactos) aparecem com nome real; os restantes como Anónimo. Sem cookies de terceiros.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/60 px-4 py-2.5 sm:px-5">
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Página {safePage + 1} de {pageCount} · identificados com nome real, restantes como Anónimo.
+        </p>
+        {pageCount > 1 && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              aria-label="Página anterior"
+              className="inline-flex size-7 items-center justify-center rounded-full border hover:bg-muted disabled:opacity-40"
+            >
+              <ChevronLeft className="size-4" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              disabled={safePage >= pageCount - 1}
+              aria-label="Página seguinte"
+              className="inline-flex size-7 items-center justify-center rounded-full border hover:bg-muted disabled:opacity-40"
+            >
+              <ChevronRight className="size-4" aria-hidden />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

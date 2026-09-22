@@ -117,6 +117,25 @@ export const taskColumns = {
 
 export type TaskRow = Omit<typeof task.$inferSelect, "geom">;
 
+/** Filtros de pesquisa para as vistas próprias (dashboard): pesquisa, categoria, província, tipo. */
+export type TaskScopeFilters = { q?: string; categoryId?: string; province?: string; contractType?: string };
+
+function scopeFilterConds(filters?: TaskScopeFilters): SQL[] {
+  const conds: SQL[] = [];
+  if (!filters) return conds;
+  // No contexto próprio o `q` abrange título e descrição (recall > precisão);
+  // na vista pública (`list`) abrange só o título.
+  if (filters.q) {
+    const like = `%${filters.q}%`;
+    const cond = or(ilike(task.title, like), ilike(task.description, like));
+    if (cond) conds.push(cond);
+  }
+  if (filters.categoryId) conds.push(eq(task.categoryId, filters.categoryId));
+  if (filters.province) conds.push(eq(task.province, filters.province));
+  if (filters.contractType) conds.push(eq(task.contractType, filters.contractType as (typeof task.contractType.enumValues)[number]));
+  return conds;
+}
+
 function setGeomTxn(tx: { execute: (q: SQL) => Promise<unknown> }, table: typeof task, id: string, latitude: number, longitude: number) {
   return tx.execute(sql`UPDATE ${table} SET geom = ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography WHERE ${table.id} = ${id}`);
 }
@@ -210,8 +229,11 @@ export const tasksRepository = {
     };
   },
 
-  async listByRequester(requesterUserId: string, status: string | undefined, page: number, limit: number) {
-    const where = status ? and(eq(task.requesterUserId, requesterUserId), eq(task.status, asTaskStatus(status))) : eq(task.requesterUserId, requesterUserId);
+  async listByRequester(requesterUserId: string, status: string | undefined, page: number, limit: number, filters?: TaskScopeFilters) {
+    const conds: SQL[] = [eq(task.requesterUserId, requesterUserId)];
+    if (status) conds.push(eq(task.status, asTaskStatus(status)));
+    conds.push(...scopeFilterConds(filters));
+    const where = and(...conds);
     const [cntRow] = await db.select({ cnt: count() }).from(task).where(where);
     const items = await db.select(taskColumns).from(task).where(where).orderBy(desc(task.createdAt)).limit(limit).offset((page - 1) * limit);
     const tagMap = await tagsRepository.getTaskTagsForTasks(items.map((i) => i.id));
@@ -219,10 +241,11 @@ export const tasksRepository = {
     return { items: enriched as (TaskRow & { tags: { id: string; slug: string; name: string }[] })[], total: cntRow?.cnt ?? 0 };
   },
 
-  async listByOrganization(organizationId: string, status: string | undefined, page: number, limit: number) {
-    const where = status
-      ? and(eq(task.requesterOrganizationId, organizationId), eq(task.status, asTaskStatus(status)))
-      : eq(task.requesterOrganizationId, organizationId);
+  async listByOrganization(organizationId: string, status: string | undefined, page: number, limit: number, filters?: TaskScopeFilters) {
+    const conds: SQL[] = [eq(task.requesterOrganizationId, organizationId)];
+    if (status) conds.push(eq(task.status, asTaskStatus(status)));
+    conds.push(...scopeFilterConds(filters));
+    const where = and(...conds);
     const [cntRow] = await db.select({ cnt: count() }).from(task).where(where);
     const items = await db.select(taskColumns).from(task).where(where).orderBy(desc(task.createdAt)).limit(limit).offset((page - 1) * limit);
     const tagMap = await tagsRepository.getTaskTagsForTasks(items.map((i) => i.id));

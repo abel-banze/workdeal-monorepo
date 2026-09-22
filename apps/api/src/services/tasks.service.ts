@@ -159,7 +159,12 @@ async listTasks(query: TaskListQuery) {
   async listMyTasks(user: AuthUser, query: TaskListQuery) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const { items, total } = await tasksRepository.listByRequester(user.id, query.status, page, limit);
+    const { items, total } = await tasksRepository.listByRequester(user.id, query.status, page, limit, {
+      q: query.q,
+      categoryId: query.categoryId,
+      province: query.province,
+      contractType: query.contractType,
+    });
     const counts = await tasksRepository.countProposalsForTasks(items.map((i) => i.id));
     return { items: items.map((i) => ({ ...i, proposalCount: counts.get(i.id) ?? 0 })), total, page, limit };
   },
@@ -171,7 +176,12 @@ async listTasks(query: TaskListQuery) {
     }
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const { items, total } = await tasksRepository.listByOrganization(organizationId, query.status, page, limit);
+    const { items, total } = await tasksRepository.listByOrganization(organizationId, query.status, page, limit, {
+      q: query.q,
+      categoryId: query.categoryId,
+      province: query.province,
+      contractType: query.contractType,
+    });
     const counts = await tasksRepository.countProposalsForTasks(items.map((i) => i.id));
     return { items: items.map((i) => ({ ...i, proposalCount: counts.get(i.id) ?? 0 })), total, page, limit };
   },

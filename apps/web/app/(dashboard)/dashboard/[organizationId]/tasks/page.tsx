@@ -2,7 +2,6 @@ import { notFound } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { getOrgRole } from "@workdeal/auth/repository"
 import { hasOrgPermission } from "@workdeal/shared"
-import { Card, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { TasksManager } from "./tasks-manager"
 
 export type TaskListItem = {
@@ -34,9 +33,9 @@ const STATUS_TABS: { key: string; label: string }[] = [
   { key: "cancelled", label: "Canceladas" },
 ]
 
-export default async function TasksPage({ params, searchParams }: { params: Promise<{ organizationId: string }>; searchParams: Promise<{ status?: string }> }) {
+export default async function TasksPage({ params, searchParams }: { params: Promise<{ organizationId: string }>; searchParams: Promise<{ status?: string; q?: string; categoryId?: string; province?: string; contractType?: string }> }) {
   const { organizationId } = await params
-  const { status } = await searchParams
+  const { status, q, categoryId, province, contractType } = await searchParams
   const isPersonal = organizationId === "personal"
   const session = await requireAuth()
 
@@ -54,6 +53,7 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
 
   const allowed = STATUS_TABS.map((t) => t.key)
   const activeStatus = status && allowed.includes(status) ? status : "all"
+  const query = (q ?? "").trim()
 
   let tasks: TaskListItem[] = []
   let categories: { id: string; name: string; slug: string }[] = []
@@ -66,6 +66,10 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
     tags = (tagsRes.data ?? []) as typeof tags
     const params = new URLSearchParams({ limit: "50" })
     if (activeStatus !== "all") params.set("status", activeStatus)
+    if (query) params.set("q", query)
+    if (categoryId) params.set("categoryId", categoryId)
+    if (province) params.set("province", province)
+    if (contractType) params.set("contractType", contractType)
     // Contexto empresa: lista TODAS as tarefas da organização (qualquer membro
     // com tasks:view), não só as criadas pelo utilizador actual. Pessoal: /my.
     const tasksPath = isPersonal
@@ -81,35 +85,28 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
 
   const activeTab = STATUS_TABS.find((t) => t.key === activeStatus)
 
+  // Filtros activos (para a barra de pesquisa e o estado vazio). O `status`
+  // vive nas tabs e nunca é limpo pelo "Limpar filtros".
+  const filterParams = new URLSearchParams()
+  if (query) filterParams.set("q", query)
+  if (categoryId) filterParams.set("categoryId", categoryId)
+  if (province) filterParams.set("province", province)
+  if (contractType) filterParams.set("contractType", contractType)
+  const hasFilters = filterParams.size > 0
+
+  function tabHref(key: string): string {
+    const qs = new URLSearchParams(filterParams)
+    if (key !== "all") qs.set("status", key)
+    const s = qs.toString()
+    return `/dashboard/${organizationId}/tasks${s ? `?${s}` : ""}`
+  }
+
+  const clearHref = activeStatus === "all" ? `/dashboard/${organizationId}/tasks` : `/dashboard/${organizationId}/tasks?status=${activeStatus}`
+
+  const tabHrefs = Object.fromEntries(STATUS_TABS.map((t) => [t.key, tabHref(t.key)])) as Record<string, string>
+
   return (
-    <div className="mx-auto w-full max-w-[960px] space-y-5 pb-10">
-      <Card>
-        <CardHeader>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tarefas · {isPersonal ? "Pessoal" : (orgName ?? organizationId)}</p>
-          <CardTitle className="text-xl">Pedidos de serviço</CardTitle>
-          <CardDescription>
-            Publica tarefas, gere propostas e adjudica em execução. Tarefas aparecem para fornecedores na directoria e nas oportunidades.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
-      <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1.5">
-        {STATUS_TABS.map((t) => {
-          const active = t.key === activeStatus
-          return (
-            <a
-              key={t.key}
-              href={`/dashboard/${organizationId}/tasks${t.key === "all" ? "" : `?status=${t.key}`}`}
-              aria-current={active ? "page" : undefined}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
-            >
-              {t.label}
-            </a>
-          )
-        })}
-        <span className="ml-auto self-center pr-2 text-xs text-muted-foreground">{activeTab?.label ?? "Todas"}</span>
-      </div>
-
+    <div className="mx-auto w-full max-w-[960px] space-y-5 pb-5">
       <TasksManager
         initial={tasks}
         categories={categories}
@@ -118,6 +115,12 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
         requesterOrganizationId={isPersonal ? null : organizationId}
         organizationId={organizationId}
         orgName={isPersonal ? "Pessoal" : (orgName ?? organizationId)}
+        statusTabs={STATUS_TABS}
+        activeStatus={activeStatus}
+        tabHrefs={tabHrefs}
+        activeTabLabel={activeTab?.label ?? "Todas"}
+        hasFilters={hasFilters}
+        clearHref={clearHref}
       />
     </div>
   )
