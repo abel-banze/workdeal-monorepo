@@ -1,5 +1,5 @@
 import { sendEmail as sendEmailChannel, sendSms as sendSmsChannel, sendWhatsappTemplate } from "../lib/channels.js";
-import { preRegisterCompanyHtml } from "@workdeal/shared/lib/email-templates";
+import { preRegisterCompanyHtml, workdealIntroductionHtml } from "@workdeal/shared/lib/email-templates";
 import { DEFAULT_NOTIFY_CHANNELS, type NotifyChannel } from "@workdeal/shared/schemas/pre-register";
 
 export interface PreRegisterNotifyInput {
@@ -37,6 +37,17 @@ export async function sendEmail(input: PreRegisterNotifyInput) {
     console.warn(`[pre-register email] sem contactEmail para ${input.companyName} — skip`);
     return { ok: true as const, skipped: true as const };
   }
+  // Par ordenado (igual ao WhatsApp): 1º apresentação do Workdeal,
+  // 2º convite com o link. Se a apresentação falhar, o convite não segue órfão.
+  const intro = await sendEmailChannel({
+    to: input.contactEmail,
+    subject: `O que é o Workdeal — ${input.companyName}`,
+    html: workdealIntroductionHtml({ companyName: input.companyName, contactName: input.contactName, ctaUrl: "https://workdeal.co.mz" }),
+  });
+  if (intro.outcome !== "sent") {
+    console.warn(`[pre-register email] apresentação falhou para ${input.companyName} — convite não enviado`);
+    return { ok: false as const, skipped: false as const, error: intro.error ?? "falha Email" };
+  }
   const result = await sendEmailChannel({
     to: input.contactEmail,
     subject: `${input.companyName} — completa o teu registo no Workdeal`,
@@ -48,7 +59,7 @@ export async function sendEmail(input: PreRegisterNotifyInput) {
     }),
   });
   if (result.outcome === "sent") {
-    console.log(`[Email pré-registo] enviado para ${input.contactEmail}`);
+    console.log(`[Email pré-registo] enviado para ${input.contactEmail} (após apresentação)`);
     return { ok: true as const, skipped: false as const };
   }
   return { ok: false as const, skipped: false as const, error: result.error ?? "falha Email" };

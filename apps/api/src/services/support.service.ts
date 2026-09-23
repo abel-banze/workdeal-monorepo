@@ -101,21 +101,13 @@ export const supportService = {
   },
 };
 
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 async function notifyTicketReply(ticket: { id: string; userId: string; organizationId: string | null; subject: string }) {
   const contact = await notificationsRepository.findUserContact(ticket.userId).catch(() => null);
   if (!contact) return;
   const link = `/dashboard/${ticket.organizationId ?? "personal"}/support?ticket=${ticket.id}`;
   const subject = `Resposta ao teu pedido: ${ticket.subject}`;
-  const html = `
-  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0F1A2E">
-    <h2 style="margin:0 0 8px;font-size:20px">A equipa respondeu ao teu pedido</h2>
-    <p style="color:#5B6B83;margin:0 0 16px"><strong>${escapeHtml(ticket.subject)}</strong> — vê a resposta no teu painel.</p>
-    <a href="https://workdeal.co.mz${link}" style="display:inline-block;background:#0B5E56;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Ver resposta</a>
-  </div>`;
+  const { supportReplyHtml } = await import("@workdeal/shared/lib/email-templates");
+  const html = supportReplyHtml({ subject: ticket.subject, url: `https://workdeal.co.mz${link}` });
   await notificationsService.dispatch({
     organizationId: ticket.organizationId,
     userIds: [ticket.userId],

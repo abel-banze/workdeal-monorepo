@@ -138,19 +138,24 @@ describe("pre-register notifications", () => {
   });
 
   describe("sendEmail", () => {
-    it("envia email com assunto e destinatário correctos", async () => {
+    it("envia apresentação e depois convite com assunto e destinatário correctos", async () => {
       const resendSend = vi.mocked(resend!.emails.send);
-      resendSend.mockResolvedValueOnce({ data: { id: "email-1" }, error: null, headers: {} as Record<string, string> });
+      resendSend
+        .mockResolvedValueOnce({ data: { id: "email-1" }, error: null, headers: {} as Record<string, string> })
+        .mockResolvedValueOnce({ data: { id: "email-2" }, error: null, headers: {} as Record<string, string> });
 
       const result = await sendEmail(baseInput);
 
       expect(result.ok).toBe(true);
-      expect(resendSend).toHaveBeenCalledTimes(1);
-      const call = resendSend.mock.calls[0]![0];
-      expect(call.to).toBe(baseInput.contactEmail);
-      expect(call.subject).toContain(baseInput.companyName);
-      expect(call.from).toBe("Workdeal <noreply@example.com>");
-      expect(call.html).toContain(baseInput.completionUrl);
+      expect(resendSend).toHaveBeenCalledTimes(2);
+      const intro = resendSend.mock.calls[0]![0];
+      expect(intro.to).toBe(baseInput.contactEmail);
+      expect(intro.subject).toContain("Workdeal");
+      const invite = resendSend.mock.calls[1]![0];
+      expect(invite.to).toBe(baseInput.contactEmail);
+      expect(invite.subject).toContain(baseInput.companyName);
+      expect(invite.from).toBe("Workdeal <noreply@example.com>");
+      expect(invite.html).toContain(baseInput.completionUrl);
     });
 
     it("salta quando não há contactEmail", async () => {
@@ -179,7 +184,9 @@ describe("pre-register notifications", () => {
       process.env.ZERNIO_API_KEY = "z-key";
       process.env.ZERNIO_PHONE_ID = "acc-1";
       const resendSend = vi.mocked(resend!.emails.send);
-      resendSend.mockResolvedValueOnce({ data: { id: "e" }, error: null, headers: {} as Record<string, string> });
+      resendSend
+        .mockResolvedValueOnce({ data: { id: "e1" }, error: null, headers: {} as Record<string, string> })
+        .mockResolvedValueOnce({ data: { id: "e2" }, error: null, headers: {} as Record<string, string> });
       fetchMock
         .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ status: "successful" }) } as unknown as Response)
         .mockResolvedValueOnce({ ok: true, text: async () => "" } as unknown as Response)
