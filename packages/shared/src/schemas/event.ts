@@ -3,7 +3,7 @@ import { z } from "zod";
 // ── Eventos ────────────────────────────────────────────────────────
 
 export const eventStatusSchema = z.enum(["draft", "published", "cancelled", "ended"]);
-export const eventRegistrationStatusSchema = z.enum(["registered", "cancelled", "checked_in"]);
+export const eventRegistrationStatusSchema = z.enum(["registered", "cancelled", "checked_in", "interested"]);
 export const eventVisibilitySchema = z.enum(["public", "members_only", "private"]);
 
 export const EVENT_STATUS_LABELS_PT: Record<z.infer<typeof eventStatusSchema>, string> = {
@@ -23,6 +23,7 @@ export const EVENT_REGISTRATION_STATUS_LABELS_PT: Record<z.infer<typeof eventReg
   registered: "Inscrito",
   cancelled: "Cancelado",
   checked_in: "Confirmado/Apresente",
+  interested: "Interessado",
 };
 
 const eventFormFields = z.object({
@@ -30,8 +31,10 @@ const eventFormFields = z.object({
   categoryId: z.string().min(1).nullable().optional(),
   title: z.string().trim().min(3, "Título deve ter pelo menos 3 caracteres").max(160),
   description: z.string().trim().min(10, "Descrição deve ter pelo menos 10 caracteres").max(8000),
-  startAt: z.coerce.date(),
-  endAt: z.coerce.date(),
+  // Datas opcionais: ausentes = "data a anunciar" (Brevemente). O interesse
+  // manifesta-se sem data; a inscrição exige data futura marcada.
+  startAt: z.coerce.date().nullable().optional(),
+  endAt: z.coerce.date().nullable().optional(),
   isOnline: z.boolean().default(false),
   onlineUrl: z.string().trim().url("URL inválido").max(500).nullable().optional(),
   venueName: z.string().trim().max(160).nullable().optional(),
@@ -45,16 +48,19 @@ const eventFormFields = z.object({
   visibility: eventVisibilitySchema.default("public"),
 });
 
-export const createEventSchema = eventFormFields.refine(
-  (d) => d.endAt > d.startAt,
-  {
-    message: "Fim do evento deve ser depois do início",
-    path: ["endAt"],
-  },
-);
+const endAfterStart = (d: { startAt?: Date | null; endAt?: Date | null }) =>
+  d.startAt == null || d.endAt == null || d.endAt > d.startAt;
+
+export const createEventSchema = eventFormFields.refine(endAfterStart, {
+  message: "Fim do evento deve ser depois do início",
+  path: ["endAt"],
+});
 
 export const updateEventSchema = eventFormFields.partial().extend({
   status: eventStatusSchema.optional(),
+}).refine(endAfterStart, {
+  message: "Fim do evento deve ser depois do início",
+  path: ["endAt"],
 });
 
 export const eventListQuerySchema = z.object({
@@ -97,8 +103,8 @@ export const eventViewSchema = z.object({
   title: z.string(),
   slug: z.string(),
   description: z.string(),
-  startAt: z.date(),
-  endAt: z.date(),
+  startAt: z.date().nullable(),
+  endAt: z.date().nullable(),
   isOnline: z.boolean(),
   onlineUrl: z.string().nullable(),
   venueName: z.string().nullable(),
@@ -112,6 +118,8 @@ export const eventViewSchema = z.object({
   visibility: eventVisibilitySchema,
   status: eventStatusSchema,
   registrationCount: z.number().optional().default(0),
+  // Manifestações de interesse (eventos sem data / sinal de procura)
+  interestCount: z.number().optional().default(0),
   createdAt: z.date(),
   updatedAt: z.date(),
   // Enriquecimento para o frontend público (quem organiza)

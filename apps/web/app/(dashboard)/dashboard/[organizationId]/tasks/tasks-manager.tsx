@@ -587,34 +587,34 @@ export function TasksManager({
                             <ArrowRight className="size-3.5" aria-hidden /> Ver propostas ({t.proposalCount})
                           </DropdownMenuItem>
                           {(t.status === "open" || t.status === "in_review") && (
-                            <DropdownMenuItem onSelect={() => openEdit(t)} className="rounded-lg text-[13px]">
+                            <DropdownMenuItem onClick={() => openEdit(t)} className="rounded-lg text-[13px]">
                               Editar tarefa
                             </DropdownMenuItem>
                           )}
                           {t.status === "open" && (
-                            <DropdownMenuItem onSelect={() => onStatus(t.id, "in_review")} className="rounded-lg text-[13px]">
+                            <DropdownMenuItem onClick={() => onStatus(t.id, "in_review")} className="rounded-lg text-[13px]">
                               Colocar em análise
                             </DropdownMenuItem>
                           )}
                           {t.status === "in_review" && (
-                            <DropdownMenuItem onSelect={() => onStatus(t.id, "open")} className="rounded-lg text-[13px]">
+                            <DropdownMenuItem onClick={() => onStatus(t.id, "open")} className="rounded-lg text-[13px]">
                               Voltar a aceitar propostas
                             </DropdownMenuItem>
                           )}
                           {t.status === "open" && (
-                            <DropdownMenuItem onSelect={() => onStatus(t.id, "withdrawn")} className="rounded-lg text-[13px]">
+                            <DropdownMenuItem onClick={() => onStatus(t.id, "withdrawn")} className="rounded-lg text-[13px]">
                               Retirar (pausar propostas)
                             </DropdownMenuItem>
                           )}
                           {t.status === "withdrawn" && (
-                            <DropdownMenuItem onSelect={() => onStatus(t.id, "open")} className="rounded-lg text-[13px] text-primary">
+                            <DropdownMenuItem onClick={() => onStatus(t.id, "open")} className="rounded-lg text-[13px] text-primary">
                               Reabrir tarefa
                             </DropdownMenuItem>
                           )}
                           {(t.status === "open" || t.status === "in_review") && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onSelect={() => onStatus(t.id, "cancelled")} className="rounded-lg text-[13px] text-destructive">
+                              <DropdownMenuItem onClick={() => onStatus(t.id, "cancelled")} className="rounded-lg text-[13px] text-destructive">
                                 Cancelar tarefa
                               </DropdownMenuItem>
                             </>

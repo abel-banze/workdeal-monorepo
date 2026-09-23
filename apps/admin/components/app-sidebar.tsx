@@ -47,6 +47,7 @@ const groups: { label: string; items: NavMainItem[] }[] = [
         icon: <UsersIcon />,
         items: [
           { title: "Todos os utilizadores", url: "/dashboard/users" },
+          { title: "Funil onboarding", url: "/dashboard/users/onboarding" },
           { title: "Convites", url: "/dashboard/users/invites" },
           { title: "Papéis e permissões", url: "/dashboard/users/roles" },
         ],

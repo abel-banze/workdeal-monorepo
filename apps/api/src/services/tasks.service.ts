@@ -262,6 +262,9 @@ async listTasks(query: TaskListQuery) {
       estimatedDays: input.estimatedDays ?? null,
     });
     if (taskRow.status === "open") await tasksRepository.update(input.taskId, { status: "in_review" });
+    void notifyProposalReceived(taskRow, created.id).catch((e) =>
+      console.error("[tasks] proposal notify falhou", (e as Error).message?.slice(0, 500)),
+    );
     return created;
   },
 
@@ -345,6 +348,9 @@ async listTasks(query: TaskListQuery) {
     }
     await negotiationsService.closeByProposal(proposalId, user, "accepted");
     await tasksRepository.update(taskId, { status: "in_progress" });
+    void notifyBidAwarded(taskRow, proposal.providerProfileId, agreedPriceMzn).catch((e) =>
+      console.error("[tasks] bid notify falhou", (e as Error).message?.slice(0, 500)),
+    );
     return bid;
   },
 
@@ -390,3 +396,62 @@ async listTasks(query: TaskListQuery) {
     return updated;
   },
 };
+
+// ── Notificações (via dispatcher central, fire-and-forget) ──────
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+async function notifyProposalReceived(taskRow: { id: string; title: string; requesterUserId: string; requesterOrganizationId: string | null }, proposalId: string) {
+  const { notificationsService } = await import("./notifications.service.js");
+  const { notificationsRepository } = await import("../repositories/notifications.repository.js");
+  const contact = await notificationsRepository.findUserContact(taskRow.requesterUserId).catch(() => null);
+  const link = `/dashboard/${taskRow.requesterOrganizationId ?? "personal"}/tasks/${taskRow.id}`;
+  const subject = `Nova proposta: ${taskRow.title}`;
+  const html = `
+  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0F1A2E">
+    <h2 style="margin:0 0 8px;font-size:20px">Nova proposta recebida</h2>
+    <p style="color:#5B6B83;margin:0 0 16px">A tarefa <strong>${escapeHtml(taskRow.title)}</strong> recebeu uma nova proposta.</p>
+    <a href="https://workdeal.co.mz${link}" style="display:inline-block;background:#0B5E56;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Ver propostas</a>
+  </div>`;
+  await notificationsService.dispatch({
+    organizationId: taskRow.requesterOrganizationId,
+    userIds: [taskRow.requesterUserId],
+    type: "proposal_received",
+    title: "Nova proposta recebida",
+    body: `«${taskRow.title}» recebeu uma nova proposta.`,
+    link,
+    email: contact ? { to: contact.email, subject, html } : null,
+    metadata: { taskId: taskRow.id, proposalId },
+  });
+}
+
+async function notifyBidAwarded(taskRow: { id: string; title: string }, providerProfileId: string, agreedPriceMzn: number) {
+  const { notificationsService } = await import("./notifications.service.js");
+  const { notificationsRepository } = await import("../repositories/notifications.repository.js");
+  const recipients = await notificationsRepository.resolveProfileRecipients(providerProfileId).catch(() => null);
+  if (!recipients || recipients.userIds.length === 0) return;
+  const price = `${agreedPriceMzn.toLocaleString("pt-MZ")} MZN`;
+  const link = "/dashboard/personal/opportunities";
+  const subject = `Proposta adjudicada: ${taskRow.title}`;
+  for (const userId of recipients.userIds) {
+    const contact = await notificationsRepository.findUserContact(userId).catch(() => null);
+    const html = `
+  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0F1A2E">
+    <h2 style="margin:0 0 8px;font-size:20px">Proposta adjudicada 🎉</h2>
+    <p style="color:#5B6B83;margin:0 0 16px">A tua proposta para <strong>${escapeHtml(taskRow.title)}</strong> foi aceite (${escapeHtml(price)}).</p>
+    <a href="https://workdeal.co.mz${link}" style="display:inline-block;background:#0B5E56;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Ver adjudicação</a>
+  </div>`;
+    await notificationsService.dispatch({
+      organizationId: recipients.organizationId,
+      userIds: [userId],
+      type: "bid_awarded",
+      title: "Proposta adjudicada",
+      body: `«${taskRow.title}» — valor acordado ${price}.`,
+      link,
+      email: contact ? { to: contact.email, subject, html } : null,
+      metadata: { taskId: taskRow.id, providerProfileId },
+    });
+  }
+}

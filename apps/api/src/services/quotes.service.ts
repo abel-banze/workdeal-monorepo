@@ -73,10 +73,10 @@ export const quotesService = {
       await quotesRepository.attachFiles(row.id, input.fileIds);
     }
 
-    // Notificação WhatsApp — fire-and-forget, não bloqueia resposta
+    // Notificação de cotação recebida (inbox + WhatsApp) — fire-and-forget, não bloqueia resposta
     // Template "quote_request": {{1}} = nome da empresa que recebe, {{2}} = nome do serviço
-    void notifyWhatsApp(row.id, input.targetProfileId, input.serviceLabel).catch((e) =>
-      console.error("[quotes] whatsapp notify falhou", (e as Error).message?.slice(0, 500)),
+    void notifyQuoteReceived(row.id, input.targetProfileId, input.serviceLabel).catch((e) =>
+      console.error("[quotes] notify falhou", (e as Error).message?.slice(0, 500)),
     );
 
     const files = input.fileIds?.length ? await quotesRepository.getFilesForQuote(row.id) : [];
@@ -138,47 +138,24 @@ export const quotesService = {
   },
 };
 
-async function notifyWhatsApp(quoteId: string, targetProfileId: string, serviceLabel: string) {
+async function notifyQuoteReceived(quoteId: string, targetProfileId: string, serviceLabel: string) {
   const contact = await quotesRepository.getProfileContact(targetProfileId);
   if (!contact) return;
-  const to = (contact.whatsapp ?? contact.phone ?? "").replace(/\D/g, "");
-  if (!to) {
-    console.warn(`[quotes whatsapp] sem whatsapp/phone para perfil ${targetProfileId} — cotação ${quoteId} não notificada por WhatsApp`);
-    return;
-  }
-  const token = process.env.ZERNIO_API_KEY ?? process.env.WHATSAPP_API_TOKEN;
-  const accountId = process.env.ZERNIO_PHONE_ID;
-  if (!token || !accountId) {
-    console.warn(`[quotes whatsapp] ZERNIO_API_KEY/PHONE_ID em falta — mock: enviaria para +${to} template quote_request ({{1}}=${contact.name}, {{2}}=${serviceLabel}) cotação ${quoteId}`);
-    return;
-  }
+  const { notificationsService } = await import("./notifications.service.js");
+  const { notificationsRepository } = await import("../repositories/notifications.repository.js");
+  const recipients = await notificationsRepository.resolveProfileRecipients(targetProfileId).catch(() => null);
+  const organizationId = recipients?.organizationId ?? contact.organizationId;
+  const to = contact.whatsapp ?? contact.phone ?? "";
   // Template "quote_request": {{1}} -> nome da empresa que recebe, {{2}} -> nome do serviço
   const templateName = process.env.WHATSAPP_QUOTE_TEMPLATE ?? "quote_request";
-  const templateLanguage = "pt_PT";
-  const companyName = contact.name;
-  console.log(`[quotes whatsapp] enviando para +${to} template=${templateName} quote=${quoteId} {{1}}="${companyName}" {{2}}="${serviceLabel}" via account ${accountId}`);
-  try {
-    const url = "https://zernio.com/api/v1/inbox/conversations";
-    const body = {
-      accountId,
-      participantId: to,
-      templateName,
-      templateLanguage,
-      templateParams: [companyName, serviceLabel],
-    };
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
-    const text = await res.text().catch(() => "");
-    if (!res.ok) {
-      console.error(`[quotes whatsapp] Zernio falhou ${res.status} ${text.slice(0, 800)} — cotação ${quoteId}`);
-      return;
-    }
-    console.log(`[quotes whatsapp] enviado cotação ${quoteId} para +${to} template ${templateName}`);
-  } catch (e) {
-    console.error(`[quotes whatsapp] erro fetch cotação ${quoteId}:`, (e as Error).message?.slice(0, 800));
-  }
+  await notificationsService.dispatch({
+    organizationId,
+    userIds: recipients?.userIds ?? [],
+    type: "quote_received",
+    title: "Nova cotação recebida",
+    body: `${contact.name} · ${serviceLabel}`,
+    link: organizationId ? `/dashboard/${organizationId}` : "/dashboard",
+    whatsapp: to ? { toDigits: to, templateName, templateParams: [contact.name, serviceLabel] } : null,
+    metadata: { quoteId, targetProfileId },
+  });
 }

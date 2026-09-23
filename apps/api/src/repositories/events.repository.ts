@@ -1,5 +1,5 @@
 import { db, event, eventRegistration, profile, user } from "@workdeal/db";
-import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, ne, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { boundingBox } from "@workdeal/shared/lib/geo";
 
 type EventStatus = (typeof event.status.enumValues)[number];
@@ -39,7 +39,7 @@ async function enrichOrganizer<T extends { id: string; organizerProfileId: strin
 }
 
 /** Mapas de enriquecimento para listas do dashboard (nomes em vez de só IDs). */
-type EventMini = { title: string; slug: string; status: EventStatus; startAt: Date };
+type EventMini = { title: string; slug: string; status: EventStatus; startAt: Date | null };
 
 async function fetchEventMap(eventIds: string[]): Promise<Map<string, EventMini>> {
   if (eventIds.length === 0) return new Map();
@@ -129,7 +129,11 @@ async list(params: { status?: string; q?: string; categoryId?: string; province?
       if (params.q) conds.push(ilike(event.title, `%${params.q}%`));
       if (params.categoryId) conds.push(eq(event.categoryId, params.categoryId));
     if (params.province) conds.push(eq(event.province, params.province));
-    if (params.upcoming) conds.push(gt(event.startAt, new Date()));
+    // "Brevemente" (sem data) aparece na agenda futura, depois dos datados (ASC → NULLS LAST no Postgres)
+    if (params.upcoming) {
+      const cond = or(gt(event.startAt, new Date()), isNull(event.startAt));
+      if (cond) conds.push(cond);
+    }
     let nearCoords: { latitude: number; longitude: number } | null = null;
     if (params.near) {
       const parts = params.near.split(",");
@@ -190,12 +194,29 @@ async list(params: { status?: string; q?: string; categoryId?: string; province?
   },
 
   // ── Inscrições ───────────────────────────────────────────────────
+  /** Inscritos efectivos (vagas): registered + checked_in. Interesse não consome lotação. */
   async countRegistrationsForEvents(eventIds: string[]): Promise<Map<string, number>> {
     if (eventIds.length === 0) return new Map();
     const rows = await db
       .select({ eventId: eventRegistration.eventId, cnt: count() })
       .from(eventRegistration)
-      .where(and(inArray(eventRegistration.eventId, eventIds), ne(eventRegistration.status, asRegistrationStatus("cancelled"))))
+      .where(
+        and(
+          inArray(eventRegistration.eventId, eventIds),
+          inArray(eventRegistration.status, [asRegistrationStatus("registered"), asRegistrationStatus("checked_in")]),
+        ),
+      )
+      .groupBy(eventRegistration.eventId);
+    return new Map(rows.map((r) => [r.eventId, r.cnt]));
+  },
+
+  /** Manifestações de interesse (sinal de procura, sem lotação). */
+  async countInterestsForEvents(eventIds: string[]): Promise<Map<string, number>> {
+    if (eventIds.length === 0) return new Map();
+    const rows = await db
+      .select({ eventId: eventRegistration.eventId, cnt: count() })
+      .from(eventRegistration)
+      .where(and(inArray(eventRegistration.eventId, eventIds), eq(eventRegistration.status, asRegistrationStatus("interested"))))
       .groupBy(eventRegistration.eventId);
     return new Map(rows.map((r) => [r.eventId, r.cnt]));
   },
@@ -204,7 +225,12 @@ async list(params: { status?: string; q?: string; categoryId?: string; province?
     const [row] = await db
       .select({ cnt: count() })
       .from(eventRegistration)
-      .where(and(eq(eventRegistration.eventId, eventId), ne(eventRegistration.status, asRegistrationStatus("cancelled"))));
+      .where(
+        and(
+          eq(eventRegistration.eventId, eventId),
+          inArray(eventRegistration.status, [asRegistrationStatus("registered"), asRegistrationStatus("checked_in")]),
+        ),
+      );
     return row?.cnt ?? 0;
   },
 
@@ -224,8 +250,8 @@ async list(params: { status?: string; q?: string; categoryId?: string; province?
     return new Set(rows.map((r) => r.eventId));
   },
 
-  async createRegistration(eventId: string, userId: string) {
-    const [row] = await db.insert(eventRegistration).values({ eventId, userId, status: "registered" as never }).returning();
+  async createRegistration(eventId: string, userId: string, status: "registered" | "interested" = "registered") {
+    const [row] = await db.insert(eventRegistration).values({ eventId, userId, status: status as never }).returning();
     return row ?? null;
   },
 

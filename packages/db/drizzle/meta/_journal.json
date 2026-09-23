@@ -351,6 +351,34 @@
       "when": 1789678589380,
       "tag": "0049_ai_conversations",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1789750000000,
+      "tag": "0050_event_date_tbd",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1789760000000,
+      "tag": "0051_org_notify_prefs",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1789770000000,
+      "tag": "0052_onboarding_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1789780000000,
+      "tag": "0053_notifications",
+      "breakpoints": true
     }
   ]
 }

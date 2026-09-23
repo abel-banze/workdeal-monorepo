@@ -40,8 +40,8 @@ export const eventsService = {
       title: input.title,
       slug,
       description: input.description,
-      startAt: input.startAt,
-      endAt: input.endAt,
+      startAt: input.startAt ?? null,
+      endAt: input.endAt ?? null,
       isOnline: input.isOnline ?? false,
       onlineUrl: input.onlineUrl ?? null,
       venueName: input.venueName ?? null,
@@ -71,7 +71,17 @@ const { items, total } = await eventsRepository.list({
         page,
         limit,
       });
-    return { items, total, page, limit };
+    const ids = items.map((i) => i.id);
+    const [counts, interests] = await Promise.all([
+      eventsRepository.countRegistrationsForEvents(ids),
+      eventsRepository.countInterestsForEvents(ids),
+    ]);
+    return {
+      items: items.map((i) => ({ ...i, registrationCount: counts.get(i.id) ?? 0, interestCount: interests.get(i.id) ?? 0 })),
+      total,
+      page,
+      limit,
+    };
   },
 
   async myEvents(user: AuthUser, query: EventListQuery) {
@@ -79,19 +89,37 @@ const { items, total } = await eventsRepository.list({
     const limit = query.limit ?? 20;
     const profileIds = await tasksRepository.getUserProfileIds(user.id);
     const { items, total } = await eventsRepository.listByOrganizer(profileIds, query.status, page, limit);
-    const counts = await eventsRepository.countRegistrationsForEvents(items.map((i) => i.id));
-    return { items: items.map((i) => ({ ...i, registrationCount: counts.get(i.id) ?? 0 })), total, page, limit };
+    const ids = items.map((i) => i.id);
+    const [counts, interests] = await Promise.all([
+      eventsRepository.countRegistrationsForEvents(ids),
+      eventsRepository.countInterestsForEvents(ids),
+    ]);
+    return {
+      items: items.map((i) => ({ ...i, registrationCount: counts.get(i.id) ?? 0, interestCount: interests.get(i.id) ?? 0 })),
+      total,
+      page,
+      limit,
+    };
   },
 
   async getEvent(idOrSlug: string, isSlug: boolean, user?: AuthUser | null) {
     const row = isSlug ? await eventsRepository.findBySlug(idOrSlug) : await eventsRepository.findById(idOrSlug);
     if (!row) throw new AppError(404, "EVENT_NOT_FOUND", "Evento não encontrado");
-    let myRegistration: "registered" | "checked_in" | "cancelled" | null = null;
+    let myRegistration: "registered" | "checked_in" | "cancelled" | "interested" | null = null;
     if (user) {
       const reg = await eventsRepository.findRegistrationByEventAndUser(row.id, user.id);
-      if (reg) myRegistration = reg.status as "registered" | "checked_in" | "cancelled";
+      if (reg) myRegistration = reg.status as "registered" | "checked_in" | "cancelled" | "interested";
     }
-    return { ...row, myRegistration };
+    const [counts, interests] = await Promise.all([
+      eventsRepository.countRegistrationsForEvents([row.id]),
+      eventsRepository.countInterestsForEvents([row.id]),
+    ]);
+    return {
+      ...row,
+      myRegistration,
+      registrationCount: counts.get(row.id) ?? 0,
+      interestCount: interests.get(row.id) ?? 0,
+    };
   },
 
   async updateEvent(user: AuthUser, id: string, input: UpdateEventInput) {
@@ -106,8 +134,8 @@ const { items, total } = await eventsRepository.list({
       title: string;
       slug: string;
       description: string;
-      startAt: Date;
-      endAt: Date;
+      startAt: Date | null;
+      endAt: Date | null;
       isOnline: boolean;
       onlineUrl: string | null;
       venueName: string | null;
@@ -133,8 +161,8 @@ const { items, total } = await eventsRepository.list({
       if (input.title !== existing.title) patch.slug = await uniqueSlug(slugify(input.title));
     }
     if (input.description !== undefined) patch.description = input.description;
-    if (input.startAt !== undefined) patch.startAt = input.startAt;
-    if (input.endAt !== undefined) patch.endAt = input.endAt;
+    if (input.startAt !== undefined) patch.startAt = input.startAt ?? null;
+    if (input.endAt !== undefined) patch.endAt = input.endAt ?? null;
     if (input.isOnline !== undefined) patch.isOnline = input.isOnline;
     if (input.onlineUrl !== undefined) patch.onlineUrl = input.onlineUrl ?? null;
     if (input.venueName !== undefined) patch.venueName = input.venueName ?? null;
@@ -151,21 +179,50 @@ const { items, total } = await eventsRepository.list({
     return eventsRepository.update(id, patch);
   },
 
-  // ── Inscrições ───────────────────────────────────────────────────
-  async register(eventRow: { id: string; capacity: number | null; status: string; startAt: Date }, user: AuthUser) {
+  // ── Inscrições / Interesse ─────────────────────────────────────
+  // Sem data marcada não há inscrição (vaga) — há manifestação de interesse,
+  // que não consome lotação. Quando a data é marcada, o interessado converte
+  // em inscrição pelo mesmo endpoint.
+  async register(eventRow: { id: string; title: string; slug: string; organizerProfileId: string; capacity: number | null; status: string; startAt: Date | null }, user: AuthUser) {
     if (eventRow.status !== "published") throw new AppError(409, "EVENT_NOT_OPEN", "Evento não está aberto a inscrições");
-    if (eventRow.startAt <= new Date()) throw new AppError(409, "EVENT_STARTED", "O evento já começou");
+    const startAt = eventRow.startAt;
+    if (startAt != null && startAt <= new Date()) throw new AppError(409, "EVENT_STARTED", "O evento já começou");
+    const dated = startAt != null;
     const existing = await eventsRepository.findRegistrationByEventAndUser(eventRow.id, user.id);
-    if (existing) throw new AppError(409, "ALREADY_REGISTERED", "Já estás inscrito neste evento");
+    if (existing && existing.status !== "cancelled") {
+      if (existing.status === "interested" && dated) {
+        if (eventRow.capacity != null) {
+          const active = await eventsRepository.countActiveRegistrations(eventRow.id);
+          if (active >= eventRow.capacity) throw new AppError(409, "EVENT_FULL", "Evento sem vagas");
+        }
+        const updated = await eventsRepository.updateRegistration(existing.id, "registered");
+        void notifyEventRegistration(eventRow, user, "registered").catch((e) =>
+          console.error("[events] registration notify falhou", (e as Error).message?.slice(0, 500)),
+        );
+        return updated;
+      }
+      if (existing.status === "interested") throw new AppError(409, "ALREADY_REGISTERED", "Já manifestaste interesse neste evento");
+      throw new AppError(409, "ALREADY_REGISTERED", "Já estás inscrito neste evento");
+    }
+    if (!dated) {
+      const created = await eventsRepository.createRegistration(eventRow.id, user.id, "interested");
+      void notifyEventRegistration(eventRow, user, "interested").catch((e) =>
+        console.error("[events] interest notify falhou", (e as Error).message?.slice(0, 500)),
+      );
+      return created;
+    }
     if (eventRow.capacity != null) {
       const active = await eventsRepository.countActiveRegistrations(eventRow.id);
       if (active >= eventRow.capacity) throw new AppError(409, "EVENT_FULL", "Evento sem vagas");
     }
-    return eventsRepository.createRegistration(eventRow.id, user.id);
+    const created = await eventsRepository.createRegistration(eventRow.id, user.id);
+    void notifyEventRegistration(eventRow, user, "registered").catch((e) =>
+      console.error("[events] registration notify falhou", (e as Error).message?.slice(0, 500)),
+    );
+    return created;
   },
 
-  async myRegistrations(user: AuthUser, query: EventRegistrationListQuery) {
-    const page = query.page ?? 1;
+  async myRegistrations(user: AuthUser, query: EventRegistrationListQuery) {    const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const { items, total } = await eventsRepository.listRegistrationsByUser(user.id, query.status, page, limit);
     return { items, total, page, limit };
@@ -214,3 +271,43 @@ const { items, total } = await eventsRepository.list({
     throw new AppError(404, "REGISTRATION_NOT_FOUND", "Inscrição não encontrada");
   },
 };
+
+// ── Notificações ao organizador (via dispatcher central, fire-and-forget) ──
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+async function notifyEventRegistration(
+  eventRow: { id: string; title: string; slug: string; organizerProfileId: string },
+  user: AuthUser,
+  kind: "registered" | "interested",
+) {
+  const { notificationsService } = await import("./notifications.service.js");
+  const { notificationsRepository } = await import("../repositories/notifications.repository.js");
+  const recipients = await notificationsRepository.resolveProfileRecipients(eventRow.organizerProfileId).catch(() => null);
+  if (!recipients || recipients.userIds.length === 0) return;
+  const interested = kind === "interested";
+  const title = interested ? "Novo interessado no evento" : "Nova inscrição no evento";
+  const link = `/events/${eventRow.slug}`;
+  const subject = `${title}: ${eventRow.title}`;
+  for (const userId of recipients.userIds) {
+    const contact = await notificationsRepository.findUserContact(userId).catch(() => null);
+    const html = `
+  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0F1A2E">
+    <h2 style="margin:0 0 8px;font-size:20px">${escapeHtml(title)}</h2>
+    <p style="color:#5B6B83;margin:0 0 16px"><strong>${escapeHtml(user.name)}</strong> ${interested ? "manifestou interesse" : "inscreveu-se"} em <strong>${escapeHtml(eventRow.title)}</strong>.</p>
+    <a href="https://workdeal.co.mz${link}" style="display:inline-block;background:#0B5E56;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Ver evento</a>
+  </div>`;
+    await notificationsService.dispatch({
+      organizationId: recipients.organizationId,
+      userIds: [userId],
+      type: interested ? "event_interest" : "event_registered",
+      title,
+      body: `${user.name} · «${eventRow.title}»`,
+      link,
+      email: contact ? { to: contact.email, subject, html } : null,
+      metadata: { eventId: eventRow.id },
+    });
+  }
+}

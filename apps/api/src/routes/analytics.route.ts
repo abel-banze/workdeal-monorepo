@@ -2,9 +2,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import type { Env } from "../middlewares/auth.middleware.js";
+import { requireSystemRole } from "../middlewares/rbac.middleware.js";
 import { ok } from "../lib/api-response.js";
 import { AppError } from "../lib/errors.js";
 import { analyticsService } from "../services/analytics.service.js";
+import { onboardingAnalyticsService } from "../services/onboarding-analytics.service.js";
+import { onboardingFunnelQuerySchema, trackOnboardingEventSchema, onboardingEventsQuerySchema } from "@workdeal/shared";
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
 
 const trackLimiter = createRateLimiter({ windowMs: 60_000, max: 120 });
@@ -71,4 +74,44 @@ analyticsRoute.get("/:profileId/dashboard", requireAuth, async (c) => {
 
   const data = await analyticsService.getDashboard(user, profileId);
   return c.json(ok(data), 200);
+});
+
+// ── Funil de onboarding ──────────────────────────────────────────
+// POST /api/v1/analytics/onboarding/track — qualquer utilizador autenticado
+// regista a sua própria acção (fire-and-forget, nunca bloqueia o fluxo).
+analyticsRoute.post("/onboarding/track", requireAuth, async (c) => {
+  const key = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "anon";
+  const r = trackLimiter.check(key);
+  c.header("X-RateLimit-Remaining", String(r.remaining));
+  if (!r.allowed) throw new AppError(429, "RATE_LIMITED", "Muitas requisições");
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = trackOnboardingEventSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(400, "VALIDATION_ERROR", "Dados inválidos", parsed.error.flatten());
+  }
+  await onboardingAnalyticsService.track(c.get("user"), parsed.data);
+  return c.json(ok({ tracked: true }), 201);
+});
+
+// GET /api/v1/analytics/onboarding/funnel — equipa Workdeal (admin/moderador)
+analyticsRoute.get("/onboarding/funnel", requireAuth, requireSystemRole("admin", "moderator"), async (c) => {
+  const parsed = onboardingFunnelQuerySchema.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
+  if (!parsed.success) {
+    throw new AppError(400, "VALIDATION_ERROR", "Parâmetros inválidos", parsed.error.flatten());
+  }
+  const data = await onboardingAnalyticsService.funnel(parsed.data.days);
+  return c.json(ok({ days: parsed.data.days, ...data }), 200);
+});
+
+// GET /api/v1/analytics/onboarding/events — drill-down por evento com
+// identidade (utilizador, empresas) — equipa Workdeal (admin/moderador)
+analyticsRoute.get("/onboarding/events", requireAuth, requireSystemRole("admin", "moderator"), async (c) => {
+  const parsed = onboardingEventsQuerySchema.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
+  if (!parsed.success) {
+    throw new AppError(400, "VALIDATION_ERROR", "Parâmetros inválidos", parsed.error.flatten());
+  }
+  const q = parsed.data;
+  const data = await onboardingAnalyticsService.listEvents({ action: q.action, step: q.step, days: q.days, page: q.page, limit: q.limit });
+  return c.json(ok(data.items, { total: data.total, page: q.page, limit: q.limit }), 200);
 });

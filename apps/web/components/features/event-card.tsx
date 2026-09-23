@@ -4,14 +4,18 @@ import type { EventView, EventRegistrationStatus } from "@workdeal/shared";
 import { formatEventWhen, formatDayMonth } from "@/lib/dates";
 
 export function EventCard({ event, categoryName, allowPast = true }: { event: EventView; categoryName?: string | null; allowPast?: boolean }) {
-  const when = formatEventWhen(event.startAt, event.endAt);
-  const isPast = new Date(event.endAt) < new Date();
+  const startAt = event.startAt;
+  const endAt = event.endAt;
+  const dateless = startAt == null || endAt == null;
+  const when = dateless ? "Brevemente" : formatEventWhen(startAt, endAt);
+  const isPast = !dateless && endAt != null && new Date(endAt) < new Date();
   if (isPast && !allowPast) return null;
   const hasDistance = typeof event.distanceKm === "number" && Number.isFinite(event.distanceKm);
   const distanceSuffix = hasDistance ? ` · ${(event.distanceKm as number).toFixed(1)} km` : "";
   const location = event.isOnline ? "Online" : (event.venueName || [event.province, event.district].filter(Boolean).join(" · ") || "Local a definir") + distanceSuffix;
   const spotsLeft = event.capacity != null ? event.capacity - (event.registrationCount ?? 0) : null;
   const myReg = (event as { myRegistration?: EventRegistrationStatus | null }).myRegistration;
+  const interestCount = (event as { interestCount?: number | null }).interestCount ?? 0;
 
   return (
     <Link
@@ -38,8 +42,11 @@ export function EventCard({ event, categoryName, allowPast = true }: { event: Ev
         </span>
         {myReg && myReg !== "cancelled" ? (
           <span className="absolute right-4 top-4 rounded-full bg-[#0B5E56] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white">
-            {myReg === "checked_in" ? "Presente ✓" : "Inscrito"}
+            {myReg === "checked_in" ? "Presente ✓" : myReg === "interested" ? "Interessado" : "Inscrito"}
           </span>
+        ) : null}
+        {dateless && (!myReg || myReg === "cancelled") ? (
+          <span className="absolute right-4 top-4 rounded-full bg-[#FF3B1F] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white">Brevemente</span>
         ) : null}
         {isPast ? <span className="absolute right-4 top-4 rounded-full bg-[#F6F3EE]/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#0F1A2E]/60">Terminou</span> : null}
       </div>
@@ -53,13 +60,15 @@ export function EventCard({ event, categoryName, allowPast = true }: { event: Ev
           >
             {event.title}
           </h3>
-          <span
-            className="hidden shrink-0 flex-col items-center rounded-xl border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 text-center sm:flex"
-            aria-hidden
-          >
-            <span className="font-sans text-[16px] font-black leading-none text-[#FF3B1F]">{formatDayMonth(event.startAt).split(" ")[0]}</span>
-            <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-[#0F1A2E]/50">{formatDayMonth(event.startAt).split(" ")[1]}</span>
-          </span>
+          {!dateless && startAt != null ? (
+            <span
+              className="hidden shrink-0 flex-col items-center rounded-xl border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 text-center sm:flex"
+              aria-hidden
+            >
+              <span className="font-sans text-[16px] font-black leading-none text-[#FF3B1F]">{formatDayMonth(startAt).split(" ")[0]}</span>
+              <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-[#0F1A2E]/50">{formatDayMonth(startAt).split(" ")[1]}</span>
+            </span>
+          ) : null}
         </div>
         <p className="mt-2 line-clamp-2 text-[13px] text-[#0F1A2E]/60">{location}</p>
       </div>
@@ -74,7 +83,13 @@ export function EventCard({ event, categoryName, allowPast = true }: { event: Ev
             <p className="text-xs text-[#0F1A2E]/50">Organizador a confirmar</p>
           )}
           <p className="mt-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0F1A2E]/45">
-            {spotsLeft != null ? (spotsLeft > 0 ? `${spotsLeft} vagas` : "Sem vagas") : `${event.registrationCount ?? 0} inscritos`}
+            {dateless
+              ? `${interestCount} ${interestCount === 1 ? "interessado" : "interessados"}`
+              : spotsLeft != null
+                ? spotsLeft > 0
+                  ? `${spotsLeft} vagas`
+                  : "Sem vagas"
+                : `${event.registrationCount ?? 0} inscritos`}
           </p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[#0B5E56] opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">

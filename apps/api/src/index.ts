@@ -48,6 +48,8 @@ import { featuresRoute } from "./routes/features.route.js";
 import { agentsRoute } from "./routes/agents.route.js";
 import { negotiationsRoute } from "./routes/negotiations.route.js";
 import { tendersRoute } from "./routes/tenders.route.js";
+import { organizationsRoute } from "./routes/organizations.route.js";
+import { notificationsRoute } from "./routes/notifications.route.js";
 
 const app = new Hono();
 
@@ -486,6 +488,8 @@ app.route("/api/v1/features", featuresRoute);
 app.route("/api/v1/ai", agentsRoute);
 app.route("/api/v1/negotiations", negotiationsRoute);
 app.route("/api/v1/tenders", tendersRoute);
+app.route("/api/v1/organizations", organizationsRoute);
+app.route("/api/v1/notifications", notificationsRoute);
 
 app.notFound(() => {
   throw new AppError(404, "NOT_FOUND", "Rota não encontrada");

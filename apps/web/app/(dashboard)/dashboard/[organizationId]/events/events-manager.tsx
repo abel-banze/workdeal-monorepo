@@ -16,6 +16,7 @@ const EVENT_STYLES: Record<string, { label: string; cls: string }> = {
 const REG_STYLES: Record<string, { label: string; cls: string }> = {
   registered: { label: "Inscrito", cls: "bg-[#0F1A2E] text-white" },
   checked_in: { label: "Presente", cls: "bg-[#0B5E56] text-white" },
+  interested: { label: "Interessado", cls: "bg-[#FF3B1F] text-white" },
   cancelled: { label: "Cancelado", cls: "bg-[#FF3B1F] text-white" },
 }
 
@@ -34,6 +35,7 @@ type CreateForm = {
   title: string
   categoryId: string
   description: string
+  dateTbd: boolean
   startAt: string
   endAt: string
   isOnline: boolean
@@ -50,6 +52,7 @@ const emptyCreate: CreateForm = {
   title: "",
   categoryId: "",
   description: "",
+  dateTbd: false,
   startAt: "",
   endAt: "",
   isOnline: false,
@@ -93,7 +96,8 @@ export function EventsManager({
     return categories.find((c) => c.id === id)?.name ?? ""
   }
 
-  function fmtDate(iso: string): string {
+  function fmtDate(iso: string | null): string {
+    if (!iso) return "Brevemente · data a anunciar"
     const d = new Date(iso)
     return `${d.toLocaleDateString("pt-MZ")} · ${d.toLocaleTimeString("pt-MZ", { hour: "2-digit", minute: "2-digit" })}`
   }
@@ -139,13 +143,13 @@ export function EventsManager({
       setError("Descrição deve ter pelo menos 10 caracteres")
       return
     }
-    if (!form.startAt || !form.endAt) {
-      setError("Data de início e fim são obrigatórias")
+    const startAt = form.dateTbd || !form.startAt ? null : new Date(form.startAt)
+    const endAt = form.dateTbd || !form.endAt ? null : new Date(form.endAt)
+    if (!form.dateTbd && (!startAt || !endAt)) {
+      setError("Data de início e fim são obrigatórias (ou marca «data a anunciar»)")
       return
     }
-    const startAt = new Date(form.startAt)
-    const endAt = new Date(form.endAt)
-    if (endAt <= startAt) {
+    if (startAt && endAt && endAt <= startAt) {
       setError("Fim do evento deve ser depois do início")
       return
     }
@@ -271,8 +275,12 @@ export function EventsManager({
                     </option>
                   ))}
                 </select>
-                <input value={form.startAt} onChange={(e) => setForm({ ...form, startAt: e.target.value })} type="datetime-local" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
-                <input value={form.endAt} onChange={(e) => setForm({ ...form, endAt: e.target.value })} type="datetime-local" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]" />
+                <input value={form.startAt} onChange={(e) => setForm({ ...form, startAt: e.target.value })} type="datetime-local" disabled={form.dateTbd} title="Início do evento" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E] disabled:opacity-50" />
+                <input value={form.endAt} onChange={(e) => setForm({ ...form, endAt: e.target.value })} type="datetime-local" disabled={form.dateTbd} title="Fim do evento" className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E] disabled:opacity-50" />
+                <label className="flex items-center gap-2 rounded-lg border border-dashed border-[#FF3B1F]/40 bg-[#FF3B1F]/5 px-3 py-2 text-[13px] font-semibold text-[#0F1A2E]">
+                  <input type="checkbox" checked={form.dateTbd} onChange={(e) => setForm({ ...form, dateTbd: e.target.checked })} className="size-4 accent-[#FF3B1F]" />
+                  Data a anunciar (Brevemente)
+                </label>
                 <select value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} className="rounded-lg border border-[#D9D2C2] bg-[#F6F3EE] px-3 py-2 text-[13px] text-[#0F1A2E]">
                   <option value="">Província (opcional)</option>
                   {PROVINCES.map((p) => (
@@ -320,8 +328,9 @@ export function EventsManager({
       <div className="space-y-3">
         {events.map((ev) => {
           const st = EVENT_STYLES[ev.status] ?? { label: ev.status, cls: "bg-[#6B7280] text-white" }
-          const regs = regsByEvent[ev.id]
-          const activeRegs = (regs ?? []).filter((r) => r.status !== "cancelled").length
+            const regs = regsByEvent[ev.id]
+            const activeRegs = (regs ?? []).filter((r) => r.status !== "cancelled").length
+            const interestedRegs = (regs ?? []).filter((r) => r.status === "interested").length
           return (
             <div key={ev.id} className="overflow-hidden rounded-[18px] border border-[#D9D2C2] bg-white">
               <div className="flex flex-wrap items-start justify-between gap-2 p-4">
@@ -337,8 +346,11 @@ export function EventsManager({
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="rounded-full border border-[#D9D2C2] bg-[#F6F3EE] px-2.5 py-1 font-mono font-semibold text-[#0F1A2E]">
-                    {ev.registrationCount}{ev.capacity ? `/${ev.capacity}` : ""} inscrições
+                    {ev.registrationCount}{ev.capacity ? `/${ev.capacity}` : ""} inscrições{(ev.interestCount ?? 0) > 0 ? ` · ${ev.interestCount} interessados` : ""}
                   </span>
+                  {(ev.startAt == null || ev.endAt == null) && (
+                    <span className="rounded-full bg-[#FF3B1F] px-2.5 py-1 text-[11px] font-bold text-white">Brevemente</span>
+                  )}
                 </div>
               </div>
               {ev.description && <p className="line-clamp-2 px-4 pb-3 text-[13px] leading-relaxed text-[#0F1A2E]/60">{ev.description}</p>}
@@ -370,6 +382,7 @@ export function EventsManager({
                 <div className="border-t border-[#D9D2C2]/60 bg-[#F6F3EE]/60 p-4">
                   <p className="text-xs font-black text-[#0F1A2E]">
                     Inscrições · {activeRegs} activa{activeRegs === 1 ? "" : "s"}
+                    {interestedRegs > 0 ? ` (${interestedRegs} interessado${interestedRegs === 1 ? "" : "s"})` : ""}
                   </p>
                   {regs.length === 0 && <p className="mt-2 text-xs text-[#0F1A2E]/50">Ninguém inscrito ainda.</p>}
                   <ul className="mt-2 divide-y divide-[#D9D2C2]/60">

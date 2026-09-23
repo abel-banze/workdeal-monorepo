@@ -67,3 +67,20 @@ export function useTrackClick(profileId: string, eventType: string, metadata?: R
     trackEvent({ profileId, eventType, metadata });
   }, [profileId, eventType, metadata]);
 }
+
+/** Tracking do funil de onboarding — fire-and-forget, nunca bloqueia o fluxo. */
+export async function trackOnboardingEvent(data: {
+  action: string;
+  step?: number | null;
+  metadata?: Record<string, unknown>;
+}) {
+  try {
+    const visitorId = getVisitorId();
+    await fetch("/api/v1/analytics/onboarding/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...data, visitorId }),
+      keepalive: true,
+    });
+  } catch {}
+}

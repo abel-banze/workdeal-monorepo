@@ -69,7 +69,7 @@ export const quotesRepository = {
   },
 
   async getProfileContact(targetProfileId: string) {
-    const [row] = await db.select({ whatsapp: profile.whatsapp, phone: profile.phone, email: profile.email, name: profile.name }).from(profile).where(eq(profile.id, targetProfileId)).limit(1);
+    const [row] = await db.select({ whatsapp: profile.whatsapp, phone: profile.phone, email: profile.email, name: profile.name, organizationId: profile.organizationId }).from(profile).where(eq(profile.id, targetProfileId)).limit(1);
     return row ?? null;
   },
 

@@ -20,8 +20,9 @@ export function formatFull(date: Date | string) {
   return FULL.format(new Date(date));
 }
 
-/** "Seg, 28 Ago" + "9:00–18:00" (ou em dias seguidos). */
-export function formatEventWhen(startAt: Date | string, endAt: Date | string) {
+/** "Seg, 28 Ago" + "9:00–18:00" (ou em dias seguidos). Sem datas → "Brevemente". */
+export function formatEventWhen(startAt: Date | string | null, endAt: Date | string | null) {
+  if (startAt == null || endAt == null) return "Brevemente · data a anunciar";
   const start = new Date(startAt);
   const end = new Date(endAt);
   const sameDay = start.toDateString() === end.toDateString();

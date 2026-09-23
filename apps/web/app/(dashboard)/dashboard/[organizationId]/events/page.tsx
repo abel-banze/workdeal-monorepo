@@ -11,8 +11,8 @@ export type EventListItem = {
   title: string
   slug: string
   description: string
-  startAt: string
-  endAt: string
+  startAt: string | null
+  endAt: string | null
   isOnline: boolean
   onlineUrl: string | null
   venueName: string | null
@@ -23,6 +23,7 @@ export type EventListItem = {
   capacity: number | null
   status: string
   registrationCount: number
+  interestCount: number
   createdAt: string
 }
 
