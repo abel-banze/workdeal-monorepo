@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { normalizeMzPhone } from "@workdeal/shared/lib/phone";
+import { getBulkSendAt, markBulkSent } from "./bulk-send-log.js";
 import { db } from "./client.js";
 import { organization, profile } from "./schema.js";
 
@@ -20,7 +21,8 @@ dotenv.config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) }
 //   - `--limit=N` processa no máximo N empresas (para lotes).
 //   - `--delay-ms=M` pausa entre envios (defeito 1500ms, evita rate-limit).
 //   - Deduplica por número normalizado (mesmo telefone em várias empresas → envia 1x).
-//   - Sem reenvio automático: o script não regista o envio; re-correr reenvia.
+//   - Sem reenvio automático: quem já recebeu (bulk_send_log) é saltado;
+//     usa --resend para forçar.
 
 const TEMPLATE = process.env.WHATSAPP_NEW_TENDERS_TEMPLATE ?? "new_tenders";
 const TEMPLATE_LANGUAGE = "pt_PT";
@@ -76,6 +78,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   const send = hasFlag("send");
+  const resend = hasFlag("resend");
   const limitRaw = argValue("limit");
   const limit = limitRaw ? Math.max(1, Number.parseInt(limitRaw, 10) || 0) : Number.POSITIVE_INFINITY;
   const delayRaw = argValue("delay-ms");
@@ -103,6 +106,7 @@ async function main() {
   let failed = 0;
   let skippedBadPhone = 0;
   let skippedDuplicate = 0;
+  let skippedAlreadySent = 0;
 
   for (const org of rows) {
     if (queued >= limit) break;
@@ -120,6 +124,14 @@ async function main() {
       continue;
     }
     seenPhones.add(digits);
+    if (!resend) {
+      const prev = await getBulkSendAt(org.id, TEMPLATE);
+      if (prev) {
+        skippedAlreadySent++;
+        log(`SKIP já enviado em ${prev.slice(0, 10)}: "${org.name}" (usa --resend para forçar)`);
+        continue;
+      }
+    }
     queued++;
 
     if (!send) {
@@ -130,6 +142,7 @@ async function main() {
     const result = await sendTemplateMessage(digits, org.name);
     if (result.ok) {
       sent++;
+      await markBulkSent(org.id, TEMPLATE).catch((e) => log(`AVISO tracking falhou para "${org.name}": ${(e as Error).message}`));
       log(`OK "${org.name}" → +${maskPhone(digits)}`);
     } else {
       failed++;
@@ -138,8 +151,8 @@ async function main() {
     await sleep(delayMs);
   }
 
-  log(`\nResumo: ${queued} na fila | ${send ? `${sent} enviadas, ${failed} falhas` : "dry-run, nada enviado"} | skips: ${skippedBadPhone} telefone ausente/inválido, ${skippedDuplicate} duplicados.`);
-  if (!send) log("Para enviar de verdade, corre com --send (opcional: --limit=N --delay-ms=M).");
+  log(`\nResumo: ${queued} na fila | ${send ? `${sent} enviadas, ${failed} falhas` : "dry-run, nada enviado"} | skips: ${skippedBadPhone} telefone ausente/inválido, ${skippedDuplicate} duplicados, ${skippedAlreadySent} já enviados.`);
+  if (!send) log("Para enviar de verdade, corre com --send (opcional: --limit=N --delay-ms=M --resend).");
   if (send && failed > 0) process.exitCode = 1;
 }
 

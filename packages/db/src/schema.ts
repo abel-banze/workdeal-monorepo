@@ -1021,6 +1021,24 @@ export const broadcastRecipient = pgTable(
   ],
 );
 
+// ── Log de envios em massa (scripts bulk) ────────────────────────
+// Uma linha por (empresa, template): re-correr um script salta quem já
+// recebeu (a menos de --resend) e permite auditar a cobertura.
+export const bulkSendLog = pgTable(
+  "bulk_send_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "set null" }),
+    template: text("template").notNull(),
+    channel: text("channel").notNull().default("whatsapp"),
+    sentAt: timestamp("sent_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("bulk_send_log_org_template_idx").on(table.organizationId, table.template, table.channel),
+    index("bulk_send_log_template_idx").on(table.template, table.sentAt),
+  ],
+);
+
 // ── Onboarding funnel ──────────────────────────────────────────
 // Tracking de acções durante o onboarding (sem perfil ainda — por isso não
 // cabe em analytics_event, que exige profile_id). Base para o funil:

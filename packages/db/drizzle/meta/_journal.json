@@ -393,6 +393,13 @@
       "when": 1789800000000,
       "tag": "0055_broadcast",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1789810000000,
+      "tag": "0056_bulk_send_log",
+      "breakpoints": true
     }
   ]
 }

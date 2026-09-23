@@ -148,6 +148,13 @@ async function notifyQuoteReceived(quoteId: string, targetProfileId: string, ser
   const to = contact.whatsapp ?? contact.phone ?? "";
   // Template "quote_request": {{1}} -> nome da empresa que recebe, {{2}} -> nome do serviço
   const templateName = process.env.WHATSAPP_QUOTE_TEMPLATE ?? "quote_request";
+  const subject = `Nova cotação recebida: ${serviceLabel}`;
+  const html = `
+  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0F1A2E">
+    <h2 style="margin:0 0 8px;font-size:20px">Nova cotação recebida</h2>
+    <p style="color:#5B6B83;margin:0 0 16px"><strong>${escapeHtml(contact.name)}</strong> recebeu um pedido de cotação para <strong>${escapeHtml(serviceLabel)}</strong>.</p>
+    <a href="https://workdeal.co.mz/dashboard${organizationId ? `/${organizationId}` : ""}" style="display:inline-block;background:#0B5E56;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Ver cotação</a>
+  </div>`;
   await notificationsService.dispatch({
     organizationId,
     userIds: recipients?.userIds ?? [],
@@ -155,7 +162,12 @@ async function notifyQuoteReceived(quoteId: string, targetProfileId: string, ser
     title: "Nova cotação recebida",
     body: `${contact.name} · ${serviceLabel}`,
     link: organizationId ? `/dashboard/${organizationId}` : "/dashboard",
+    email: contact.email ? { to: contact.email, subject, html } : null,
     whatsapp: to ? { toDigits: to, templateName, templateParams: [contact.name, serviceLabel] } : null,
     metadata: { quoteId, targetProfileId },
   });
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
