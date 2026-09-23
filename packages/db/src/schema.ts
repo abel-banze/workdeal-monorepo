@@ -875,6 +875,33 @@ export const analyticsEvent = pgTable(
   ],
 );
 
+// ── Notificações ───────────────────────────────────────────────
+// Registo único de notificações: cada dispatch cria a linha (item do inbox,
+// estado lido/não-lido) e carimba em metadata.channels o resultado por canal
+// (in_app/email/whatsapp/sms: sent|skipped|failed). Base do sino + auditoria.
+export const notificationStatusEnum = pgEnum("notification_status", ["unread", "read"]);
+
+export const notification = pgTable(
+  "notification",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    recipientUserId: text("recipient_user_id").references(() => user.id, { onDelete: "cascade" }),
+    recipientOrganizationId: text("recipient_organization_id").references(() => organization.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    link: text("link"),
+    status: notificationStatusEnum("status").notNull().default("unread"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("notification_user_idx").on(table.recipientUserId, table.createdAt),
+    index("notification_org_idx").on(table.recipientOrganizationId, table.createdAt),
+    index("notification_type_idx").on(table.type, table.createdAt),
+  ],
+);
+
 // ── Onboarding funnel ──────────────────────────────────────────
 // Tracking de acções durante o onboarding (sem perfil ainda — por isso não
 // cabe em analytics_event, que exige profile_id). Base para o funil:

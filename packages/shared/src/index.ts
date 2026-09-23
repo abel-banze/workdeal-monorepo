@@ -27,6 +27,7 @@ export * from "./schemas/affiliate.js";
 export * from "./schemas/ai.js";
 export * from "./schemas/negotiation.js";
 export * from "./schemas/notifications.js";
+export * from "./schemas/notification.js";
 export * from "./schemas/onboarding-analytics.js";
 export * from "./schemas/tender.js";
 export * from "./institution-labels.js";

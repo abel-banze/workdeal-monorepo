@@ -1,4 +1,3 @@
-import { resend, EMAIL_FROM } from "../lib/resend.js";
 import { negotiationsRepository } from "../repositories/negotiations.repository.js";
 import type { SenderSide } from "@workdeal/shared";
 
@@ -38,20 +37,12 @@ function threadUrl(taskId: string, requesterOrganizationId: string | null, recip
 
 /**
  * Notifica o lado contrário por email quando há uma nova mensagem.
- * Best-effort e não bloqueante: falhas de envio não devem falhar a mutação.
+ * Passa pelo dispatcher central: regista no inbox e respeita as
+ * preferências da empresa. Best-effort e não bloqueante.
  */
 export async function notifyNewNegotiationMessage(params: NotifyNewMessageParams): Promise<{ ok: boolean; reason?: string }> {
   const recipient = await negotiationsRepository.findNotificationRecipient(params.providerProfileId, params.requesterUserId, params.recipientSide);
   if (!recipient?.email) return { ok: false, reason: "NO_RECIPIENT" };
-
-  if (!resend) {
-    if (process.env.NODE_ENV === "production") {
-      return { ok: false, reason: "RESEND_API_KEY em falta" };
-    }
-    console.warn("[Negociação] RESEND_API_KEY não configurado — email mock");
-    console.log(`[Negociação email mock] nova mensagem para ${recipient.email}`);
-    return { ok: true };
-  }
 
   const label = params.recipientSide === "provider" ? "fornecedor" : "solicitante";
   const subject = params.isOffer
@@ -70,13 +61,19 @@ export async function notifyNewNegotiationMessage(params: NotifyNewMessageParams
     <a href="${url}" style="display:inline-block;background:#F59E0B;color:#0B0E14;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Abrir negociação</a>
   </div>`;
 
-  try {
-    await resend.emails.send({ from: EMAIL_FROM, to: recipient.email, subject, html });
-    return { ok: true };
-  } catch (err) {
-    console.error("[Negociação] falha ao enviar email de notificação", err instanceof Error ? err.message : String(err));
-    return { ok: false, reason: "SEND_FAILED" };
-  }
+  const { notificationsService } = await import("./notifications.service.js");
+  const res = await notificationsService.dispatch({
+    organizationId: params.recipientSide === "requester" ? params.requesterOrganizationId : recipient.organizationId,
+    userIds: recipient.userId ? [recipient.userId] : [],
+    type: "negotiation_message",
+    title: subject,
+    body: preview,
+    link: url,
+    email: { to: recipient.email, subject, html },
+    metadata: { threadId: params.threadId, taskId: params.taskId },
+  });
+  if (res.channels.email === "sent") return { ok: true };
+  return { ok: false, reason: res.channels.email === "skipped" ? "OPTED_OUT" : "SEND_FAILED" };
 }
 
 /**
@@ -86,15 +83,6 @@ export async function notifyNewNegotiationMessage(params: NotifyNewMessageParams
 export async function notifyOfferResponse(params: NotifyOfferResponseParams): Promise<{ ok: boolean; reason?: string }> {
   const recipient = await negotiationsRepository.findNotificationRecipient(params.providerProfileId, params.requesterUserId, params.recipientSide);
   if (!recipient?.email) return { ok: false, reason: "NO_RECIPIENT" };
-
-  if (!resend) {
-    if (process.env.NODE_ENV === "production") {
-      return { ok: false, reason: "RESEND_API_KEY em falta" };
-    }
-    console.warn("[Negociação] RESEND_API_KEY não configurado — email mock");
-    console.log(`[Negociação email mock] contraproposta ${params.decision} para ${recipient.email}`);
-    return { ok: true };
-  }
 
   const accepted = params.decision === "accepted";
   const subject = accepted
@@ -120,13 +108,19 @@ export async function notifyOfferResponse(params: NotifyOfferResponseParams): Pr
     <a href="${url}" style="display:inline-block;background:#F59E0B;color:#0B0E14;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Abrir negociação</a>
   </div>`;
 
-  try {
-    await resend.emails.send({ from: EMAIL_FROM, to: recipient.email, subject, html });
-    return { ok: true };
-  } catch (err) {
-    console.error("[Negociação] falha ao enviar email de notificação", err instanceof Error ? err.message : String(err));
-    return { ok: false, reason: "SEND_FAILED" };
-  }
+  const { notificationsService } = await import("./notifications.service.js");
+  const res = await notificationsService.dispatch({
+    organizationId: params.recipientSide === "requester" ? params.requesterOrganizationId : recipient.organizationId,
+    userIds: recipient.userId ? [recipient.userId] : [],
+    type: "negotiation_offer",
+    title: subject,
+    body: terms,
+    link: url,
+    email: { to: recipient.email, subject, html },
+    metadata: { threadId: params.threadId, taskId: params.taskId, decision: params.decision },
+  });
+  if (res.channels.email === "sent") return { ok: true };
+  return { ok: false, reason: res.channels.email === "skipped" ? "OPTED_OUT" : "SEND_FAILED" };
 }
 
 function escapeHtml(value: string): string {

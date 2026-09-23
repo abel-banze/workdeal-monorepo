@@ -242,22 +242,22 @@ export const negotiationsRepository = {
    * requester → quem pediu a tarefa; provider → dono do perfil do fornecedor
    * (fallback para o email público do perfil se a conta não for resolvível).
    */
-  async findNotificationRecipient(providerProfileId: string, requesterUserId: string, recipientSide: SenderSide): Promise<{ name: string | null; email: string | null } | null> {
+  async findNotificationRecipient(providerProfileId: string, requesterUserId: string, recipientSide: SenderSide): Promise<{ name: string | null; email: string | null; userId: string | null; organizationId: string | null } | null> {
     if (recipientSide === "requester") {
       const [u] = await db.select({ name: user.name, email: user.email }).from(user).where(eq(user.id, requesterUserId)).limit(1);
-      return u ? { name: u.name, email: u.email } : null;
+      return u ? { name: u.name, email: u.email, userId: requesterUserId, organizationId: null } : null;
     }
     const [p] = await db
-      .select({ name: profile.name, email: profile.email, userId: profile.userId })
+      .select({ name: profile.name, email: profile.email, userId: profile.userId, organizationId: profile.organizationId })
       .from(profile)
       .where(inArray(profile.id, [providerProfileId]))
       .limit(1);
     if (!p) return null;
     if (p.userId) {
       const [u] = await db.select({ name: user.name, email: user.email }).from(user).where(eq(user.id, p.userId)).limit(1);
-      if (u) return { name: u.name, email: u.email };
+      if (u) return { name: u.name, email: u.email, userId: p.userId, organizationId: p.organizationId };
     }
-    return p.email ? { name: p.name, email: p.email } : null;
+    return p.email ? { name: p.name, email: p.email, userId: p.userId, organizationId: p.organizationId } : null;
   },
 
   /** Perfil pessoal do utilizador (profiles com userId, não os da organização). */

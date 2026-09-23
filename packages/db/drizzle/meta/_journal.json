@@ -372,6 +372,13 @@
       "when": 1789770000000,
       "tag": "0052_onboarding_events",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1789780000000,
+      "tag": "0053_notifications",
+      "breakpoints": true
     }
   ]
 }
