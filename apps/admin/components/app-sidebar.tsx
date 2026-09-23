@@ -25,6 +25,7 @@ import {
   CreditCardIcon,
   SettingsIcon,
   GiftIcon,
+  SendIcon,
   Settings2Icon,
   BotIcon,
   ActivityIcon,
@@ -146,6 +147,16 @@ const groups: { label: string; items: NavMainItem[] }[] = [
       },
       { title: "Features", url: "/dashboard/features", icon: <Settings2Icon /> },
       { title: "Subscrições", url: "/dashboard/subscriptions", icon: <CreditCardIcon /> },
+    ],
+  },
+  {
+    label: "Comunicação",
+    items: [
+      {
+        title: "Newsletter",
+        icon: <SendIcon />,
+        items: [{ title: "Campanhas e envios", url: "/dashboard/broadcast" }],
+      },
     ],
   },
   {

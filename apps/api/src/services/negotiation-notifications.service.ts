@@ -1,4 +1,5 @@
 import { negotiationsRepository } from "../repositories/negotiations.repository.js";
+import { negotiationMessageHtml, negotiationOfferHtml } from "@workdeal/shared/lib/email-templates";
 import type { SenderSide } from "@workdeal/shared";
 
 export interface NotifyNewMessageParams {
@@ -51,15 +52,7 @@ export async function notifyNewNegotiationMessage(params: NotifyNewMessageParams
   const url = threadUrl(params.taskId, params.requesterOrganizationId, params.recipientSide);
   const preview = (params.body || (params.isOffer ? "(contraproposta)" : "(sem texto)")).slice(0, 160);
 
-  const html = `
-  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0B0E14">
-    <h2 style="margin:0 0 8px;font-size:20px">Nova mensagem de ${escapeHtml(params.senderName)}</h2>
-    <p style="color:#5B6B83;margin:0 0 16px">Negociação entre solicitante e ${label} · pedido de serviço</p>
-    <div style="border-left:4px solid #F59E0B;padding:12px 16px;background:#F5F1E8;border-radius:8px;margin-bottom:16px">
-      <p style="margin:0;white-space:pre-wrap">${escapeHtml(preview)}</p>
-    </div>
-    <a href="${url}" style="display:inline-block;background:#F59E0B;color:#0B0E14;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Abrir negociação</a>
-  </div>`;
+  const html = negotiationMessageHtml({ senderName: params.senderName, label, preview, url });
 
   const { notificationsService } = await import("./notifications.service.js");
   const res = await notificationsService.dispatch({
@@ -94,19 +87,14 @@ export async function notifyOfferResponse(params: NotifyOfferResponseParams): Pr
       ? `${params.priceMzn.toLocaleString("pt-MZ")} MZN${params.estimatedDays != null ? ` · ~${params.estimatedDays} dias` : ""}`
       : "termos propostos";
 
-  const html = `
-  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0B0E14">
-    <h2 style="margin:0 0 8px;font-size:20px">${accepted ? "Contraproposta aceite" : "Contraproposta recusada"}</h2>
-    <div style="border-left:4px solid ${accepted ? "#0B5E56" : "#B91C1C"};padding:12px 16px;background:#F5F1E8;border-radius:8px;margin-bottom:16px">
-      <p style="margin:0;white-space:pre-wrap">${escapeHtml(terms)}</p>
-    </div>
-    <p style="color:#5B6B83;margin:0 0 16px">${
-      accepted
-        ? "Os termos foram actualizados na proposta. A negociação continua até à adjudicação."
-        : "Pode enviar uma nova contraproposta para continuar a negociar."
-    }</p>
-    <a href="${url}" style="display:inline-block;background:#F59E0B;color:#0B0E14;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Abrir negociação</a>
-  </div>`;
+  const html = negotiationOfferHtml({
+    accepted,
+    terms,
+    note: accepted
+      ? "Os termos foram actualizados na proposta. A negociação continua até à adjudicação."
+      : "Pode enviar uma nova contraproposta para continuar a negociar.",
+    url,
+  });
 
   const { notificationsService } = await import("./notifications.service.js");
   const res = await notificationsService.dispatch({
@@ -121,8 +109,4 @@ export async function notifyOfferResponse(params: NotifyOfferResponseParams): Pr
   });
   if (res.channels.email === "sent") return { ok: true };
   return { ok: false, reason: res.channels.email === "skipped" ? "OPTED_OUT" : "SEND_FAILED" };
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

@@ -8,25 +8,23 @@ import { organization, profile } from "./schema.js";
 
 dotenv.config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 
-// Disparo WhatsApp em massa para TODAS as empresas (todas as organizações),
-// com o telefone resolvido por: organization.contactPhone → profile.whatsapp
-// → profile.phone. Empresas sem nenhum telefone válido são saltadas.
+// Disparo WhatsApp em massa para TODAS as empresas a convidar sobre
+// concursos públicos, com o telefone resolvido por: organization.contactPhone
+// → profile.whatsapp → profile.phone. Empresas sem telefone válido são saltadas.
 //
-// Template: tasks_cta (override via WHATSAPP_TASKS_CTA_TEMPLATE), único
-// parâmetro {{1}} = nome da empresa. Envio via Zernio — mesmo contrato do
-// sendWhatsApp de pre-register-notifications.service.ts.
-//
-// Segurança para disparo em massa:
+// Template: new_tenders (override via WHATSAPP_NEW_TENDERS_TEMPLATE).
+// NOTA: os parâmetros abaixo assumem {{1}} = nome da empresa — têm de bater
+// certo com o template aprovado no Zernio (ver lib/message-templates.ts).
+// Segurança igual ao send-tasks-cta:
 //   - Por defeito é DRY-RUN (só lista quem receberia). Para enviar de verdade:
-//       pnpm --filter @workdeal/db db:send:tasks-cta -- --send
+//       pnpm --filter @workdeal/db db:send:new-tenders -- --send
 //   - `--limit=N` processa no máximo N empresas (para lotes).
 //   - `--delay-ms=M` pausa entre envios (defeito 1500ms, evita rate-limit).
 //   - Deduplica por número normalizado (mesmo telefone em várias empresas → envia 1x).
-//   - Sem telefone válido (normalização MZ falha) → skip com aviso.
 //   - Sem reenvio automático: quem já recebeu (bulk_send_log) é saltado;
-//     usa --resend para forçar. Usa --limit para controlar os lotes.
+//     usa --resend para forçar.
 
-const TEMPLATE = process.env.WHATSAPP_TASKS_CTA_TEMPLATE ?? "tasks_cta";
+const TEMPLATE = process.env.WHATSAPP_NEW_TENDERS_TEMPLATE ?? "new_tenders";
 const TEMPLATE_LANGUAGE = "pt_PT";
 
 function argValue(name: string): string | null {
@@ -42,7 +40,7 @@ function hasFlag(name: string): boolean {
 }
 
 function log(msg: string) {
-  console.log(`[send-tasks-cta] ${msg}`);
+  console.log(`[send-new-tenders] ${msg}`);
 }
 
 function maskPhone(digits: string): string {
@@ -88,7 +86,6 @@ async function main() {
 
   log(`Template "${TEMPLATE}" ({{1}} = nome da empresa). Modo: ${send ? "ENVIO REAL" : "DRY-RUN (usa --send para enviar)"}.`);
 
-  // Todas as empresas; telefone com fallback para o perfil público
   const rows = await db
     .select({
       id: organization.id,
@@ -114,7 +111,7 @@ async function main() {
   for (const org of rows) {
     if (queued >= limit) break;
     const rawPhone = org.contactPhone ?? org.profileWhatsapp ?? org.profilePhone ?? "";
-    // Normalização canónica MZ (258XXXXXXXXX) — igual ao envio do pré-registo.
+    // Normalização canónica MZ (258XXXXXXXXX) — igual aos restantes envios.
     const digits = normalizeMzPhone(rawPhone);
     if (!digits) {
       skippedBadPhone++;

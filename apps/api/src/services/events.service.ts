@@ -274,10 +274,6 @@ const { items, total } = await eventsRepository.list({
 
 // ── Notificações ao organizador (via dispatcher central, fire-and-forget) ──
 
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 async function notifyEventRegistration(
   eventRow: { id: string; title: string; slug: string; organizerProfileId: string },
   user: AuthUser,
@@ -285,6 +281,7 @@ async function notifyEventRegistration(
 ) {
   const { notificationsService } = await import("./notifications.service.js");
   const { notificationsRepository } = await import("../repositories/notifications.repository.js");
+  const { eventRegistrationHtml } = await import("@workdeal/shared/lib/email-templates");
   const recipients = await notificationsRepository.resolveProfileRecipients(eventRow.organizerProfileId).catch(() => null);
   if (!recipients || recipients.userIds.length === 0) return;
   const interested = kind === "interested";
@@ -293,12 +290,7 @@ async function notifyEventRegistration(
   const subject = `${title}: ${eventRow.title}`;
   for (const userId of recipients.userIds) {
     const contact = await notificationsRepository.findUserContact(userId).catch(() => null);
-    const html = `
-  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0F1A2E">
-    <h2 style="margin:0 0 8px;font-size:20px">${escapeHtml(title)}</h2>
-    <p style="color:#5B6B83;margin:0 0 16px"><strong>${escapeHtml(user.name)}</strong> ${interested ? "manifestou interesse" : "inscreveu-se"} em <strong>${escapeHtml(eventRow.title)}</strong>.</p>
-    <a href="https://workdeal.co.mz${link}" style="display:inline-block;background:#0B5E56;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Ver evento</a>
-  </div>`;
+    const html = eventRegistrationHtml({ interested, userName: user.name, eventTitle: eventRow.title, url: `https://workdeal.co.mz${link}` });
     await notificationsService.dispatch({
       organizationId: recipients.organizationId,
       userIds: [userId],

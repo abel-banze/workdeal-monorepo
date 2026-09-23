@@ -1,4 +1,5 @@
 import { createRateLimiter } from "@workdeal/shared/lib/rate-limit";
+import { quoteReceivedHtml } from "@workdeal/shared/lib/email-templates";
 import { AppError } from "../lib/errors.js";
 import { quotesRepository } from "../repositories/quotes.repository.js";
 import { db, organization, member, profile } from "@workdeal/db";
@@ -148,13 +149,17 @@ async function notifyQuoteReceived(quoteId: string, targetProfileId: string, ser
   const to = contact.whatsapp ?? contact.phone ?? "";
   // Template "quote_request": {{1}} -> nome da empresa que recebe, {{2}} -> nome do serviço
   const templateName = process.env.WHATSAPP_QUOTE_TEMPLATE ?? "quote_request";
+  const subject = `Nova cotação recebida: ${serviceLabel}`;
+  const link = organizationId ? `/dashboard/${organizationId}` : "/dashboard";
+  const html = quoteReceivedHtml({ companyName: contact.name, serviceLabel, url: `https://workdeal.co.mz${link}` });
   await notificationsService.dispatch({
     organizationId,
     userIds: recipients?.userIds ?? [],
     type: "quote_received",
     title: "Nova cotação recebida",
     body: `${contact.name} · ${serviceLabel}`,
-    link: organizationId ? `/dashboard/${organizationId}` : "/dashboard",
+    link,
+    email: contact.email ? { to: contact.email, subject, html } : null,
     whatsapp: to ? { toDigits: to, templateName, templateParams: [contact.name, serviceLabel] } : null,
     metadata: { quoteId, targetProfileId },
   });

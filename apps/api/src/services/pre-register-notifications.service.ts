@@ -1,6 +1,5 @@
-import { resend, EMAIL_FROM } from "../lib/resend.js";
-import { preRegisterCompanyHtml } from "@workdeal/shared/lib/email-templates";
-import { normalizeMzPhone } from "@workdeal/shared/lib/phone";
+import { sendEmail as sendEmailChannel, sendSms as sendSmsChannel, sendWhatsappTemplate } from "../lib/channels.js";
+import { preRegisterCompanyHtml, workdealIntroductionHtml } from "@workdeal/shared/lib/email-templates";
 import { DEFAULT_NOTIFY_CHANNELS, type NotifyChannel } from "@workdeal/shared/schemas/pre-register";
 
 export interface PreRegisterNotifyInput {
@@ -38,38 +37,32 @@ export async function sendEmail(input: PreRegisterNotifyInput) {
     console.warn(`[pre-register email] sem contactEmail para ${input.companyName} — skip`);
     return { ok: true as const, skipped: true as const };
   }
-  if (!resend) {
-    if (process.env.NODE_ENV === "production") {
-      return { ok: false as const, skipped: false as const, error: "RESEND_API_KEY em falta" };
-    }
-    console.warn("[Email] RESEND_API_KEY não configurado — mock pre-registo");
-    console.log(`[Email pré-registo mock] para ${input.contactEmail} (${input.companyName}) -> ${input.completionUrl}`);
+  // Par ordenado (igual ao WhatsApp): 1º apresentação do Workdeal,
+  // 2º convite com o link. Se a apresentação falhar, o convite não segue órfão.
+  const intro = await sendEmailChannel({
+    to: input.contactEmail,
+    subject: `O que é o Workdeal — ${input.companyName}`,
+    html: workdealIntroductionHtml({ companyName: input.companyName, contactName: input.contactName, ctaUrl: "https://workdeal.co.mz" }),
+  });
+  if (intro.outcome !== "sent") {
+    console.warn(`[pre-register email] apresentação falhou para ${input.companyName} — convite não enviado`);
+    return { ok: false as const, skipped: false as const, error: intro.error ?? "falha Email" };
+  }
+  const result = await sendEmailChannel({
+    to: input.contactEmail,
+    subject: `${input.companyName} — completa o teu registo no Workdeal`,
+    html: preRegisterCompanyHtml({
+      companyName: input.companyName,
+      contactName: input.contactName,
+      completionUrl: input.completionUrl,
+      formattedAddress: input.formattedAddress,
+    }),
+  });
+  if (result.outcome === "sent") {
+    console.log(`[Email pré-registo] enviado para ${input.contactEmail} (após apresentação)`);
     return { ok: true as const, skipped: false as const };
   }
-  try {
-    const { data, error } = await resend.emails.send({
-      from: EMAIL_FROM,
-      to: input.contactEmail,
-      subject: `${input.companyName} — completa o teu registo no Workdeal`,
-      html: preRegisterCompanyHtml({
-        companyName: input.companyName,
-        contactName: input.contactName,
-        completionUrl: input.completionUrl,
-        formattedAddress: input.formattedAddress,
-      }),
-    });
-    if (error || !data?.id) {
-      const msg = (error as { message?: string })?.message || "resposta sem id";
-      console.error(`[Email pré-registo] falha: ${msg}`);
-      return { ok: false as const, skipped: false as const, error: msg };
-    }
-    console.log(`[Email pré-registo] enviado para ${input.contactEmail} (id: ${data.id})`);
-    return { ok: true as const, skipped: false as const };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[Email pré-registo] falha:", msg);
-    return { ok: false as const, skipped: false as const, error: msg };
-  }
+  return { ok: false as const, skipped: false as const, error: result.error ?? "falha Email" };
 }
 
 export async function sendSms(input: PreRegisterNotifyInput) {
@@ -77,82 +70,38 @@ export async function sendSms(input: PreRegisterNotifyInput) {
     console.warn(`[pre-register sms] sem contactPhone para ${input.companyName} — skip`);
     return { ok: true as const, skipped: true as const };
   }
-  const token = process.env.SMS_USER_TOKEN;
-  const digits = input.contactPhone.replace(/\D/g, "");
-  const isProd = process.env.NODE_ENV === "production";
-  if (!token) {
-    if (isProd) return { ok: false as const, skipped: false as const, error: "SMS_USER_TOKEN em falta" };
-    console.warn("[SMS] SMS_USER_TOKEN em falta — mock dev");
-    console.log(`[SMS pré-registo mock] para +${digits}: ${input.companyName} — completa o registo em ${input.completionUrl}`);
-    return { ok: true as const, skipped: false as const };
-  }
-  let url = (process.env.SMS_API_URL || "https://my.turbo.host/api/international-sms/submit").replace(/\/+$/, "");
-  if (!url.endsWith("/submit")) url = `${url}/submit`;
   const message = `A Workdeal iniciou o registo da ${input.companyName}. Completa o teu perfil aqui: ${input.completionUrl}`;
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_token: token, origin: "CODEBAZ", message, numbers: [`+${digits}`] }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-    });
-    const text = await res.text().catch(() => "");
-    const data = text ? (JSON.parse(text) as { status?: string; message?: string }) : null;
-    if (res.ok && data?.status === "successful") {
-      console.log(`[SMS pré-registo] enviado para +${digits}`);
-      return { ok: true as const, skipped: false as const };
-    }
-    console.warn(`[SMS pré-registo] falha ${res.status} ${(data?.message ?? text).slice(0, 300)}`);
-    return isProd ? { ok: false as const, skipped: false as const, error: "falha SMS" } : { ok: true as const, skipped: false as const };
-  } catch (e) {
-    console.warn(`[SMS pré-registo] erro fetch ${e instanceof Error ? e.message : String(e)}`);
-    return isProd ? { ok: false as const, skipped: false as const, error: "falha SMS" } : { ok: true as const, skipped: false as const };
-  }
+  const result = await sendSmsChannel({ to: input.contactPhone, message });
+  if (result.outcome === "sent") return { ok: true as const, skipped: false as const };
+  const isProd = process.env.NODE_ENV === "production";
+  return isProd ? { ok: false as const, skipped: false as const, error: result.error ?? "falha SMS" } : { ok: true as const, skipped: false as const };
 }
 
 export async function sendWhatsApp(input: PreRegisterNotifyInput) {
-  // Normalização canónica MZ (258XXXXXXXXX) — mesmo normalizador do OTP/onboarding.
-  const digits = normalizeMzPhone(input.contactPhone);
-  if (!digits) {
-    console.warn(`[pre-register whatsapp] telefone ausente/inválido para ${input.companyName} — skip`);
+  if (!input.contactPhone) {
+    console.warn(`[pre-register whatsapp] sem contactPhone para ${input.companyName} — skip`);
     return { ok: true as const, skipped: true as const };
   }
-  const token = process.env.ZERNIO_API_KEY ?? process.env.WHATSAPP_API_TOKEN;
-  const accountId = process.env.ZERNIO_PHONE_ID;
+  // Par ordenado: 1º apresentação do Workdeal (sem parâmetros), 2º convite
+  // com nome+link. Se a apresentação falhar, não se envia o convite órfão.
   const isProd = process.env.NODE_ENV === "production";
-  if (!token || !accountId) {
-    if (isProd) return { ok: false as const, skipped: false as const, error: "ZERNIO_API_KEY/PHONE_ID em falta" };
-    console.warn(`[pre-register whatsapp] ZERNIO em falta — mock: enviaria para +${digits} template onboarding_request ({{1}}=nome, {{2}}=link)`);
-    return { ok: true as const, skipped: false as const };
+  const introName = process.env.WHATSAPP_INTRODUCTION_TEMPLATE ?? "workdeal_introduction";
+  const intro = await sendWhatsappTemplate({ to: input.contactPhone, templateName: introName, templateParams: [] });
+  if (intro.outcome !== "sent") {
+    console.warn(`[pre-register whatsapp] introdução falhou para ${input.companyName} — convite não enviado`);
+    return isProd ? { ok: false as const, skipped: false as const, error: intro.error ?? "falha WhatsApp" } : { ok: true as const, skipped: false as const };
   }
   const templateName = process.env.WHATSAPP_PREREGISTER_TEMPLATE ?? "onboarding_request";
-  const templateLanguage = "pt_PT";
-  try {
-    const res = await fetch("https://zernio.com/api/v1/inbox/conversations", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        accountId,
-        participantId: digits,
-        templateName,
-        templateLanguage,
-        templateParams: [input.companyName, input.completionUrl],
-      }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-    });
-    const text = await res.text().catch(() => "");
-    if (!res.ok) {
-      console.error(`[pre-register whatsapp] Zernio falhou ${res.status} ${text.slice(0, 800)}`);
-      return isProd ? { ok: false as const, skipped: false as const, error: "falha WhatsApp" } : { ok: true as const, skipped: false as const };
-    }
-    console.log(`[pre-register whatsapp] enviado para +${digits} template ${templateName}`);
+  const result = await sendWhatsappTemplate({
+    to: input.contactPhone,
+    templateName,
+    templateParams: [input.companyName, input.completionUrl],
+  });
+  if (result.outcome === "sent") {
+    console.log(`[pre-register whatsapp] enviado para ${input.companyName} template ${templateName} (após introdução)`);
     return { ok: true as const, skipped: false as const };
-  } catch (e) {
-    console.warn(`[pre-register whatsapp] erro fetch ${e instanceof Error ? e.message : String(e)}`);
-    return isProd ? { ok: false as const, skipped: false as const, error: "falha WhatsApp" } : { ok: true as const, skipped: false as const };
   }
+  return isProd ? { ok: false as const, skipped: false as const, error: result.error ?? "falha WhatsApp" } : { ok: true as const, skipped: false as const };
 }
 
 export const preRegisterNotificationService = { notifyCompanyPreRegister, webOrigin };

@@ -3,7 +3,9 @@ import { eq } from "drizzle-orm";
 import {
   type VerificationListQuery,
   type VerificationPaymentProofInput,
+  type AuthUser,
   VERIFICATION_DOCUMENT_TYPES,
+  VERIFICATION_LEVEL_LABELS_PT,
   missingVerificationDocuments,
   verificationDocumentLabel,
 } from "@workdeal/shared";
@@ -36,6 +38,9 @@ class VerificationsService {
     if (status === "approved") {
       await this.assignBadgeForLevel(updated);
     }
+    void notifyVerificationDecision(updated).catch((e) =>
+      console.error("[verifications] decision notify falhou", (e as Error).message?.slice(0, 500)),
+    );
     return updated;
   }
 
@@ -45,6 +50,7 @@ class VerificationsService {
     level: "level1" | "level2" = "level1",
     brNumber: string | null | undefined,
     payment?: VerificationPaymentProofInput,
+    requester?: { user: AuthUser; profileName: string; organizationId: string | null },
   ) {
     // Permite re-submissão: só bloqueia se já existe pending/in_review
     const pending = await db
@@ -90,6 +96,13 @@ class VerificationsService {
       level: level as never,
       brNumber: brNumber?.trim() || null,
       paymentProof: paymentProof as never,
+    }).then((created) => {
+      if (requester) {
+        void notifyVerificationRequested({ ...requester, level }).catch((e) =>
+          console.error("[verifications] request notify falhou", (e as Error).message?.slice(0, 500)),
+        );
+      }
+      return created;
     });
   }
 
@@ -121,3 +134,70 @@ class VerificationsService {
 }
 
 export const verificationsService = new VerificationsService();
+
+// ── Notificações (via dispatcher central, fire-and-forget) ──────
+
+async function notifyVerificationRequested(requester: {
+  user: AuthUser;
+  profileName: string;
+  organizationId: string | null;
+  level: "level1" | "level2";
+}) {
+  const { notificationsService } = await import("./notifications.service.js");
+  const { verificationRequestedHtml } = await import("@workdeal/shared/lib/email-templates");
+  const link = `/dashboard/${requester.organizationId ?? "personal"}/verification`;
+  const subject = `Pedido de verificação recebido: ${requester.profileName}`;
+  const html = verificationRequestedHtml({
+    companyName: requester.profileName,
+    level: VERIFICATION_LEVEL_LABELS_PT[requester.level] ?? requester.level,
+    url: `https://workdeal.co.mz${link}`,
+  });
+  await notificationsService.dispatch({
+    organizationId: requester.organizationId,
+    userIds: [requester.user.id],
+    type: "verification_update",
+    title: "Pedido de verificação recebido",
+    body: `«${requester.profileName}» — em análise (24–48h úteis).`,
+    link,
+    email: { to: requester.user.email, subject, html },
+    metadata: {},
+  });
+}
+
+async function notifyVerificationDecision(updated: {
+  profileId: string;
+  level: "level1" | "level2" | null;
+  status: string;
+  reviewNote?: string | null;
+}) {
+  const { notificationsService } = await import("./notifications.service.js");
+  const { notificationsRepository } = await import("../repositories/notifications.repository.js");
+  const { verificationDecisionHtml } = await import("@workdeal/shared/lib/email-templates");
+  const recipients = await notificationsRepository.resolveProfileRecipients(updated.profileId).catch(() => null);
+  if (!recipients || recipients.userIds.length === 0) return;
+  const approved = updated.status === "approved";
+  const level = updated.level ?? "level1";
+  const title = approved ? "Empresa verificada" : "Pedido não aprovado";
+  const link = `/dashboard/${recipients.organizationId ?? "personal"}/verification`;
+  const subject = approved ? `Empresa verificada: ${recipients.profileName ?? "o teu perfil"}` : `Pedido não aprovado: ${recipients.profileName ?? "o teu perfil"}`;
+  for (const userId of recipients.userIds) {
+    const contact = await notificationsRepository.findUserContact(userId).catch(() => null);
+    const html = verificationDecisionHtml({
+      approved,
+      companyName: recipients.profileName ?? "A tua empresa",
+      level: VERIFICATION_LEVEL_LABELS_PT[level] ?? level,
+      reviewNote: updated.reviewNote ?? null,
+      url: `https://workdeal.co.mz${link}`,
+    });
+    await notificationsService.dispatch({
+      organizationId: recipients.organizationId,
+      userIds: [userId],
+      type: "verification_update",
+      title,
+      body: approved ? "Selo Workdeal activo." : "Vê o motivo e submete de novo.",
+      link,
+      email: contact ? { to: contact.email, subject, html } : null,
+      metadata: { profileId: updated.profileId },
+    });
+  }
+}

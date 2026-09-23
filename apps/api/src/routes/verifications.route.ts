@@ -33,7 +33,11 @@ verificationsRoute.post("/request", requireAuth, zValidator("json", verification
   }
 
   // Delegar criação com verificação de duplicado pendente no service
-  const created = await verificationsService.create(profileId, documents, level, brNumber, payment);
+  const created = await verificationsService.create(profileId, documents, level, brNumber, payment, {
+    user,
+    profileName: row.name,
+    organizationId: row.organizationId,
+  });
   return c.json({ success: true, data: created }, 201);
 });
 

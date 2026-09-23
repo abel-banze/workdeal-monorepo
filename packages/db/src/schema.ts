@@ -902,6 +902,143 @@ export const notification = pgTable(
   ],
 );
 
+// ── Suporte (helpdesk) + Feedback ──────────────────────────────
+// Tickets com conversa (support_message) para ajuda; feedback é
+// fire-and-forget com triagem (sem conversa).
+export const supportTicketStatusEnum = pgEnum("support_ticket_status", ["open", "in_progress", "waiting_user", "resolved", "closed"]);
+export const supportTicketCategoryEnum = pgEnum("support_ticket_category", ["conta", "perfil", "tarefas", "eventos", "pagamentos", "tecnico", "outro"]);
+export const feedbackKindEnum = pgEnum("feedback_kind", ["suggestion", "bug", "praise"]);
+export const feedbackStatusEnum = pgEnum("feedback_status", ["open", "in_review", "resolved", "dismissed"]);
+
+export const supportTicket = pgTable(
+  "support_ticket",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "set null" }),
+    subject: text("subject").notNull(),
+    category: supportTicketCategoryEnum("category").notNull().default("outro"),
+    status: supportTicketStatusEnum("status").notNull().default("open"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("support_ticket_user_idx").on(table.userId, table.createdAt),
+    index("support_ticket_status_idx").on(table.status, table.createdAt),
+  ],
+);
+
+export const supportMessage = pgTable(
+  "support_message",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ticketId: uuid("ticket_id")
+      .notNull()
+      .references(() => supportTicket.id, { onDelete: "cascade" }),
+    senderUserId: text("sender_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    isInternal: boolean("is_internal").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("support_message_ticket_idx").on(table.ticketId, table.createdAt)],
+);
+
+export const feedback = pgTable(
+  "feedback",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "set null" }),
+    kind: feedbackKindEnum("kind").notNull().default("suggestion"),
+    message: text("message").notNull(),
+    page: text("page"),
+    status: feedbackStatusEnum("status").notNull().default("open"),
+    adminNote: text("admin_note"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("feedback_user_idx").on(table.userId, table.createdAt),
+    index("feedback_status_idx").on(table.status, table.createdAt),
+  ],
+);
+
+// ── Newsletter / difusão (admin) ───────────────────────────────
+// Campanhas em massa (WhatsApp/email/SMS) com destinatários materializados:
+// o envio corre em lotes resumíveis (sem worker dedicado) e cada tentativa
+// fica registada em broadcast_recipient.
+export const broadcastChannelEnum = pgEnum("broadcast_channel", ["whatsapp", "email", "sms"]);
+export const broadcastStatusEnum = pgEnum("broadcast_status", ["draft", "ready", "sending", "sent"]);
+export const broadcastRecipientStatusEnum = pgEnum("broadcast_recipient_status", ["pending", "sent", "failed", "skipped"]);
+
+export const broadcastCampaign = pgTable(
+  "broadcast_campaign",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    channel: broadcastChannelEnum("channel").notNull(),
+    // WhatsApp: chave do template aprovado (ver lib/message-templates.ts).
+    // Email: subject + bodyHtml livres (templates prontos a preparar).
+    templateKey: text("template_key"),
+    subject: text("subject"),
+    bodyHtml: text("body_html"),
+    status: broadcastStatusEnum("status").notNull().default("draft"),
+    totalRecipients: integer("total_recipients").notNull().default(0),
+    sentCount: integer("sent_count").notNull().default(0),
+    failedCount: integer("failed_count").notNull().default(0),
+    createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("broadcast_campaign_status_idx").on(table.status, table.createdAt)],
+);
+
+export const broadcastRecipient = pgTable(
+  "broadcast_recipient",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => broadcastCampaign.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "set null" }),
+    // Endereço resolvido na preparação (telefone normalizado ou email).
+    address: text("address").notNull(),
+    companyName: text("company_name"),
+    status: broadcastRecipientStatusEnum("status").notNull().default("pending"),
+    error: text("error"),
+    sentAt: timestamp("sent_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("broadcast_recipient_campaign_address_idx").on(table.campaignId, table.address),
+    index("broadcast_recipient_pending_idx").on(table.campaignId, table.status),
+  ],
+);
+
+// ── Log de envios em massa (scripts bulk) ────────────────────────
+// Uma linha por (empresa, template): re-correr um script salta quem já
+// recebeu (a menos de --resend) e permite auditar a cobertura.
+export const bulkSendLog = pgTable(
+  "bulk_send_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: text("organization_id").references(() => organization.id, { onDelete: "set null" }),
+    template: text("template").notNull(),
+    channel: text("channel").notNull().default("whatsapp"),
+    sentAt: timestamp("sent_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("bulk_send_log_org_template_idx").on(table.organizationId, table.template, table.channel),
+    index("bulk_send_log_template_idx").on(table.template, table.sentAt),
+  ],
+);
+
 // ── Onboarding funnel ──────────────────────────────────────────
 // Tracking de acções durante o onboarding (sem perfil ainda — por isso não
 // cabe em analytics_event, que exige profile_id). Base para o funil:

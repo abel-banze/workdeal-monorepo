@@ -18,6 +18,7 @@ export const notificationTypeSchema = z.enum([
   "negotiation_offer",
   "verification_update",
   "team_invite",
+  "support_reply",
   "admin_notice",
 ]);
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
@@ -38,6 +39,7 @@ export const NOTIFICATION_TYPE_LABELS_PT: Record<NotificationType, string> = {
   negotiation_offer: "Contraproposta",
   verification_update: "Verificação",
   team_invite: "Convite de equipa",
+  support_reply: "Resposta do suporte",
   admin_notice: "Aviso Workdeal",
 };
 

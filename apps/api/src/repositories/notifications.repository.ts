@@ -50,13 +50,13 @@ export const notificationsRepository = {
    * Destinatários de um perfil: utilizador dono (perfil pessoal) ou membros
    * da organização (perfil de empresa) — para direccionar o inbox.
    */
-  async resolveProfileRecipients(profileId: string): Promise<{ userIds: string[]; organizationId: string | null }> {
+  async resolveProfileRecipients(profileId: string): Promise<{ userIds: string[]; organizationId: string | null; profileName: string | null }> {
     const { profile } = await import("@workdeal/db");
-    const [p] = await db.select({ userId: profile.userId, organizationId: profile.organizationId }).from(profile).where(eq(profile.id, profileId)).limit(1);
-    if (!p) return { userIds: [], organizationId: null };
-    if (p.userId) return { userIds: [p.userId], organizationId: p.organizationId };
-    if (p.organizationId) return { userIds: await this.listOrgMemberUserIds(p.organizationId), organizationId: p.organizationId };
-    return { userIds: [], organizationId: null };
+    const [p] = await db.select({ userId: profile.userId, organizationId: profile.organizationId, name: profile.name }).from(profile).where(eq(profile.id, profileId)).limit(1);
+    if (!p) return { userIds: [], organizationId: null, profileName: null };
+    if (p.userId) return { userIds: [p.userId], organizationId: p.organizationId, profileName: p.name };
+    if (p.organizationId) return { userIds: await this.listOrgMemberUserIds(p.organizationId), organizationId: p.organizationId, profileName: p.name };
+    return { userIds: [], organizationId: null, profileName: p.name };
   },
 
   /** Telefone de contacto de uma organização (fallback para WhatsApp). */
