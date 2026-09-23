@@ -379,6 +379,20 @@
       "when": 1789780000000,
       "tag": "0053_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1789790000000,
+      "tag": "0054_support_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1789800000000,
+      "tag": "0055_broadcast",
+      "breakpoints": true
     }
   ]
 }

@@ -62,6 +62,7 @@ function buildNavGroups(activeId: string | null) {
         { title: "Equipa", url: `${base}/team` },
         { title: "Verificação", url: `${base}/verification` },
         { title: "Subscrição", url: `${base}/subscription` },
+        { title: "Ajuda e suporte", url: `${base}/support` },
       ],
     },
   ]

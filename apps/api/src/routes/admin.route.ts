@@ -20,6 +20,8 @@ import { adminSubscriptionsRoute } from "./admin-subscriptions.route.js";
 import { adminAffiliatesRoute } from "./admin-affiliates.route.js";
 import { adminFeaturesRoute } from "./admin-features.route.js";
 import { aiSettingsRoute } from "./ai-settings.route.js";
+import { broadcastController } from "../controllers/broadcast.controller.js";
+import { broadcastListQuerySchema, createBroadcastCampaignSchema, sendBroadcastBatchSchema, sendIndividualMessageSchema } from "@workdeal/shared";
 
 export const adminRoute = new Hono<Env>();
 
@@ -50,6 +52,39 @@ adminRoute.get("/reports", zValidator("query", reportListQuerySchema), async (c)
 
 adminRoute.patch("/reports/:id", zValidator("json", z.object({ status: z.enum(["resolved", "dismissed"]) })), async (c) => {
   const { body, status } = await reportsController.updateStatus(c.req.param("id"), c.req.valid("json").status);
+  return c.json(body, status);
+});
+
+// --- Newsletter / difusão ---
+adminRoute.post("/broadcast/campaigns", zValidator("json", createBroadcastCampaignSchema), async (c) => {
+  const { body, status } = await broadcastController.create(c.get("user"), c.req.valid("json"));
+  return c.json(body, status);
+});
+
+adminRoute.get("/broadcast/campaigns", zValidator("query", broadcastListQuerySchema), async (c) => {
+  const { body, status } = await broadcastController.list(c.req.valid("query"));
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
+adminRoute.get("/broadcast/campaigns/:id", async (c) => {
+  const { body, status } = await broadcastController.get(c.req.param("id"));
+  c.header("Cache-Control", "no-store");
+  return c.json(body, status);
+});
+
+adminRoute.post("/broadcast/campaigns/:id/prepare", async (c) => {
+  const { body, status } = await broadcastController.prepare(c.req.param("id"));
+  return c.json(body, status);
+});
+
+adminRoute.post("/broadcast/campaigns/:id/send-batch", zValidator("query", sendBroadcastBatchSchema), async (c) => {
+  const { body, status } = await broadcastController.sendBatch(c.req.param("id"), c.req.valid("query"));
+  return c.json(body, status);
+});
+
+adminRoute.post("/broadcast/send", zValidator("json", sendIndividualMessageSchema), async (c) => {
+  const { body, status } = await broadcastController.sendIndividual(c.get("user"), c.req.valid("json"));
   return c.json(body, status);
 });
 

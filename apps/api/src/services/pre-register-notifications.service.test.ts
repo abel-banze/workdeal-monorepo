@@ -14,6 +14,7 @@ import {
   webOrigin,
   BASE_URL,
 } from "./pre-register-notifications.service.js";
+import type { NotifyChannel } from "@workdeal/shared/schemas/pre-register";
 import { resend } from "../lib/resend.js";
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -51,22 +52,30 @@ describe("pre-register notifications", () => {
   });
 
   describe("sendWhatsApp", () => {
-    it("envia template onboarding_request com {{1}}=nome e {{2}}=link completo", async () => {
+    it("envia introdução e depois onboarding_request com {{1}}=nome e {{2}}=link completo", async () => {
       process.env.ZERNIO_API_KEY = "z-key";
       process.env.ZERNIO_PHONE_ID = "acc-1";
 
-      fetchMock.mockResolvedValueOnce({
-        ok: true,
-        text: async () => "",
-      } as unknown as Response);
+      fetchMock
+        .mockResolvedValueOnce({ ok: true, text: async () => "" } as unknown as Response)
+        .mockResolvedValueOnce({ ok: true, text: async () => "" } as unknown as Response);
 
       const result = await sendWhatsApp(baseInput);
 
       expect(result.ok).toBe(true);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-      expect(url).toBe("https://zernio.com/api/v1/inbox/conversations");
-      const body = JSON.parse(init.body as string) as {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      // 1º: apresentação do Workdeal (sem parâmetros)
+      const [url1, init1] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url1).toBe("https://zernio.com/api/v1/inbox/conversations");
+      const intro = JSON.parse(init1.body as string) as { templateName: string; templateParams: string[]; participantId: string };
+      expect(intro.templateName).toBe("workdeal_introduction");
+      expect(intro.templateParams).toEqual([]);
+      expect(intro.participantId).toBe("258821234567");
+
+      // 2º: convite com nome + link
+      const [, init2] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+      const body = JSON.parse(init2.body as string) as {
         accountId: string;
         participantId: string;
         templateName: string;
@@ -92,7 +101,9 @@ describe("pre-register notifications", () => {
     it("usa WHATSAPP_API_TOKEN como fallback do token Zernio", async () => {
       process.env.WHATSAPP_API_TOKEN = "wa-token";
       process.env.ZERNIO_PHONE_ID = "acc-1";
-      fetchMock.mockResolvedValueOnce({ ok: true, text: async () => "" } as unknown as Response);
+      fetchMock
+        .mockResolvedValueOnce({ ok: true, text: async () => "" } as unknown as Response)
+        .mockResolvedValueOnce({ ok: true, text: async () => "" } as unknown as Response);
       await sendWhatsApp(baseInput);
       const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
       const headers = init.headers as Record<string, string>;
@@ -171,14 +182,18 @@ describe("pre-register notifications", () => {
       resendSend.mockResolvedValueOnce({ data: { id: "e" }, error: null, headers: {} as Record<string, string> });
       fetchMock
         .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ status: "successful" }) } as unknown as Response)
+        .mockResolvedValueOnce({ ok: true, text: async () => "" } as unknown as Response)
         .mockResolvedValueOnce({ ok: true, text: async () => "" } as unknown as Response);
 
-      const result = await notifyCompanyPreRegister(baseInput);
+      const result = await notifyCompanyPreRegister({
+        ...baseInput,
+        channels: ["email", "sms", "whatsapp"] as NotifyChannel[],
+      });
 
       expect(result.email.ok).toBe(true);
       expect(result.sms.ok).toBe(true);
       expect(result.whatsapp.ok).toBe(true);
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
     });
   });
 });

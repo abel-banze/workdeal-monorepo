@@ -1,5 +1,4 @@
-import { resend, EMAIL_FROM } from "../lib/resend.js";
-import { normalizeMzPhone } from "@workdeal/shared/lib/phone";
+import { sendEmail, sendSms, sendWhatsappTemplate, type ChannelOutcome } from "../lib/channels.js";
 import { DEFAULT_NOTIFICATION_PREFS, type NotificationListQuery, type NotificationPrefs, type NotificationType } from "@workdeal/shared";
 import { getOrgRole } from "@workdeal/auth";
 import { AppError } from "../lib/errors.js";
@@ -9,6 +8,7 @@ import type { AuthUser } from "@workdeal/shared";
 
 export type DispatchEmail = { to: string; subject: string; html: string };
 export type DispatchWhatsapp = { toDigits: string; templateName: string; templateParams: string[] };
+export type DispatchSms = { toDigits: string; message: string };
 
 export type DispatchInput = {
   organizationId?: string | null;
@@ -20,68 +20,11 @@ export type DispatchInput = {
   link?: string | null;
   email?: DispatchEmail | null;
   whatsapp?: DispatchWhatsapp | null;
+  sms?: DispatchSms | null;
   metadata?: Record<string, unknown> | null;
 };
 
-export type ChannelOutcome = "sent" | "skipped" | "failed";
 export type DispatchResult = { ok: boolean; channels: Record<string, ChannelOutcome>; ids: string[] };
-
-const isProd = () => process.env.NODE_ENV === "production";
-
-async function sendEmailPayload(payload: DispatchEmail): Promise<ChannelOutcome> {
-  if (!resend) {
-    if (isProd()) return "failed";
-    console.warn(`[notifications email mock] para ${payload.to}: ${payload.subject}`);
-    return "sent";
-  }
-  try {
-    const { data, error } = await resend.emails.send({ from: EMAIL_FROM, to: payload.to, subject: payload.subject, html: payload.html });
-    if (error || !data?.id) {
-      console.error(`[notifications email] falha: ${(error as { message?: string })?.message ?? "resposta sem id"}`);
-      return "failed";
-    }
-    return "sent";
-  } catch (e) {
-    console.error("[notifications email] falha:", e instanceof Error ? e.message : String(e));
-    return "failed";
-  }
-}
-
-async function sendWhatsappPayload(payload: DispatchWhatsapp): Promise<ChannelOutcome> {
-  const digits = normalizeMzPhone(payload.toDigits);
-  if (!digits) return "skipped";
-  const token = process.env.ZERNIO_API_KEY ?? process.env.WHATSAPP_API_TOKEN;
-  const accountId = process.env.ZERNIO_PHONE_ID;
-  if (!token || !accountId) {
-    if (isProd()) return "failed";
-    console.warn(`[notifications whatsapp mock] para +${digits} template ${payload.templateName}`);
-    return "sent";
-  }
-  try {
-    const res = await fetch("https://zernio.com/api/v1/inbox/conversations", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        accountId,
-        participantId: digits,
-        templateName: payload.templateName,
-        templateLanguage: "pt_PT",
-        templateParams: payload.templateParams,
-      }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-    });
-    const text = await res.text().catch(() => "");
-    if (!res.ok) {
-      console.error(`[notifications whatsapp] Zernio falhou ${res.status} ${text.slice(0, 500)}`);
-      return "failed";
-    }
-    return "sent";
-  } catch (e) {
-    console.error(`[notifications whatsapp] erro fetch:`, e instanceof Error ? e.message : String(e));
-    return "failed";
-  }
-}
 
 async function resolvePrefs(organizationId?: string | null): Promise<NotificationPrefs> {
   if (!organizationId) return DEFAULT_NOTIFICATION_PREFS;
@@ -119,14 +62,19 @@ export const notificationsService = {
       }
 
       if (input.email && prefs.email) {
-        channels.email = await sendEmailPayload(input.email);
+        channels.email = (await sendEmail(input.email)).outcome;
       } else if (input.email) {
         channels.email = "skipped";
       }
       if (input.whatsapp && prefs.whatsapp) {
-        channels.whatsapp = await sendWhatsappPayload(input.whatsapp);
+        channels.whatsapp = (await sendWhatsappTemplate({ to: input.whatsapp.toDigits, templateName: input.whatsapp.templateName, templateParams: input.whatsapp.templateParams })).outcome;
       } else if (input.whatsapp) {
         channels.whatsapp = "skipped";
+      }
+      if (input.sms && prefs.sms) {
+        channels.sms = (await sendSms({ to: input.sms.toDigits, message: input.sms.message })).outcome;
+      } else if (input.sms) {
+        channels.sms = "skipped";
       }
 
       // Carimba o resultado dos canais em todas as linhas criadas

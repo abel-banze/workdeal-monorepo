@@ -105,7 +105,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <SidebarProvider>
       <AppSidebar teams={teams} user={user} />
       <SidebarInset>
-        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-[#D9D2C2]/60 bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/75 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-2 bg-white/85 dark:bg-zinc-900 backdrop-blur-md supports-[backdrop-filter]:bg-white/75 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
